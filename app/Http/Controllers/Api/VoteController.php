@@ -1,0 +1,151 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Models\NewsUrl;
+use App\Models\Tag;
+use App\Models\Vote;
+use App\Http\Controllers\Controller;
+use App\Services\AbuseDetectionService;
+use App\Services\AccountSignalService;
+use App\Services\AuditLogService;
+use App\Services\EvidenceUrlService;
+use App\Services\EvidenceSyncService;
+use App\Services\MediaOutletService;
+use App\Services\NewsAggregationService;
+use App\Services\TrustScoreService;
+use App\Services\UrlFingerprintService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use InvalidArgumentException;
+
+class VoteController extends Controller
+{
+    public function store(
+        Request $request,
+        UrlFingerprintService $fingerprints,
+        TrustScoreService $trustScores,
+        NewsAggregationService $newsAggregation,
+        MediaOutletService $mediaOutlets,
+        AuditLogService $auditLog,
+        AbuseDetectionService $abuseDetection,
+        EvidenceUrlService $evidenceUrls,
+        EvidenceSyncService $evidenceSync,
+        AccountSignalService $accountSignals,
+    ): JsonResponse {
+        $validated = $request->validate([
+            'url' => ['required', 'url', 'max:4096'],
+            'tag_id' => ['required', 'integer', 'exists:tags,id'],
+            'evidence_url' => ['nullable', 'url', 'max:2048'],
+            'evidence_note' => ['nullable', 'string', 'max:320'],
+            'title_snapshot' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $tag = Tag::query()->findOrFail($validated['tag_id']);
+        $evidenceUrl = $validated['evidence_url'] ?? null;
+        $evidence = null;
+
+        if ($tag->requires_evidence && ! $evidenceUrl) {
+            return response()->json([
+                'message' => 'Evidence URL is required for this tag.',
+                'errors' => [
+                    'evidence_url' => ['Evidence URL is required for this tag.'],
+                ],
+            ], 422);
+        }
+
+        if ($tag->requires_evidence && ! trim((string) ($validated['evidence_note'] ?? ''))) {
+            return response()->json([
+                'message' => 'Evidence note is required for this tag.',
+                'errors' => [
+                    'evidence_note' => ['Evidence note is required for this tag.'],
+                ],
+            ], 422);
+        }
+
+        try {
+            $evidence = $evidenceUrls->inspect($evidenceUrl);
+        } catch (InvalidArgumentException $exception) {
+            return response()->json([
+                'message' => $exception->getMessage(),
+                'errors' => [
+                    'evidence_url' => [$exception->getMessage()],
+                ],
+            ], 422);
+        }
+
+        try {
+            $fingerprint = $fingerprints->fingerprint($validated['url']);
+        } catch (InvalidArgumentException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        $newsUrl = NewsUrl::query()->firstOrCreate(
+            ['hash' => $fingerprint['hash']],
+            [
+                'original_url' => $fingerprint['original_url'],
+                'normalized_url' => $fingerprint['normalized_url'],
+                'title_snapshot' => $validated['title_snapshot'] ?? null,
+                'voting_closes_at' => now()->addHours(72),
+            ],
+        );
+
+        $newsAggregation->ensureVotingWindow($newsUrl);
+        $mediaOutlets->attachOutlet($newsUrl);
+
+        if (! $newsAggregation->isOpen($newsUrl)) {
+            return response()->json([
+                'message' => 'Voting window has closed for this news URL.',
+                'status' => $newsAggregation->statusForFingerprint($fingerprint),
+            ], 409);
+        }
+
+        if (! $newsUrl->title_snapshot && ! empty($validated['title_snapshot'])) {
+            $newsUrl->forceFill(['title_snapshot' => $validated['title_snapshot']])->save();
+        }
+
+        $minimumReadSeconds = (int) config('truthshield.min_read_seconds_before_vote', 15);
+        $secondsRead = (int) $request->user()
+            ->readSessions()
+            ->where('news_url_id', $newsUrl->id)
+            ->value('seconds_read');
+
+        if ($minimumReadSeconds > 0 && $secondsRead < $minimumReadSeconds) {
+            return response()->json([
+                'message' => 'Please read the article before voting.',
+                'minimum_read_seconds' => $minimumReadSeconds,
+                'seconds_read' => $secondsRead,
+            ], 428);
+        }
+
+        $vote = Vote::query()->updateOrCreate(
+            [
+                'user_id' => $request->user()->id,
+                'news_url_id' => $newsUrl->id,
+            ],
+            [
+                'tag_id' => $validated['tag_id'],
+                'evidence_url' => $evidenceUrl,
+                'evidence_type' => $evidence['type'],
+                'evidence_host' => $evidence['host'],
+                'evidence_safety' => $evidence['safety'],
+                'evidence_note' => $validated['evidence_note'] ?? null,
+                'weight_score' => $trustScores->voteWeightFor($request->user()),
+            ],
+        );
+
+        $newsAggregation->forgetStatusCache($newsUrl);
+        $evidenceSync->syncFromVote($vote, $evidence);
+        $auditLog->record($request, 'vote.upserted', $vote, [
+            'news_url_id' => $newsUrl->id,
+            'tag_id' => $validated['tag_id'],
+        ]);
+        $accountSignals->record($request, $request->user(), $newsUrl, 'vote');
+        $abuseDetection->inspectVote($request, $request->user(), $newsUrl, $vote);
+
+        return response()->json([
+            'message' => 'Vote recorded.',
+            'vote' => $vote->load(['tag:id,name,slug,color', 'newsUrl:id,hash,normalized_url,title_snapshot']),
+        ], 201);
+    }
+}

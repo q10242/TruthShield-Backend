@@ -1,0 +1,110 @@
+<?php
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\NewsController;
+use App\Http\Controllers\Api\VoteController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AdminGovernanceController;
+use App\Http\Controllers\Api\AuthSessionController;
+use App\Http\Controllers\Api\AlgorithmController;
+use App\Http\Controllers\Api\ApiDocsController;
+use App\Http\Controllers\Api\AccountGraphController;
+use App\Http\Controllers\Api\ApiClientController;
+use App\Http\Controllers\Api\AppealController;
+use App\Http\Controllers\Api\EvidenceController;
+use App\Http\Controllers\Api\EvidenceLibraryController;
+use App\Http\Controllers\Api\ExtensionSummaryController;
+use App\Http\Controllers\Api\ExtensionEventController;
+use App\Http\Controllers\Api\ExportController;
+use App\Http\Controllers\Api\LeaderboardController;
+use App\Http\Controllers\Api\LaunchOpsController;
+use App\Http\Controllers\Api\LookupController;
+use App\Http\Controllers\Api\MediaOutletController;
+use App\Http\Controllers\Api\NewsDetailController;
+use App\Http\Controllers\Api\NewsSearchController;
+use App\Http\Controllers\Api\NewsDomainReportController;
+use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\ModerationEventController;
+use App\Http\Controllers\Api\OpenApiController;
+use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\ReadSessionController;
+use App\Http\Controllers\Api\SystemHealthController;
+use App\Http\Controllers\Api\TransparencyController;
+use App\Http\Controllers\Api\TrustLeaderboardController;
+use App\Http\Controllers\Api\UserVoteController;
+use App\Http\Controllers\Api\UserDataExportController;
+use App\Services\TrustScoreService;
+
+Route::post('/auth/dev-login', [AuthController::class, 'devLogin'])->middleware('throttle:auth');
+Route::post('/auth/{provider}/begin', [AuthController::class, 'oauthBegin'])->middleware('throttle:auth');
+Route::get('/auth/{provider}/redirect', [AuthController::class, 'socialiteRedirect'])->middleware('throttle:auth');
+Route::get('/auth/{provider}/socialite-callback', [AuthController::class, 'socialiteCallback'])->middleware('throttle:auth');
+Route::post('/auth/{provider}/callback', [AuthController::class, 'oauthCallback'])->middleware('throttle:auth');
+Route::post('/auth/{provider}/link', [AuthController::class, 'linkIdentity'])->middleware(['auth:sanctum', 'throttle:auth']);
+Route::post('/auth/logout', [AuthSessionController::class, 'logout'])->middleware('auth:sanctum');
+Route::get('/tags', [LookupController::class, 'tags']);
+Route::get('/docs', [ApiDocsController::class, 'show']);
+Route::get('/openapi.json', [OpenApiController::class, 'show']);
+Route::get('/algorithm', [AlgorithmController::class, 'show']);
+Route::get('/account-graph/summary', [AccountGraphController::class, 'summary'])->middleware('auth:sanctum');
+Route::get('/evidence-report-reasons', [LookupController::class, 'evidenceReportReasons']);
+Route::get('/trusted-evidence-sources', [LaunchOpsController::class, 'trustedEvidenceSources']);
+Route::get('/rate-limit-policies', [LaunchOpsController::class, 'rateLimitPolicies']);
+Route::get('/extension/selector-checks', [LaunchOpsController::class, 'selectorChecks']);
+Route::post('/extension/selector-checks', [LaunchOpsController::class, 'storeSelectorCheck'])->middleware('throttle:120,1');
+Route::get('/extension/summary', [ExtensionSummaryController::class, 'show']);
+Route::post('/extension/events', [ExtensionEventController::class, 'store'])->middleware('throttle:120,1');
+Route::get('/extension/coverage', [ExtensionEventController::class, 'coverage']);
+Route::get('/news-domains', [LookupController::class, 'newsDomains']);
+Route::post('/news-domain-reports', [NewsDomainReportController::class, 'store'])->middleware('throttle:10,1');
+Route::get('/news-domain-reports/status', [NewsDomainReportController::class, 'status'])->middleware('throttle:60,1');
+Route::get('/news/status', [NewsController::class, 'status'])->middleware('throttle:hover');
+Route::get('/news/search', [NewsSearchController::class, 'index']);
+Route::get('/news/evidence', [EvidenceController::class, 'index']);
+Route::get('/news/by-id/{newsUrl}', [NewsDetailController::class, 'show']);
+Route::get('/evidence-library', [EvidenceLibraryController::class, 'index']);
+Route::get('/moderation-events', [ModerationEventController::class, 'index']);
+Route::get('/leaderboard/media', [LeaderboardController::class, 'media']);
+Route::get('/leaderboard/domains', [LeaderboardController::class, 'domains']);
+Route::get('/leaderboard/trust', [TrustLeaderboardController::class, 'index']);
+Route::get('/exports/media.csv', [ExportController::class, 'mediaCsv']);
+Route::get('/exports/news.csv', [ExportController::class, 'newsCsv']);
+Route::get('/exports/evidence.csv', [ExportController::class, 'evidenceCsv']);
+Route::get('/media/{mediaOutlet:slug}', [MediaOutletController::class, 'show']);
+Route::get('/transparency', [TransparencyController::class, 'show']);
+Route::get('/system/health', [SystemHealthController::class, 'show']);
+Route::get('/me/profile', [ProfileController::class, 'show'])->middleware('auth:sanctum');
+Route::get('/me/api-clients', [ApiClientController::class, 'index'])->middleware('auth:sanctum');
+Route::post('/me/api-clients', [ApiClientController::class, 'store'])->middleware('auth:sanctum');
+Route::post('/me/api-clients/{client}/revoke', [ApiClientController::class, 'revoke'])->middleware('auth:sanctum');
+Route::get('/me/export', [UserDataExportController::class, 'show'])->middleware('auth:sanctum');
+Route::get('/me/appeals', [AppealController::class, 'index'])->middleware('auth:sanctum');
+Route::post('/me/appeals', [AppealController::class, 'store'])->middleware(['auth:sanctum', 'throttle:10,1']);
+Route::get('/me/vote', [UserVoteController::class, 'show'])->middleware('auth:sanctum');
+Route::get('/me/notifications', [NotificationController::class, 'index'])->middleware('auth:sanctum');
+Route::post('/me/notifications/read-all', [NotificationController::class, 'markAllRead'])->middleware('auth:sanctum');
+Route::post('/me/notifications/{notification}/read', [NotificationController::class, 'markRead'])->middleware('auth:sanctum');
+Route::post('/news/read-session', [ReadSessionController::class, 'store'])->middleware(['auth:sanctum', 'throttle:60,1']);
+Route::post('/vote', [VoteController::class, 'store'])->middleware(['auth:sanctum', 'throttle:vote']);
+Route::post('/evidence/{vote}/reaction', [EvidenceController::class, 'react'])->middleware(['auth:sanctum', 'throttle:reaction']);
+Route::post('/evidence/{vote}/report', [EvidenceController::class, 'report'])->middleware(['auth:sanctum', 'throttle:10,1']);
+Route::post('/admin/evidences/{evidence}/hide', [AdminGovernanceController::class, 'hideEvidence'])->middleware('auth:sanctum');
+Route::post('/admin/evidences/{evidence}/restore', [AdminGovernanceController::class, 'restoreEvidence'])->middleware('auth:sanctum');
+Route::post('/admin/evidence-reports/{report}/review', [AdminGovernanceController::class, 'reviewEvidenceReport'])->middleware('auth:sanctum');
+Route::post('/admin/abuse-events/{event}/review', [AdminGovernanceController::class, 'reviewAbuseEvent'])->middleware('auth:sanctum');
+Route::post('/admin/users/{user}/risk', [AdminGovernanceController::class, 'restrictUser'])->middleware('auth:sanctum');
+Route::post('/admin/users/{user}/trust-adjustment', [AdminGovernanceController::class, 'adjustTrust'])->middleware('auth:sanctum');
+Route::post('/admin/appeals/{appeal}/review', [AdminGovernanceController::class, 'reviewAppeal'])->middleware('auth:sanctum');
+Route::post('/admin/trusted-evidence-sources', [AdminGovernanceController::class, 'storeTrustedSource'])->middleware('auth:sanctum');
+
+Route::get('/user', function (Request $request, TrustScoreService $trustScores) {
+    $user = $request->user();
+
+    return [
+        ...$user->toArray(),
+        'can_react_to_evidence' => $trustScores->canReactToEvidence($user),
+        'evidence_reaction_min_trust_score' => $trustScores->evidenceReactionMinTrustScore(),
+        'min_read_seconds_before_vote' => (int) config('truthshield.min_read_seconds_before_vote', 15),
+    ];
+})->middleware('auth:sanctum');

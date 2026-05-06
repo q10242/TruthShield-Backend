@@ -1,0 +1,103 @@
+<?php
+
+namespace App\Filament\Resources;
+
+use App\Filament\Resources\NewsDomainResource\Pages;
+use App\Models\NewsDomain;
+use Filament\Forms;
+use Filament\Forms\Form;
+use Filament\Resources\Resource;
+use Filament\Tables;
+use Filament\Tables\Table;
+
+class NewsDomainResource extends Resource
+{
+    protected static ?string $model = NewsDomain::class;
+
+    protected static ?string $navigationIcon = 'heroicon-o-globe-alt';
+
+    protected static ?string $navigationGroup = 'News Sources';
+
+    public static function form(Form $form): Form
+    {
+        return $form->schema([
+            Forms\Components\TextInput::make('domain')
+                ->required()
+                ->maxLength(255)
+                ->unique(ignoreRecord: true),
+            Forms\Components\Select::make('media_outlet_id')
+                ->relationship('mediaOutlet', 'name')
+                ->searchable()
+                ->preload(),
+            Forms\Components\TextInput::make('name')
+                ->maxLength(255),
+            Forms\Components\Toggle::make('is_active')
+                ->required()
+                ->default(true),
+            Forms\Components\Textarea::make('notes')
+                ->maxLength(500)
+                ->columnSpanFull(),
+            Forms\Components\TextInput::make('article_selector')
+                ->maxLength(500)
+                ->helperText('Optional CSS selector used by the extension to place the article vote panel.')
+                ->columnSpanFull(),
+            Forms\Components\TextInput::make('title_selector')
+                ->maxLength(500)
+                ->helperText('Optional CSS selector used by the extension to detect article title.')
+                ->columnSpanFull(),
+            Forms\Components\TextInput::make('content_selector')
+                ->maxLength(500)
+                ->helperText('Optional CSS selector used by the extension to detect article body.')
+                ->columnSpanFull(),
+            Forms\Components\TextInput::make('blocked_path_pattern')
+                ->maxLength(500)
+                ->helperText('Optional regular expression for paths where the extension should not inject.')
+                ->columnSpanFull(),
+            Forms\Components\TextInput::make('priority')
+                ->numeric()
+                ->required()
+                ->default(100),
+        ]);
+    }
+
+    public static function table(Table $table): Table
+    {
+        return $table
+            ->columns([
+                Tables\Columns\TextColumn::make('domain')
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('name')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('mediaOutlet.name')
+                    ->label('Media')
+                    ->searchable(),
+                Tables\Columns\IconColumn::make('is_active')
+                    ->boolean()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('priority')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('updated_at')
+                    ->dateTime()
+                    ->sortable(),
+            ])
+            ->filters([
+                Tables\Filters\TernaryFilter::make('is_active'),
+            ])
+            ->actions([
+                Tables\Actions\EditAction::make(),
+            ])
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make(),
+                ]),
+            ]);
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ManageNewsDomains::route('/'),
+        ];
+    }
+}

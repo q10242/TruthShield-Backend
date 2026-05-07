@@ -45,6 +45,10 @@ class ApiDocsController extends Controller
                 ['method' => 'GET', 'path' => '/api/leaderboard/media', 'description' => 'Media leaderboard.'],
                 ['method' => 'GET', 'path' => '/api/exports/news.csv', 'description' => 'Tracked news CSV export.'],
                 ['method' => 'GET', 'path' => '/api/exports/evidence.csv', 'description' => 'Evidence CSV export.'],
+                ['method' => 'POST', 'path' => '/api/donations/ecpay', 'description' => 'Create an ECPay donation checkout payload.'],
+                ['method' => 'POST', 'path' => '/api/donations/ecpay/notify', 'description' => 'ECPay server notification callback with CheckMacValue verification.'],
+                ['method' => 'GET', 'path' => '/api/donations/summary', 'description' => 'Public donation totals for transparency pages.'],
+                ['method' => 'GET', 'path' => '/api/exports/donations.csv', 'description' => 'Donation CSV export for operations.'],
                 ['method' => 'GET', 'path' => '/api/algorithm', 'description' => 'Public algorithm summary.'],
             ],
         ]);

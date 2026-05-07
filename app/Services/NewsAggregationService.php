@@ -20,7 +20,7 @@ class NewsAggregationService
         $cachedMissing = Cache::store(config('truthshield.status_cache_store'))->get($missingCacheKey);
 
         if (is_array($cachedMissing)) {
-            return $cachedMissing;
+            return $this->normalizeEmptyStatus($cachedMissing);
         }
 
         $newsUrl = NewsUrl::query()->where('hash', $fingerprint['hash'])->first();
@@ -278,7 +278,7 @@ class NewsAggregationService
             'tone' => 'neutral',
             'percentage' => 0.0,
             'total_weight' => 0.0,
-            'is_open' => false,
+            'is_open' => true,
             'voting_closes_at' => null,
             'finalized_at' => null,
             'algorithm_version' => config('truthshield.algorithm_version', 'truthshield-v1'),
@@ -292,6 +292,15 @@ class NewsAggregationService
                 'latest_snapshot' => null,
             ],
         ];
+    }
+
+    private function normalizeEmptyStatus(array $status): array
+    {
+        if (($status['top_tag'] ?? null) === null && empty($status['voting_closes_at']) && empty($status['finalized_at'])) {
+            $status['is_open'] = true;
+        }
+
+        return $status;
     }
 
     private function displayText(?string $severity, float $percentage, ?string $tagName): string

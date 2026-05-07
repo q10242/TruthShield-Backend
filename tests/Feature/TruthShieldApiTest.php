@@ -228,6 +228,9 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonPath('top_tag', null)
             ->assertJsonPath('display_text', '尚無足夠投票資料')
             ->assertJsonPath('tone', 'neutral')
+            ->assertJsonPath('is_open', true)
+            ->assertJsonPath('voting_closes_at', null)
+            ->assertJsonPath('finalized_at', null)
             ->assertJsonStructure([
                 'is_open',
                 'voting_closes_at',

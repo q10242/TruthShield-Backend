@@ -72,6 +72,8 @@ Route::post('/url-classification-reports', [CommunityMaintenanceController::clas
 Route::post('/trusted-source-suggestions', [CommunityMaintenanceController::class, 'storeTrustedSourceSuggestion'])->middleware('throttle:20,1');
 Route::get('/community/tasks', [CommunityTaskController::class, 'index']);
 Route::get('/community/tasks/stats', [CommunityTaskController::class, 'stats']);
+Route::get('/community/tasks/{task}', [CommunityTaskController::class, 'show']);
+Route::post('/community/tasks/{task}/signal', [CommunityTaskController::class, 'signal'])->middleware(['auth:sanctum', 'throttle:20,1']);
 Route::get('/news/status', [NewsController::class, 'status'])->middleware('throttle:hover');
 Route::post('/news/snapshot', [NewsSnapshotController::class, 'store'])->middleware('throttle:30,1');
 Route::post('/news/change-reports', [NewsChangeReportController::class, 'store'])->middleware('throttle:20,1');
@@ -91,6 +93,7 @@ Route::get('/exports/user-data-requests.csv', [ExportController::class, 'userDat
 Route::get('/exports/news-snapshots.csv', [ExportController::class, 'snapshotsCsv']);
 Route::get('/exports/news-change-reports.csv', [ExportController::class, 'changeReportsCsv']);
 Route::get('/exports/governance-events.csv', [ExportController::class, 'governanceCsv']);
+Route::get('/exports/community-signals.csv', [ExportController::class, 'communitySignalsCsv']);
 Route::get('/media/{mediaOutlet:slug}', [MediaOutletController::class, 'show']);
 Route::get('/transparency', [TransparencyController::class, 'show']);
 Route::get('/system/health', [SystemHealthController::class, 'show']);

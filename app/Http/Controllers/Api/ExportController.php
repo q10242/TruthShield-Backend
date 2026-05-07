@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CommunitySignal;
 use App\Models\Donation;
 use App\Models\MediaOutlet;
 use App\Models\ModerationEvent;
@@ -241,5 +242,31 @@ class ExportController extends Controller
                     }
                 });
         }, 'truthshield-governance-events.csv', ['Content-Type' => 'text/csv']);
+    }
+
+    public function communitySignalsCsv(): StreamedResponse
+    {
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['id', 'signal_type', 'subject_type', 'subject_id', 'subject_key', 'value', 'weight_score', 'authenticated', 'created_at']);
+
+            CommunitySignal::query()
+                ->latest()
+                ->chunk(500, function ($rows) use ($handle): void {
+                    foreach ($rows as $row) {
+                        fputcsv($handle, [
+                            $row->id,
+                            $row->signal_type,
+                            $row->subject_type,
+                            $row->subject_id,
+                            $row->subject_key,
+                            $row->value,
+                            $row->weight_score,
+                            $row->user_id ? 1 : 0,
+                            $row->created_at?->toJSON(),
+                        ]);
+                    }
+                });
+        }, 'truthshield-community-signals.csv', ['Content-Type' => 'text/csv']);
     }
 }

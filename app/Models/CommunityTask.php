@@ -17,7 +17,10 @@ class CommunityTask extends Model
         'status',
         'action_url',
         'metrics',
+        'generation_snapshot',
+        'expires_at',
         'resolved_at',
+        'resolved_reason',
     ];
 
     protected function casts(): array
@@ -25,6 +28,8 @@ class CommunityTask extends Model
         return [
             'priority' => 'integer',
             'metrics' => 'array',
+            'generation_snapshot' => 'array',
+            'expires_at' => 'datetime',
             'resolved_at' => 'datetime',
         ];
     }

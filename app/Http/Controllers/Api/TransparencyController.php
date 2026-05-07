@@ -69,6 +69,7 @@ class TransparencyController extends Controller
             'community_signals' => CommunitySignal::query()->count(),
             'community_authenticated_signals' => CommunitySignal::query()->whereNotNull('user_id')->count(),
             'community_demoted_evidence' => Evidence::query()->where('moderation_status', 'community_demoted')->count(),
+            'community_signal_abuse_events' => AbuseEvent::query()->where('type', 'community_signal_spike')->where('reviewed', false)->count(),
             'donation_total_amount' => (int) Donation::query()->where('status', Donation::STATUS_PAID)->sum('amount'),
             'donation_paid_count' => Donation::query()->where('status', Donation::STATUS_PAID)->count(),
             'donation_month_amount' => (int) Donation::query()->where('status', Donation::STATUS_PAID)->where('paid_at', '>=', now()->startOfMonth())->sum('amount'),

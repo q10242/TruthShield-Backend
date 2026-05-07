@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\CommunitySignal;
 use App\Models\CommunityTask;
+use App\Models\AbuseEvent;
 use App\Models\Evidence;
 use App\Models\MediaOutlet;
 use App\Models\ModerationEvent;
@@ -20,6 +21,10 @@ use Illuminate\Support\Str;
 
 class CommunityAutomationService
 {
+    public function __construct(private readonly CommunityPolicyService $policy)
+    {
+    }
+
     public function run(): array
     {
         $stats = [
@@ -29,6 +34,8 @@ class CommunityAutomationService
             'evidences_soft_demoted' => $this->softDemoteEvidence(),
             'controversy_tasks_created' => $this->createControversyTasks(),
             'maintenance_tasks_synced' => $this->syncMaintenanceTasks(),
+            'community_abuse_events_created' => $this->detectCommunitySignalAbuse(),
+            'stale_tasks_expired' => $this->expireStaleTasks(),
         ];
 
         Cache::store(config('truthshield.status_cache_store'))->forget('transparency:summary:v2');
@@ -49,6 +56,9 @@ class CommunityAutomationService
             'auto_applied_url_rules' => UrlClassificationReport::query()->where('status', 'community_approved')->count(),
             'auto_approved_sources' => TrustedSourceSuggestion::query()->where('status', 'community_approved')->count(),
             'community_demoted_evidence' => Evidence::query()->where('moderation_status', 'community_demoted')->count(),
+            'auto_governance_events' => ModerationEvent::query()->where('event_type', 'like', 'community.%')->count(),
+            'automation_success_rate' => $this->automationSuccessRate(),
+            'community_signal_abuse_events' => AbuseEvent::query()->where('type', 'community_signal_spike')->where('reviewed', false)->count(),
         ];
     }
 
@@ -63,6 +73,28 @@ class CommunityAutomationService
             'distinct_users' => (int) (clone $base)->whereNotNull('user_id')->distinct('user_id')->count('user_id'),
             'anonymous_signals' => (int) (clone $base)->whereNull('user_id')->count(),
             'total_signals' => (int) (clone $base)->count(),
+            'required_users' => $this->policy->minDistinctUsers(),
+        ];
+    }
+
+    public function taskDetail(CommunityTask $task): array
+    {
+        $signalType = $this->signalTypeForTask($task->type);
+        $summary = $signalType ? $this->signalSummary($signalType, $task->subject_key) : ($task->metrics ?: []);
+        $thresholdKey = $this->thresholdKeyForTask($task->type);
+        $requiredScore = $thresholdKey ? $this->policy->threshold($thresholdKey, 0) : 0;
+
+        return [
+            'task' => $task,
+            'signal_type' => $signalType,
+            'summary' => $summary,
+            'gap' => [
+                'required_users' => $this->policy->minDistinctUsers(),
+                'remaining_users' => max(0, $this->policy->minDistinctUsers() - (int) ($summary['distinct_users'] ?? 0)),
+                'required_score' => $requiredScore,
+                'remaining_score' => max(0, round($requiredScore - (float) ($summary['weighted_score'] ?? 0), 4)),
+            ],
+            'actions' => $this->actionsForTask($task),
         ];
     }
 
@@ -151,7 +183,7 @@ class CommunityAutomationService
             ->each(function (TrustedSourceSuggestion $suggestion) use (&$count): void {
                 $key = $this->trustedSourceKey($suggestion->host, $suggestion->source_type);
                 $summary = $this->signalSummary('trusted_source', $key);
-                $highRisk = in_array($suggestion->source_type, config('truthshield_community.high_risk_source_types', []), true);
+                $highRisk = in_array($suggestion->source_type, $this->policy->all()['high_risk_source_types'], true);
 
                 if (! $this->passes('trusted_source', $summary) || $highRisk) {
                     $this->upsertTask('trusted_source_candidate', $suggestion, $key, '確認可信證據來源', "{$suggestion->host} 被提議為 {$suggestion->source_type} 來源。", 65, '/report-domain', $summary, $highRisk);
@@ -180,7 +212,7 @@ class CommunityAutomationService
     private function softDemoteEvidence(): int
     {
         $count = 0;
-        $threshold = (float) config('truthshield_community.thresholds.evidence_unhelpful', 4.0);
+        $threshold = $this->policy->threshold('evidence_unhelpful', 4.0);
 
         Evidence::query()
             ->where('moderation_status', 'visible')
@@ -227,7 +259,7 @@ class CommunityAutomationService
     private function createControversyTasks(): int
     {
         $created = 0;
-        $threshold = (float) config('truthshield_community.thresholds.controversy_total_weight', 4.0);
+        $threshold = $this->policy->threshold('controversy_total_weight', 4.0);
 
         NewsUrl::query()
             ->whereNull('finalized_at')
@@ -288,7 +320,7 @@ class CommunityAutomationService
 
         TrustedSourceSuggestion::query()->where('status', 'pending')->get()->each(function (TrustedSourceSuggestion $suggestion) use (&$count): void {
             $key = $this->trustedSourceKey($suggestion->host, $suggestion->source_type);
-            $highRisk = in_array($suggestion->source_type, config('truthshield_community.high_risk_source_types', []), true);
+            $highRisk = in_array($suggestion->source_type, $this->policy->all()['high_risk_source_types'], true);
             $this->upsertTask('trusted_source_candidate', $suggestion, $key, '確認可信證據來源', "{$suggestion->host} / {$suggestion->source_type}", 50, '/report-domain', $this->signalSummary('trusted_source', $key), $highRisk);
             $count++;
         });
@@ -298,16 +330,40 @@ class CommunityAutomationService
 
     private function upsertTask(string $type, Model $subject, string $key, string $title, string $description, int $priority, string $actionUrl, array $metrics = [], bool $escalated = false): CommunityTask
     {
+        $policy = $this->policy->all();
+        $existing = CommunityTask::query()
+            ->where('type', $type)
+            ->where('subject_key', $key)
+            ->whereIn('status', ['open', 'escalated'])
+            ->first();
+        $status = $escalated || $existing?->status === 'escalated' ? 'escalated' : 'open';
+        $attributes = $existing
+            ? ['id' => $existing->id]
+            : ['type' => $type, 'subject_key' => $key, 'status' => $status];
+
         return CommunityTask::query()->updateOrCreate(
-            ['type' => $type, 'subject_key' => $key, 'status' => $escalated ? 'escalated' : 'open'],
+            $attributes,
             [
+                'type' => $type,
+                'subject_key' => $key,
                 'subject_type' => $subject::class,
                 'subject_id' => $subject->getKey(),
                 'title' => $title,
                 'description' => $description,
                 'priority' => $escalated ? max($priority, 85) : $priority,
+                'status' => $status,
                 'action_url' => $actionUrl,
                 'metrics' => $metrics,
+                'generation_snapshot' => [
+                    'reason' => $description,
+                    'policy' => [
+                        'min_distinct_users' => $policy['min_distinct_users'],
+                        'thresholds' => $policy['thresholds'],
+                    ],
+                    'metrics' => $metrics,
+                    'generated_at' => now()->toJSON(),
+                ],
+                'expires_at' => now()->addDays(max(1, (int) $policy['task_stale_days'])),
             ],
         );
     }
@@ -318,24 +374,137 @@ class CommunityAutomationService
             ->where('type', $type)
             ->where('subject_key', $key)
             ->whereIn('status', ['open', 'escalated'])
-            ->update(['status' => 'resolved', 'resolved_at' => now()]);
+            ->update(['status' => 'resolved', 'resolved_at' => now(), 'resolved_reason' => 'community_consensus_applied']);
     }
 
     private function passes(string $type, array $summary): bool
     {
-        return $summary['distinct_users'] >= (int) config('truthshield_community.min_distinct_users', 3)
-            && $summary['weighted_score'] >= (float) config("truthshield_community.thresholds.{$type}", 6.0);
+        return $summary['distinct_users'] >= $this->policy->minDistinctUsers()
+            && $summary['weighted_score'] >= $this->policy->threshold($type, 6.0);
     }
 
     private function isHighRiskDomain(string $domain): bool
     {
-        foreach (config('truthshield_community.high_risk_domain_keywords', []) as $keyword) {
+        foreach ($this->policy->all()['high_risk_domain_keywords'] as $keyword) {
             if (str_contains($domain, $keyword)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private function expireStaleTasks(): int
+    {
+        return CommunityTask::query()
+            ->whereIn('status', ['open', 'escalated'])
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '<=', now())
+            ->update(['status' => 'resolved', 'resolved_at' => now(), 'resolved_reason' => 'expired_without_consensus']);
+    }
+
+    private function detectCommunitySignalAbuse(): int
+    {
+        $created = 0;
+
+        CommunitySignal::query()
+            ->where('created_at', '>=', now()->subMinutes(10))
+            ->whereNotNull('user_id')
+            ->selectRaw('signal_type, subject_key, count(*) as signal_count, count(distinct user_id) as user_count, sum(weight_score) as weight_sum')
+            ->groupBy('signal_type', 'subject_key')
+            ->havingRaw('count(*) >= 5')
+            ->get()
+            ->each(function ($cluster) use (&$created): void {
+                $exists = AbuseEvent::query()
+                    ->where('type', 'community_signal_spike')
+                    ->where('created_at', '>=', now()->subHour())
+                    ->where('metadata->signal_type', $cluster->signal_type)
+                    ->where('metadata->subject_key', $cluster->subject_key)
+                    ->exists();
+
+                if ($exists) {
+                    return;
+                }
+
+                AbuseEvent::query()->create([
+                    'type' => 'community_signal_spike',
+                    'severity' => ((int) $cluster->signal_count >= 10 || (float) $cluster->weight_sum >= 10) ? 'high' : 'medium',
+                    'metadata' => [
+                        'signal_type' => $cluster->signal_type,
+                        'subject_key' => $cluster->subject_key,
+                        'signal_count' => (int) $cluster->signal_count,
+                        'user_count' => (int) $cluster->user_count,
+                        'weight_sum' => round((float) $cluster->weight_sum, 4),
+                        'window' => '10m',
+                    ],
+                ]);
+                $created++;
+            });
+
+        return $created;
+    }
+
+    private function automationSuccessRate(): int
+    {
+        $autoEvents = ModerationEvent::query()->where('event_type', 'like', 'community.%')->count();
+        if ($autoEvents === 0) {
+            return 100;
+        }
+
+        $appealEvents = ModerationEvent::query()
+            ->where('event_type', 'appeal.created')
+            ->where('metadata->subject_type', 'like', '%community%')
+            ->count();
+
+        return max(0, min(100, (int) round((($autoEvents - $appealEvents) / $autoEvents) * 100)));
+    }
+
+    public function signalTypeForTask(string $taskType): ?string
+    {
+        return match ($taskType) {
+            'domain_candidate' => 'domain_report',
+            'url_rule_candidate' => 'url_classification',
+            'trusted_source_candidate' => 'trusted_source',
+            'evidence_quality_review' => 'evidence_unhelpful',
+            default => null,
+        };
+    }
+
+    public function thresholdKeyForTask(string $taskType): ?string
+    {
+        return match ($taskType) {
+            'domain_candidate' => 'domain_report',
+            'url_rule_candidate' => 'url_classification',
+            'trusted_source_candidate' => 'trusted_source',
+            'evidence_quality_review' => 'evidence_unhelpful',
+            default => null,
+        };
+    }
+
+    private function actionsForTask(CommunityTask $task): array
+    {
+        return match ($task->type) {
+            'domain_candidate' => [
+                ['value' => 'confirm_news_domain', 'label' => '我確認這是新聞站'],
+                ['value' => 'reject_news_domain', 'label' => '我認為這不是新聞站'],
+            ],
+            'url_rule_candidate' => [
+                ['value' => 'confirm_url_rule', 'label' => '我確認這個 URL 規則正確'],
+                ['value' => 'reject_url_rule', 'label' => '這個規則可能會誤判'],
+            ],
+            'trusted_source_candidate' => [
+                ['value' => 'confirm_trusted_source', 'label' => '我確認這是穩定可信來源'],
+                ['value' => 'reject_trusted_source', 'label' => '這個來源不適合自動信任'],
+            ],
+            'evidence_quality_review' => [
+                ['value' => 'confirm_evidence_unhelpful', 'label' => '這個證據沒幫助'],
+                ['value' => 'reject_evidence_unhelpful', 'label' => '這個證據仍有幫助'],
+            ],
+            'controversial_news' => [
+                ['value' => 'needs_more_evidence', 'label' => '這則新聞需要更多證據'],
+            ],
+            default => [],
+        };
     }
 
     private function trustBonusForSourceType(string $type): float

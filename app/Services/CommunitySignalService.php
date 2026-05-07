@@ -10,6 +10,10 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class CommunitySignalService
 {
+    public function __construct(private readonly CommunityPolicyService $policy)
+    {
+    }
+
     public function record(Request $request, string $signalType, Model $subject, string $subjectKey, ?string $value = null, array $metadata = []): CommunitySignal
     {
         $user = $this->optionalUser($request);
@@ -62,7 +66,7 @@ class CommunitySignalService
             return 0.05;
         }
 
-        if ((float) $user->trust_score < (float) config('truthshield_community.trust_floor', 1.0)) {
+        if ((float) $user->trust_score < $this->policy->trustFloor()) {
             return max(0.1, (float) $user->trust_score * 0.25);
         }
 

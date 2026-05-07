@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CommunityTask;
 use App\Services\CommunityAutomationService;
+use App\Services\CommunitySignalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -41,6 +42,40 @@ class CommunityTaskController extends Controller
             ],
             'data' => $query->limit($limit)->get(),
         ]);
+    }
+
+    public function show(CommunityTask $task, CommunityAutomationService $automation): JsonResponse
+    {
+        return response()->json($automation->taskDetail($task));
+    }
+
+    public function signal(Request $request, CommunityTask $task, CommunityAutomationService $automation, CommunitySignalService $signals): JsonResponse
+    {
+        $validated = $request->validate([
+            'value' => ['required', 'string', 'max:120'],
+            'note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $baseSignalType = $automation->signalTypeForTask($task->type);
+        if (! $baseSignalType) {
+            return response()->json(['message' => 'This task does not accept direct community signals.'], 422);
+        }
+
+        $signalType = str_starts_with($validated['value'], 'reject_')
+            ? "{$baseSignalType}_rejection"
+            : $baseSignalType;
+
+        $signal = $signals->record($request, $signalType, $task, $task->subject_key, $validated['value'], [
+            'task_id' => $task->id,
+            'task_type' => $task->type,
+            'note' => $validated['note'] ?? null,
+        ]);
+
+        return response()->json([
+            'message' => 'Community signal recorded.',
+            'signal' => $signal,
+            'detail' => $automation->taskDetail($task->refresh()),
+        ], 201);
     }
 
     public function stats(CommunityAutomationService $automation): JsonResponse

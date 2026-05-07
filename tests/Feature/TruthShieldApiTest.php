@@ -29,6 +29,7 @@ use App\Models\ExtensionSelectorCheck;
 use App\Models\ExtensionEvent;
 use App\Models\OperationalEvent;
 use App\Models\RateLimitPolicy;
+use App\Models\SystemSetting;
 use App\Models\TrustedEvidenceSource;
 use App\Models\TrustedSourceSuggestion;
 use App\Models\UrlClassificationReport;
@@ -1110,6 +1111,24 @@ class TruthShieldApiTest extends TestCase
             'subject_key' => 'self-managed-news.test',
             'status' => 'open',
         ]);
+
+        $task = CommunityTask::query()->where('subject_key', 'self-managed-news.test')->firstOrFail();
+        $this->getJson("/api/community/tasks/{$task->id}")
+            ->assertOk()
+            ->assertJsonPath('gap.remaining_users', 1)
+            ->assertJsonStructure(['task', 'summary', 'gap', 'actions']);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/community/tasks/{$task->id}/signal", [
+                'value' => 'confirm_news_domain',
+                'note' => '這是新聞站。',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('signal.subject_key', 'self-managed-news.test');
+
+        $this->get('/api/exports/community-signals.csv')
+            ->assertOk()
+            ->assertHeader('content-type', 'text/csv; charset=utf-8');
     }
 
     public function test_community_automation_auto_approves_low_risk_domain_url_rule_and_trusted_source(): void
@@ -1148,6 +1167,27 @@ class TruthShieldApiTest extends TestCase
         $this->assertDatabaseHas('news_domain_reports', ['domain' => 'auto-news.test', 'status' => 'community_approved']);
         $this->assertDatabaseHas('url_classification_reports', ['domain' => 'auto-news.test', 'status' => 'community_approved']);
         $this->assertDatabaseHas('trusted_source_suggestions', ['host' => 'drive.google.com', 'status' => 'community_approved']);
+    }
+
+    public function test_community_policy_can_be_overridden_from_system_settings(): void
+    {
+        SystemSetting::query()->create([
+            'key' => 'community_policy',
+            'value' => [
+                'min_distinct_users' => 1,
+                'thresholds' => ['domain_report' => 1.0],
+                'high_risk_domain_keywords' => ['blocked'],
+            ],
+            'description' => 'Test community policy override.',
+        ]);
+
+        $user = User::factory()->create(['trust_score' => 1.2]);
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/news-domain-reports', ['url' => 'https://settings-news.test/story/1'])
+            ->assertCreated();
+
+        $this->artisan('truthshield:run-community-automation')->assertExitCode(0);
+        $this->assertDatabaseHas('news_domains', ['domain' => 'settings-news.test']);
     }
 
     public function test_high_risk_source_escalates_and_evidence_can_be_soft_demoted(): void

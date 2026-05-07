@@ -491,6 +491,7 @@ Schedule::command('truthshield:snapshot-evidence --limit=100')->everyThirtyMinut
 Schedule::command('truthshield:detect-abuse-clusters')->hourly();
 Schedule::command('truthshield:build-account-graph')->hourly();
 Schedule::command('truthshield:record-operational-heartbeat')->everyFiveMinutes();
+Schedule::command('truthshield:run-community-automation')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('truthshield:seed-launch-policies')->daily();
 Schedule::command('truthshield:check-extension-selectors')->daily();
 Schedule::command('truthshield:refresh-evidence-quality --limit=500')->hourly();

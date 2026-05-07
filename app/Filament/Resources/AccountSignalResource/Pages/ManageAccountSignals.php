@@ -2,10 +2,14 @@
 
 namespace App\Filament\Resources\AccountSignalResource\Pages;
 
+use App\Filament\Resources\Concerns\HasAdminResourceDescription;
+
 use App\Filament\Resources\AccountSignalResource;
 use Filament\Resources\Pages\ManageRecords;
 
 class ManageAccountSignals extends ManageRecords
 {
+    use HasAdminResourceDescription;
+
     protected static string $resource = AccountSignalResource::class;
 }

@@ -6,6 +6,49 @@ use Illuminate\Support\Str;
 
 class AdminChineseLabels
 {
+    private const RESOURCE_DESCRIPTIONS = [
+        'AbuseClusterResource' => '管理被系統分群出的協同行為事件。這裡會影響網軍偵測、風險研判與後續帳號限權處理。',
+        'AbuseEventResource' => '管理單筆濫用或可疑行為事件。審核結果可能影響帳號風險狀態、權重倍率與公開治理紀錄。',
+        'AccountEdgeResource' => '查看帳號之間的風險關聯摘要。這些資料用於反操縱分析，不應被當成單獨封鎖依據。',
+        'AccountSignalResource' => '查看使用者行為訊號，例如投票、閱讀、證據評分與裝置摘要。這會支撐風險模型與帳號關聯圖。',
+        'AlgorithmVersionResource' => '管理演算法版本與啟用狀態。定案結果會保存版本，任何變更都會影響透明說明與可稽核性。',
+        'ApiClientResource' => '管理研究或資料整合用 API client。啟用或撤銷會影響外部系統可存取的資料範圍。',
+        'AppealResource' => '管理使用者申訴。審核結果會影響證據可見性、帳號限制、信用調整與通知。',
+        'AuditLogResource' => '查看後台與重要 API 操作紀錄。這是追蹤管理行為與事後稽核的主要資料。',
+        'BadgeResource' => '管理徽章與成就。這會影響使用者 Profile 展示與參與誘因，不應頻繁改動條件。',
+        'CommunityTaskResource' => '管理社群自治任務。任務狀態會影響使用者協助維護新聞站、證據品質與可信來源的入口。',
+        'DonationResource' => '管理捐款訂單與付款狀態。資料會用於公開資金透明頁與營運匯出。',
+        'EvidenceReactionResource' => '管理使用者對證據的有用／沒幫助評分。這會影響證據排序、品質分與未來信用結算。',
+        'EvidenceReportResource' => '管理證據檢舉。處理結果可能隱藏或恢復證據，並會通知作者與留下治理紀錄。',
+        'EvidenceResource' => '管理從投票拆出的證據資料。隱藏、品質分與快照狀態會影響證據庫與新聞頁排序。',
+        'ExtensionEventResource' => '查看插件遙測事件。這用於判斷 tooltip、橫幅、右鍵入口與不同新聞站的相容性。',
+        'ExtensionSelectorCheckResource' => '管理插件 selector 檢查結果。失敗資料會指引新聞站規則修正與覆蓋率改善。',
+        'MediaOutletResource' => '管理媒體實體與網域彙整。這會影響媒體排行榜與新聞歸屬。',
+        'ModerationEventResource' => '查看公開治理紀錄摘要。這些紀錄會出現在透明頁，請避免放入私人資料。',
+        'NewsChangeReportResource' => '管理新聞被刪除、修改或無法存取的回報。審核結果會影響新聞快照與前台警示。',
+        'NewsDomainReportResource' => '管理使用者回報的未收錄新聞站。審核後可轉為插件監控網域或社群任務。',
+        'NewsDomainResource' => '管理新聞站網域與頁面規則。這直接影響插件是否顯示 tooltip、橫幅與投票入口。',
+        'NewsUrlResource' => '管理已收錄新聞 URL。投票截止、定案快照與 URL 指紋會影響所有結果頁與 API 回應。',
+        'NewsUrlSnapshotResource' => '管理新聞中繼資料快照與變更紀錄。這用於處理新聞修改、刪除與存證情境。',
+        'OauthLoginStateResource' => '管理 OAuth 登入 state。這是登入安全資料，通常只用於除錯與異常排查。',
+        'OfficialResponseResource' => '管理官方、本人或媒體澄清。發布後會在新聞頁高可見度顯示，但不直接改變投票結果。',
+        'OperationalEventResource' => '查看營運事件與系統異常。這會支撐 health/readiness 判斷與上線前風險排查。',
+        'RateLimitPolicyResource' => '管理公開限流政策摘要。這會影響高流量 hover、投票、檢舉與登入保護策略。',
+        'ReadSessionResource' => '查看新聞閱讀紀錄摘要。這用於確認使用者是否閱讀後投票，避免未讀灌票。',
+        'SystemSettingResource' => '管理系統設定與自治門檻。錯誤設定可能影響演算法、社群自動化與公開頁統計。',
+        'TagResource' => '管理新聞標籤。標籤會直接影響投票選項、tooltip 顯示與排行榜統計。',
+        'TrustScoreHistoryResource' => '查看信用分歷史。這是解釋使用者權重變化、申訴與結算結果的重要依據。',
+        'TrustedEvidenceSourceResource' => '管理可信證據來源，例如雲端硬碟、圖床、封存服務與查核機構。這會影響證據安全性與品質加權。',
+        'TrustedSourceSuggestionResource' => '管理使用者提議的可信來源。通過後會擴充可接受的證據來源與信任加成。',
+        'UrlClassificationReportResource' => '管理使用者回報的 URL 類型，例如新聞頁、分類頁或首頁。這會影響插件是否注入橫幅。',
+        'UserDataRequestResource' => '管理使用者資料權利請求。這涉及隱私、刪除、更正與資料匯出處理。',
+        'UserIdentityResource' => '管理使用者綁定的第三方身份。這會影響身份等級、登入追蹤與未來 OAuth 替換。',
+        'UserNotificationResource' => '管理站內通知。這會影響使用者是否得知審核、申訴、證據或系統狀態。',
+        'UserResource' => '管理使用者、公開暱稱、身份等級、風險狀態與後台權限。變更會直接影響投票權重與管理能力。',
+        'VerifiedClaimantResource' => '管理作者、媒體、當事人或機構代表身份申請。通過後使用者可提交官方澄清。',
+        'VoteResource' => '管理使用者對新聞的投票與證據留言。這是加權結果、證據庫與信用結算的核心資料。',
+    ];
+
     /**
      * Chinese labels shared by Filament forms and tables.
      *
@@ -120,5 +163,14 @@ class AdminChineseLabels
         $key = Str::of($name)->afterLast('.')->snake()->toString();
 
         return self::FIELD_LABELS[$key] ?? Str::of($key)->replace('_', ' ')->title()->toString();
+    }
+
+    public static function resourceDescription(?string $resourceClass): ?string
+    {
+        if (! $resourceClass) {
+            return null;
+        }
+
+        return self::RESOURCE_DESCRIPTIONS[class_basename($resourceClass)] ?? null;
     }
 }

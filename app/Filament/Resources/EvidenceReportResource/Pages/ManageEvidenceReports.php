@@ -2,10 +2,14 @@
 
 namespace App\Filament\Resources\EvidenceReportResource\Pages;
 
+use App\Filament\Resources\Concerns\HasAdminResourceDescription;
+
 use App\Filament\Resources\EvidenceReportResource;
 use Filament\Resources\Pages\ManageRecords;
 
 class ManageEvidenceReports extends ManageRecords
 {
+    use HasAdminResourceDescription;
+
     protected static string $resource = EvidenceReportResource::class;
 }

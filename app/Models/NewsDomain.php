@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Cache;
 
 class NewsDomain extends Model
 {
@@ -28,6 +29,12 @@ class NewsDomain extends Model
             'is_active' => 'boolean',
             'priority' => 'integer',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saved(fn () => Cache::store(config('truthshield.status_cache_store'))->forget('lookup:news-domains:v2'));
+        static::deleted(fn () => Cache::store(config('truthshield.status_cache_store'))->forget('lookup:news-domains:v2'));
     }
 
     public function mediaOutlet(): BelongsTo

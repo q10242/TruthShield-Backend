@@ -6,16 +6,23 @@ use App\Http\Controllers\Controller;
 use App\Models\NewsDomain;
 use App\Models\Tag;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 
 class LookupController extends Controller
 {
     public function tags(): JsonResponse
     {
         return response()->json([
-            'data' => Tag::query()
-                ->select('id', 'name', 'slug', 'color', 'severity', 'requires_evidence', 'description')
-                ->orderBy('id')
-                ->get(),
+            'data' => Cache::store(config('truthshield.status_cache_store'))->remember(
+                'lookup:tags:v1',
+                now()->addMinutes(10),
+                fn () => Tag::query()
+                    ->select('id', 'name', 'slug', 'color', 'severity', 'requires_evidence', 'description')
+                    ->orderBy('id')
+                    ->get()
+                    ->values()
+                    ->all(),
+            ),
         ]);
     }
 
@@ -35,40 +42,46 @@ class LookupController extends Controller
 
     public function newsDomains(): JsonResponse
     {
-        $domains = NewsDomain::query()
-            ->where('is_active', true)
-            ->orderBy('priority')
-            ->orderBy('domain')
-            ->get(['domain', 'article_selector', 'title_selector', 'content_selector', 'blocked_path_pattern', 'article_url_pattern', 'list_url_pattern', 'priority']);
-
-        if ($domains->isEmpty()) {
-            $domains = collect(config('truthshield.news_domains'))
-                ->map(fn (string $domain) => (object) [
-                    'domain' => $domain,
-                    'article_selector' => null,
-                    'title_selector' => null,
-                    'content_selector' => null,
-                    'blocked_path_pattern' => null,
-                    'article_url_pattern' => null,
-                    'list_url_pattern' => null,
-                    'priority' => 100,
-                ]);
-        }
-
         return response()->json([
-            'data' => $domains
-                ->values()
-                ->map(fn ($domain) => [
-                    'domain' => $domain->domain,
-                    'article_selector' => $domain->article_selector,
-                    'title_selector' => $domain->title_selector,
-                    'content_selector' => $domain->content_selector,
-                    'blocked_path_pattern' => $domain->blocked_path_pattern,
-                    'article_url_pattern' => $domain->article_url_pattern,
-                    'list_url_pattern' => $domain->list_url_pattern,
-                    'priority' => $domain->priority,
-                ])
-                ->all(),
+            'data' => Cache::store(config('truthshield.status_cache_store'))->remember(
+                'lookup:news-domains:v2',
+                now()->addMinutes(5),
+                function (): array {
+                    $domains = NewsDomain::query()
+                        ->where('is_active', true)
+                        ->orderBy('priority')
+                        ->orderBy('domain')
+                        ->get(['domain', 'article_selector', 'title_selector', 'content_selector', 'blocked_path_pattern', 'article_url_pattern', 'list_url_pattern', 'priority']);
+
+                    if ($domains->isEmpty()) {
+                        $domains = collect(config('truthshield.news_domains'))
+                            ->map(fn (string $domain) => (object) [
+                                'domain' => $domain,
+                                'article_selector' => null,
+                                'title_selector' => null,
+                                'content_selector' => null,
+                                'blocked_path_pattern' => null,
+                                'article_url_pattern' => null,
+                                'list_url_pattern' => null,
+                                'priority' => 100,
+                            ]);
+                    }
+
+                    return $domains
+                        ->values()
+                        ->map(fn ($domain) => [
+                            'domain' => $domain->domain,
+                            'article_selector' => $domain->article_selector,
+                            'title_selector' => $domain->title_selector,
+                            'content_selector' => $domain->content_selector,
+                            'blocked_path_pattern' => $domain->blocked_path_pattern,
+                            'article_url_pattern' => $domain->article_url_pattern,
+                            'list_url_pattern' => $domain->list_url_pattern,
+                            'priority' => $domain->priority,
+                        ])
+                        ->all();
+                },
+            ),
         ]);
     }
 }

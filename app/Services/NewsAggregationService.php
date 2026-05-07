@@ -12,10 +12,20 @@ class NewsAggregationService
 {
     public function statusForFingerprint(array $fingerprint): array
     {
+        $missingCacheKey = $this->missingStatusCacheKey($fingerprint['hash']);
+        $cachedMissing = Cache::store(config('truthshield.status_cache_store'))->get($missingCacheKey);
+
+        if (is_array($cachedMissing)) {
+            return $cachedMissing;
+        }
+
         $newsUrl = NewsUrl::query()->where('hash', $fingerprint['hash'])->first();
 
         if (! $newsUrl) {
-            return $this->emptyStatus($fingerprint['hash'], $fingerprint['normalized_url']);
+            $empty = $this->emptyStatus($fingerprint['hash'], $fingerprint['normalized_url']);
+            Cache::store(config('truthshield.status_cache_store'))->put($missingCacheKey, $empty, now()->addMinutes(2));
+
+            return $empty;
         }
 
         $this->ensureVotingWindow($newsUrl);
@@ -68,6 +78,12 @@ class NewsAggregationService
     public function forgetStatusCache(NewsUrl $newsUrl): void
     {
         Cache::store(config('truthshield.status_cache_store'))->forget($this->statusCacheKey($newsUrl));
+        $this->forgetMissingStatusCache($newsUrl->hash);
+    }
+
+    public function forgetMissingStatusCache(string $hash): void
+    {
+        Cache::store(config('truthshield.status_cache_store'))->forget($this->missingStatusCacheKey($hash));
     }
 
     public function finalizeNewsUrl(NewsUrl $newsUrl): array
@@ -86,6 +102,24 @@ class NewsAggregationService
             ];
         }
 
+        $lock = Cache::store(config('truthshield.status_cache_store'))->lock("news:finalize:{$newsUrl->hash}", 15);
+
+        return $lock->block(5, function () use ($newsUrl): array {
+            $fresh = $newsUrl->fresh();
+
+            if ($fresh?->finalized_at && $fresh->final_status_payload && is_array($fresh->final_evidence_payload)) {
+                return [
+                    'status' => $fresh->final_status_payload,
+                    'evidence' => $fresh->final_evidence_payload,
+                ];
+            }
+
+            return $this->writeFinalPayload($fresh ?? $newsUrl);
+        });
+    }
+
+    private function writeFinalPayload(NewsUrl $newsUrl): array
+    {
         $finalizedAt = now();
         $status = $this->buildStatusPayload($newsUrl, $finalizedAt);
         $evidence = $this->buildEvidencePayload($newsUrl);
@@ -149,7 +183,12 @@ class NewsAggregationService
             ->withSum(['reactions as unhelpful_weight' => fn ($query) => $query->where('helpful', false)], 'weight_score')
             ->withCount(['reactions as helpful_count' => fn ($query) => $query->where('helpful', true)])
             ->withCount(['reactions as unhelpful_count' => fn ($query) => $query->where('helpful', false)])
-            ->orderByDesc(DB::raw('COALESCE((select sum(weight_score) from evidence_reactions where evidence_reactions.vote_id = votes.id and helpful = true), 0) - COALESCE((select sum(weight_score) from evidence_reactions where evidence_reactions.vote_id = votes.id and helpful = false), 0)'))
+            ->orderByDesc(
+                \App\Models\Evidence::query()
+                    ->select('quality_score')
+                    ->whereColumn('evidences.vote_id', 'votes.id')
+                    ->limit(1)
+            )
             ->latest('votes.updated_at')
             ->limit(20)
             ->get()
@@ -259,5 +298,12 @@ class NewsAggregationService
         $version = config('truthshield.status_cache_version', 'v1');
 
         return "news:status:{$version}:{$newsUrl->hash}";
+    }
+
+    private function missingStatusCacheKey(string $hash): string
+    {
+        $version = config('truthshield.status_cache_version', 'v1');
+
+        return "news:status:missing:{$version}:{$hash}";
     }
 }

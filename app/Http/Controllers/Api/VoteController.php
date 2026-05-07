@@ -90,6 +90,7 @@ class VoteController extends Controller
             ],
         );
 
+        $newsAggregation->forgetMissingStatusCache($fingerprint['hash']);
         $newsAggregation->ensureVotingWindow($newsUrl);
         $mediaOutlets->attachOutlet($newsUrl);
 

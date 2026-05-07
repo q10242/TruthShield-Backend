@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AbuseCluster extends Model
 {
@@ -16,5 +17,10 @@ class AbuseCluster extends Model
             'metadata' => 'array',
             'reviewed' => 'boolean',
         ];
+    }
+
+    public function newsUrl(): BelongsTo
+    {
+        return $this->belongsTo(NewsUrl::class);
     }
 }

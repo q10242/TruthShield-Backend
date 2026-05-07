@@ -25,27 +25,32 @@ class ApiClientResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\TextInput::make('name')->required(),
-            Forms\Components\Select::make('status')->options([
-                'active' => 'Active',
-                'revoked' => 'Revoked',
+            Forms\Components\Select::make('user_id')
+                ->label('擁有者')
+                ->relationship('user', 'email')
+                ->searchable()
+                ->preload(),
+            Forms\Components\TextInput::make('name')->label('名稱')->required(),
+            Forms\Components\Select::make('status')->label('狀態')->options([
+                'active' => '啟用',
+                'revoked' => '撤銷',
             ])->required(),
-            Forms\Components\TagsInput::make('abilities'),
+            Forms\Components\TagsInput::make('abilities')->label('權限'),
         ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table->columns([
-            Tables\Columns\TextColumn::make('user_id')->numeric()->sortable(),
-            Tables\Columns\TextColumn::make('name')->searchable(),
-            Tables\Columns\TextColumn::make('status')->badge()->sortable(),
-            Tables\Columns\TextColumn::make('last_used_at')->dateTime()->sortable()->placeholder('Never'),
+            Tables\Columns\TextColumn::make('user.email')->label('擁有者')->searchable()->sortable(),
+            Tables\Columns\TextColumn::make('name')->label('名稱')->searchable(),
+            Tables\Columns\TextColumn::make('status')->label('狀態')->badge()->sortable(),
+            Tables\Columns\TextColumn::make('last_used_at')->label('最後使用')->dateTime()->sortable()->placeholder('從未使用'),
             Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
         ])->filters([
             Tables\Filters\SelectFilter::make('status')->options([
-                'active' => 'Active',
-                'revoked' => 'Revoked',
+                'active' => '啟用',
+                'revoked' => '撤銷',
             ]),
         ])->actions([
             Tables\Actions\EditAction::make(),

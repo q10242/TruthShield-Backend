@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use App\Http\Middleware\LocalAdminWebAuth;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -15,6 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
         if (env('APP_ENV') === 'local') {
             $middleware->validateCsrfTokens(except: [
                 'livewire/update',
+            ]);
+
+            $middleware->appendToGroup('web', [
+                LocalAdminWebAuth::class,
             ]);
         }
     })

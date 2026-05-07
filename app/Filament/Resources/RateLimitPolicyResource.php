@@ -25,12 +25,12 @@ class RateLimitPolicyResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\TextInput::make('name')->required(),
-            Forms\Components\TextInput::make('scope')->required(),
-            Forms\Components\TextInput::make('max_attempts')->numeric()->required(),
-            Forms\Components\TextInput::make('decay_seconds')->numeric()->required(),
-            Forms\Components\TextInput::make('low_trust_multiplier')->numeric()->required(),
-            Forms\Components\Toggle::make('is_active'),
+            Forms\Components\TextInput::make('name')->label('名稱')->required(),
+            Forms\Components\TextInput::make('scope')->label('範圍')->required(),
+            Forms\Components\TextInput::make('max_attempts')->label('最大次數')->numeric()->required(),
+            Forms\Components\TextInput::make('decay_seconds')->label('衰退秒數')->numeric()->required(),
+            Forms\Components\TextInput::make('low_trust_multiplier')->label('低信任倍率')->numeric()->required(),
+            Forms\Components\Toggle::make('is_active')->label('啟用'),
         ]);
     }
 

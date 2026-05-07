@@ -25,11 +25,17 @@ class TrustedEvidenceSourceResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\TextInput::make('host')->required()->maxLength(255),
-            Forms\Components\TextInput::make('source_type')->required()->maxLength(40),
-            Forms\Components\TextInput::make('trust_bonus')->numeric()->required(),
-            Forms\Components\Toggle::make('is_active'),
-            Forms\Components\TextInput::make('notes')->maxLength(500),
+            Forms\Components\TextInput::make('host')->label('Host')->required()->maxLength(255),
+            Forms\Components\Select::make('source_type')->label('來源類型')->options([
+                'archive' => '存證服務',
+                'fact_check' => '查核組織',
+                'government' => '政府資料',
+                'media' => '媒體資料',
+                'image_host' => '圖床',
+            ])->required(),
+            Forms\Components\TextInput::make('trust_bonus')->label('信任加成')->numeric()->required(),
+            Forms\Components\Toggle::make('is_active')->label('啟用'),
+            Forms\Components\TextInput::make('notes')->label('備註')->maxLength(500),
         ]);
     }
 

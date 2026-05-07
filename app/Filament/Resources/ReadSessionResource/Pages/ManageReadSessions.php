@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ReadSessionResource\Pages;
 
 use App\Filament\Resources\ReadSessionResource;
+use Filament\Actions;
 use Filament\Resources\Pages\ManageRecords;
 
 class ManageReadSessions extends ManageRecords
@@ -11,6 +12,8 @@ class ManageReadSessions extends ManageRecords
 
     protected function getHeaderActions(): array
     {
-        return [];
+        return [
+            Actions\CreateAction::make(),
+        ];
     }
 }

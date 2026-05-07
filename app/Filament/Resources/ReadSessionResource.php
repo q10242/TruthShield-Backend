@@ -27,18 +27,25 @@ class ReadSessionResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\Placeholder::make('user_email')
+            Forms\Components\Select::make('user_id')
                 ->label('使用者')
-                ->content(fn (?ReadSession $record): string => $record?->user?->email ?? '-'),
-            Forms\Components\Placeholder::make('news_url')
+                ->relationship('user', 'email')
+                ->searchable()
+                ->preload()
+                ->required(),
+            Forms\Components\Select::make('news_url_id')
                 ->label('新聞網址')
-                ->content(fn (?ReadSession $record): string => $record?->newsUrl?->normalized_url ?? '-')
+                ->relationship('newsUrl', 'normalized_url')
+                ->searchable()
+                ->preload()
+                ->required()
                 ->columnSpanFull(),
             Forms\Components\TextInput::make('seconds_read')
+                ->label('閱讀秒數')
                 ->numeric()
                 ->required(),
-            Forms\Components\DateTimePicker::make('first_seen_at'),
-            Forms\Components\DateTimePicker::make('last_seen_at'),
+            Forms\Components\DateTimePicker::make('first_seen_at')->label('首次看到'),
+            Forms\Components\DateTimePicker::make('last_seen_at')->label('最後看到'),
         ]);
     }
 

@@ -5,22 +5,21 @@ namespace App\Http\Middleware;
 use App\Models\User;
 use Closure;
 use Filament\Facades\Filament;
-use Filament\Http\Middleware\Authenticate as FilamentAuthenticate;
 use Illuminate\Support\Facades\Auth;
 
-class LocalFilamentAdmin extends FilamentAuthenticate
+class LocalAdminWebAuth
 {
-    /**
-     * In local Docker development, keep the Filament admin usable even when the
-     * browser automation environment refuses to persist Laravel session cookies.
-     */
-    public function handle($request, Closure $next, ...$guards)
+    public function handle($request, Closure $next)
     {
         if (! app()->environment('local')) {
-            return parent::handle($request, $next, ...$guards);
+            return $next($request);
         }
 
-        if (! Filament::auth()->check()) {
+        if (! $request->is('admin*') && ! $request->is('livewire/update')) {
+            return $next($request);
+        }
+
+        if (! Auth::check()) {
             $admin = User::query()
                 ->where('email', 'admin@truthshield.local')
                 ->where('is_admin', true)

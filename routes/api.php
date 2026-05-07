@@ -82,6 +82,7 @@ Route::get('/transparency', [TransparencyController::class, 'show']);
 Route::get('/system/health', [SystemHealthController::class, 'show']);
 Route::get('/donations/summary', [DonationController::class, 'summary']);
 Route::get('/donations/supporters', [DonationController::class, 'supporters']);
+Route::get('/donations/monthly', [DonationController::class, 'monthly']);
 Route::post('/donations/ecpay', [DonationController::class, 'store'])->middleware('throttle:10,1');
 Route::post('/donations/ecpay/notify', [DonationController::class, 'notify'])->middleware('throttle:120,1');
 Route::get('/donations/{tradeNo}', [DonationController::class, 'show'])->whereAlphaNumeric('tradeNo');

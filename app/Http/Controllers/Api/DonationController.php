@@ -96,6 +96,26 @@ class DonationController extends Controller
         return response()->json(['data' => $supporters]);
     }
 
+    public function monthly(): JsonResponse
+    {
+        $rows = collect(range(5, 0))
+            ->map(function (int $monthsAgo) {
+                $month = now()->startOfMonth()->subMonths($monthsAgo);
+                $query = Donation::query()
+                    ->where('status', 'paid')
+                    ->whereBetween('paid_at', [$month, $month->copy()->endOfMonth()]);
+
+                return [
+                    'month' => $month->format('Y-m'),
+                    'amount' => (int) (clone $query)->sum('amount'),
+                    'count' => (clone $query)->count(),
+                ];
+            })
+            ->values();
+
+        return response()->json(['data' => $rows]);
+    }
+
     public function notify(Request $request, EcpayDonationService $ecpay)
     {
         $payload = $request->all();

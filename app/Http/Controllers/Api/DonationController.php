@@ -7,6 +7,7 @@ use App\Models\Donation;
 use App\Services\EcpayDonationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class DonationController extends Controller
 {
@@ -19,8 +20,10 @@ class DonationController extends Controller
             'message' => ['nullable', 'string', 'max:120'],
         ]);
 
+        $user = $request->user() ?? $this->userFromBearerToken($request);
+
         $donation = Donation::query()->create([
-            'user_id' => $request->user()?->id,
+            'user_id' => $user?->id,
             'provider' => 'ecpay',
             'merchant_trade_no' => $ecpay->nextTradeNo(),
             'amount' => $validated['amount'],
@@ -111,5 +114,15 @@ class DonationController extends Controller
         ])->save();
 
         return response('1|OK');
+    }
+
+    private function userFromBearerToken(Request $request)
+    {
+        $token = $request->bearerToken();
+        if (! $token) {
+            return null;
+        }
+
+        return PersonalAccessToken::findToken($token)?->tokenable;
     }
 }

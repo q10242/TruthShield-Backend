@@ -13,8 +13,9 @@ class DonationController extends Controller
 {
     public function store(Request $request, EcpayDonationService $ecpay): JsonResponse
     {
+        $allowedAmounts = implode(',', config('truthshield.donation_amounts', [100, 300, 500, 1000, 2000, 5000]));
         $validated = $request->validate([
-            'amount' => ['required', 'integer', 'in:100,300,500,1000,2000,5000'],
+            'amount' => ['required', 'integer', 'in:' . $allowedAmounts],
             'donor_name' => ['nullable', 'string', 'max:80'],
             'donor_email' => ['nullable', 'email', 'max:160'],
             'message' => ['nullable', 'string', 'max:120'],

@@ -75,4 +75,9 @@ return [
         'news.ltn.com.tw',
         'tw.news.yahoo.com',
     ],
+
+    'donation_amounts' => array_values(array_filter(array_map(
+        'intval',
+        explode(',', env('TRUTHSHIELD_DONATION_AMOUNTS', '100,300,500,1000,2000,5000')),
+    ))),
 ];

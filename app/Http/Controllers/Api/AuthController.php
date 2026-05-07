@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\OauthLoginState;
 use App\Models\User;
 use App\Models\UserIdentity;
+use App\Services\BotProtectionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Laravel\Socialite\Facades\Socialite;
@@ -70,8 +71,12 @@ class AuthController extends Controller
         return $this->oauthCallback($synthetic, $provider);
     }
 
-    public function devLogin(Request $request): JsonResponse
+    public function devLogin(Request $request, BotProtectionService $botProtection): JsonResponse
     {
+        if ($response = $botProtection->enforce($request, 'auth.dev_login')) {
+            return $response;
+        }
+
         if (! config('truthshield.dev_login_enabled', false)) {
             return response()->json(['message' => 'Dev login is disabled.'], 403);
         }
@@ -80,6 +85,7 @@ class AuthController extends Controller
             'name' => ['nullable', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
             'fb_id' => ['nullable', 'string', 'max:255'],
+            'challenge_token' => ['nullable', 'string', 'max:2048'],
         ]);
 
         $user = User::query()->updateOrCreate(
@@ -112,15 +118,21 @@ class AuthController extends Controller
         ]);
     }
 
-    public function oauthCallback(Request $request, string $provider): JsonResponse
+    public function oauthCallback(Request $request, string $provider, ?BotProtectionService $botProtection = null): JsonResponse
     {
         abort_unless(in_array($provider, ['facebook', 'google', 'github'], true), 404);
+
+        $botProtection ??= app(BotProtectionService::class);
+        if ($response = $botProtection->enforce($request, 'auth.oauth_callback')) {
+            return $response;
+        }
 
         $validated = $request->validate([
             'provider_user_id' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
             'name' => ['nullable', 'string', 'max:255'],
             'state' => ['nullable', 'string', 'max:120'],
+            'challenge_token' => ['nullable', 'string', 'max:2048'],
         ]);
 
         if (! empty($validated['state'])) {

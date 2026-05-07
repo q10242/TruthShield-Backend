@@ -4,18 +4,24 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\NewsDomainReport;
+use App\Services\BotProtectionService;
 use App\Services\CommunitySignalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class NewsDomainReportController extends Controller
 {
-    public function store(Request $request, CommunitySignalService $signals): JsonResponse
+    public function store(Request $request, CommunitySignalService $signals, BotProtectionService $botProtection): JsonResponse
     {
+        if ($response = $botProtection->enforce($request, 'domain.report')) {
+            return $response;
+        }
+
         $validated = $request->validate([
             'url' => ['required', 'url', 'max:4096'],
             'page_title' => ['nullable', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:500'],
+            'challenge_token' => ['nullable', 'string', 'max:2048'],
         ]);
 
         $domain = strtolower((string) parse_url($validated['url'], PHP_URL_HOST));

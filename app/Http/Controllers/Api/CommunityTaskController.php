@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\CommunityTask;
+use App\Services\BotProtectionService;
 use App\Services\CommunityAutomationService;
 use App\Services\CommunitySignalService;
 use Illuminate\Http\JsonResponse;
@@ -49,11 +50,16 @@ class CommunityTaskController extends Controller
         return response()->json($automation->taskDetail($task));
     }
 
-    public function signal(Request $request, CommunityTask $task, CommunityAutomationService $automation, CommunitySignalService $signals): JsonResponse
+    public function signal(Request $request, CommunityTask $task, CommunityAutomationService $automation, CommunitySignalService $signals, BotProtectionService $botProtection): JsonResponse
     {
+        if ($response = $botProtection->enforce($request, 'community.signal')) {
+            return $response;
+        }
+
         $validated = $request->validate([
             'value' => ['required', 'string', 'max:120'],
             'note' => ['nullable', 'string', 'max:500'],
+            'challenge_token' => ['nullable', 'string', 'max:2048'],
         ]);
 
         $baseSignalType = $automation->signalTypeForTask($task->type);

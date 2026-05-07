@@ -54,6 +54,10 @@ class TruthShieldApiTest extends TestCase
 
         config(['truthshield.status_cache_store' => 'array']);
         config(['truthshield.min_read_seconds_before_vote' => 0]);
+        config(['truthshield_bot.enabled' => false]);
+        config(['truthshield_bot.turnstile_enabled' => false]);
+        config(['truthshield_bot.challenge_threshold' => 50]);
+        config(['truthshield_bot.block_threshold' => 90]);
     }
 
     public function test_news_domains_response_shape(): void
@@ -874,6 +878,71 @@ class TruthShieldApiTest extends TestCase
             'name' => 'Disabled',
         ])
             ->assertForbidden();
+    }
+
+    public function test_bot_config_and_extension_nonce_are_available(): void
+    {
+        config(['truthshield_bot.enabled' => true]);
+
+        $this->getJson('/api/bot/config')
+            ->assertOk()
+            ->assertJsonStructure([
+                'bot_protection_enabled',
+                'turnstile_enabled',
+                'turnstile_site_key',
+                'challenge_threshold',
+                'protected_actions',
+            ]);
+
+        $this->getJson('/api/extension/nonce')
+            ->assertOk()
+            ->assertJsonStructure(['nonce', 'expires_at', 'signature']);
+    }
+
+    public function test_bot_challenge_can_gate_write_actions(): void
+    {
+        config([
+            'truthshield.dev_login_enabled' => true,
+            'truthshield_bot.enabled' => true,
+            'truthshield_bot.turnstile_enabled' => true,
+            'truthshield_bot.challenge_threshold' => 0,
+            'truthshield_bot.block_threshold' => 100,
+        ]);
+
+        $this->postJson('/api/auth/dev-login', [
+            'email' => 'challenge@example.com',
+            'name' => 'Challenge',
+        ])
+            ->assertStatus(428)
+            ->assertJsonPath('bot_protection.challenge_required', true);
+
+        $this->postJson('/api/auth/dev-login', [
+            'email' => 'challenge@example.com',
+            'name' => 'Challenge',
+            'challenge_token' => 'local-pass',
+        ])
+            ->assertOk()
+            ->assertJsonStructure(['token', 'user']);
+    }
+
+    public function test_extension_nonce_marks_signed_telemetry(): void
+    {
+        $nonce = $this->getJson('/api/extension/nonce')->assertOk()->json();
+
+        $this->withHeaders([
+            'X-TruthShield-Extension-Nonce' => $nonce['nonce'],
+            'X-TruthShield-Extension-Signature' => $nonce['signature'],
+        ])
+            ->postJson('/api/extension/events', [
+                'domain' => 'www.cna.com.tw',
+                'event_type' => 'tooltip_shown',
+                'success' => true,
+                'extension_version' => '0.1.0',
+            ])
+            ->assertCreated();
+
+        $event = ExtensionEvent::query()->firstOrFail();
+        $this->assertTrue($event->metadata['extension_signature_valid']);
     }
 
     public function test_vote_creates_primary_evidence_and_status_includes_algorithm_version(): void

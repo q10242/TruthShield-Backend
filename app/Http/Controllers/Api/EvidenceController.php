@@ -10,6 +10,7 @@ use App\Models\Vote;
 use App\Services\AccountSignalService;
 use App\Services\AuditLogService;
 use App\Services\CommunitySignalService;
+use App\Services\BotProtectionService;
 use App\Services\NewsAggregationService;
 use App\Services\NotificationService;
 use App\Services\EvidenceSyncService;
@@ -49,10 +50,16 @@ class EvidenceController extends Controller
         EvidenceSyncService $evidenceSync,
         AccountSignalService $accountSignals,
         CommunitySignalService $communitySignals,
+        BotProtectionService $botProtection,
     ): JsonResponse
     {
+        if ($response = $botProtection->enforce($request, 'evidence.react')) {
+            return $response;
+        }
+
         $validated = $request->validate([
             'helpful' => ['required', 'boolean'],
+            'challenge_token' => ['nullable', 'string', 'max:2048'],
         ]);
 
         $vote->loadMissing('newsUrl');
@@ -107,11 +114,16 @@ class EvidenceController extends Controller
         ]);
     }
 
-    public function report(Request $request, Vote $vote, AuditLogService $auditLog, NotificationService $notifications, CommunitySignalService $communitySignals): JsonResponse
+    public function report(Request $request, Vote $vote, AuditLogService $auditLog, NotificationService $notifications, CommunitySignalService $communitySignals, BotProtectionService $botProtection): JsonResponse
     {
+        if ($response = $botProtection->enforce($request, 'evidence.report')) {
+            return $response;
+        }
+
         $validated = $request->validate([
             'reason' => ['required', 'string', 'max:80'],
             'note' => ['nullable', 'string', 'max:500'],
+            'challenge_token' => ['nullable', 'string', 'max:2048'],
         ]);
 
         $report = EvidenceReport::query()->updateOrCreate(

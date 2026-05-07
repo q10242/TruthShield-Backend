@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\InspectAbuseSignalsJob;
 use App\Services\AccountSignalService;
 use App\Services\AuditLogService;
+use App\Services\BotProtectionService;
 use App\Services\EvidenceUrlService;
 use App\Services\EvidenceSyncService;
 use App\Services\MediaOutletService;
@@ -32,13 +33,19 @@ class VoteController extends Controller
         EvidenceUrlService $evidenceUrls,
         EvidenceSyncService $evidenceSync,
         AccountSignalService $accountSignals,
+        BotProtectionService $botProtection,
     ): JsonResponse {
+        if ($response = $botProtection->enforce($request, 'vote.create')) {
+            return $response;
+        }
+
         $validated = $request->validate([
             'url' => ['required', 'url', 'max:4096'],
             'tag_id' => ['required', 'integer', 'exists:tags,id'],
             'evidence_url' => ['nullable', 'url', 'max:2048'],
             'evidence_note' => ['nullable', 'string', 'max:320'],
             'title_snapshot' => ['nullable', 'string', 'max:255'],
+            'challenge_token' => ['nullable', 'string', 'max:2048'],
         ]);
 
         $tag = Tag::query()->findOrFail($validated['tag_id']);

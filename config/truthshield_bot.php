@@ -1,0 +1,32 @@
+<?php
+
+return [
+    'enabled' => (bool) env('TRUTHSHIELD_BOT_PROTECTION_ENABLED', env('APP_ENV') === 'production'),
+    'turnstile_enabled' => (bool) env('TRUTHSHIELD_TURNSTILE_ENABLED', false),
+    'turnstile_site_key' => env('TRUTHSHIELD_TURNSTILE_SITE_KEY'),
+    'turnstile_secret' => env('TRUTHSHIELD_TURNSTILE_SECRET'),
+    'turnstile_verify_url' => env('TRUTHSHIELD_TURNSTILE_VERIFY_URL', 'https://challenges.cloudflare.com/turnstile/v0/siteverify'),
+    'challenge_threshold' => (int) env('TRUTHSHIELD_BOT_CHALLENGE_THRESHOLD', 50),
+    'block_threshold' => (int) env('TRUTHSHIELD_BOT_BLOCK_THRESHOLD', 90),
+    'challenge_actions' => [
+        'auth.dev_login',
+        'auth.oauth_callback',
+        'vote.create',
+        'evidence.react',
+        'evidence.report',
+        'community.signal',
+        'domain.report',
+        'url.classification',
+        'trusted_source.suggest',
+        'data_request.create',
+    ],
+    'blocked_user_agent_patterns' => [
+        'curl',
+        'python-requests',
+        'scrapy',
+        'httpclient',
+        'headlesschrome',
+        'phantomjs',
+    ],
+    'extension_nonce_ttl_seconds' => (int) env('TRUTHSHIELD_EXTENSION_NONCE_TTL_SECONDS', 300),
+];

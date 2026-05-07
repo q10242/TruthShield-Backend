@@ -4,13 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ExtensionEvent;
+use App\Services\ExtensionNonceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 class ExtensionEventController extends Controller
 {
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, ExtensionNonceService $nonces): JsonResponse
     {
         $validated = $request->validate([
             'domain' => ['required', 'string', 'max:255'],
@@ -24,12 +25,16 @@ class ExtensionEventController extends Controller
             ...$validated,
             'domain' => strtolower($validated['domain']),
             'success' => (bool) ($validated['success'] ?? true),
+            'metadata' => [
+                ...($validated['metadata'] ?? []),
+                'extension_signature_valid' => $nonces->validRequest($request),
+            ],
         ]);
 
         return response()->json(['event' => $event], 201);
     }
 
-    public function storeBatch(Request $request): JsonResponse
+    public function storeBatch(Request $request, ExtensionNonceService $nonces): JsonResponse
     {
         $validated = $request->validate([
             'events' => ['required', 'array', 'min:1', 'max:50'],
@@ -41,13 +46,17 @@ class ExtensionEventController extends Controller
         ]);
 
         $now = Carbon::now();
+        $signatureValid = $nonces->validRequest($request);
         $rows = collect($validated['events'])
             ->map(fn (array $event): array => [
                 'domain' => strtolower($event['domain']),
                 'event_type' => $event['event_type'],
                 'extension_version' => $event['extension_version'] ?? null,
                 'success' => (bool) ($event['success'] ?? true),
-                'metadata' => isset($event['metadata']) ? json_encode($event['metadata']) : null,
+                'metadata' => json_encode([
+                    ...($event['metadata'] ?? []),
+                    'extension_signature_valid' => $signatureValid,
+                ]),
                 'created_at' => $now,
                 'updated_at' => $now,
             ])

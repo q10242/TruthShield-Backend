@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\ApiDocsController;
 use App\Http\Controllers\Api\AccountGraphController;
 use App\Http\Controllers\Api\ApiClientController;
 use App\Http\Controllers\Api\AppealController;
+use App\Http\Controllers\Api\BotProtectionController;
 use App\Http\Controllers\Api\CommunityMaintenanceController;
 use App\Http\Controllers\Api\CommunityTaskController;
 use App\Http\Controllers\Api\DonationController;
@@ -44,6 +45,8 @@ use App\Http\Controllers\Api\VisionReadinessController;
 use App\Services\TrustScoreService;
 
 Route::post('/auth/dev-login', [AuthController::class, 'devLogin'])->middleware('throttle:auth');
+Route::get('/bot/config', [BotProtectionController::class, 'config']);
+Route::get('/extension/nonce', [BotProtectionController::class, 'extensionNonce'])->middleware('throttle:120,1');
 Route::post('/auth/{provider}/begin', [AuthController::class, 'oauthBegin'])->middleware('throttle:auth');
 Route::get('/auth/{provider}/redirect', [AuthController::class, 'socialiteRedirect'])->middleware('throttle:auth');
 Route::get('/auth/{provider}/socialite-callback', [AuthController::class, 'socialiteCallback'])->middleware('throttle:auth');

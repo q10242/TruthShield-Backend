@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\TrustedSourceSuggestion;
 use App\Models\User;
 use App\Models\UrlClassificationReport;
+use App\Services\BotProtectionService;
 use App\Services\CommunityAutomationService;
 use App\Services\CommunitySignalService;
 use Illuminate\Http\JsonResponse;
@@ -15,13 +16,18 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class CommunityMaintenanceController extends Controller
 {
-    public function storeUrlClassification(Request $request, CommunitySignalService $signals, CommunityAutomationService $automation): JsonResponse
+    public function storeUrlClassification(Request $request, CommunitySignalService $signals, CommunityAutomationService $automation, BotProtectionService $botProtection): JsonResponse
     {
+        if ($response = $botProtection->enforce($request, 'url.classification')) {
+            return $response;
+        }
+
         $validated = $request->validate([
             'url' => ['required', 'url', 'max:4096'],
             'classification' => ['required', 'string', 'in:article,list,home,search,not_news,unknown'],
             'page_title' => ['nullable', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:500'],
+            'challenge_token' => ['nullable', 'string', 'max:2048'],
         ]);
 
         $host = strtolower((string) parse_url($validated['url'], PHP_URL_HOST));
@@ -87,13 +93,18 @@ class CommunityMaintenanceController extends Controller
         ], 201);
     }
 
-    public function storeTrustedSourceSuggestion(Request $request, CommunitySignalService $signals, CommunityAutomationService $automation): JsonResponse
+    public function storeTrustedSourceSuggestion(Request $request, CommunitySignalService $signals, CommunityAutomationService $automation, BotProtectionService $botProtection): JsonResponse
     {
+        if ($response = $botProtection->enforce($request, 'trusted_source.suggest')) {
+            return $response;
+        }
+
         $validated = $request->validate([
             'url' => ['nullable', 'url', 'max:2048'],
             'host' => ['nullable', 'string', 'max:255'],
             'source_type' => ['nullable', 'string', 'max:40'],
             'note' => ['nullable', 'string', 'max:500'],
+            'challenge_token' => ['nullable', 'string', 'max:2048'],
         ]);
 
         $host = strtolower((string) ($validated['host'] ?? ''));

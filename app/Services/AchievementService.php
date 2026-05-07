@@ -24,10 +24,17 @@ class AchievementService
             );
 
             if ($stats[$definition['metric']] >= $definition['target']) {
+                $alreadyUnlocked = $user->badges()
+                    ->where('badges.id', $badge->id)
+                    ->exists();
+
                 $user->badges()->syncWithoutDetaching([
                     $badge->id => ['reason' => $definition['reason']],
                 ]);
-                $unlocked[] = $definition['slug'];
+
+                if (! $alreadyUnlocked) {
+                    $unlocked[] = $definition['slug'];
+                }
             }
         }
 

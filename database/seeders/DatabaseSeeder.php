@@ -55,11 +55,11 @@ class DatabaseSeeder extends Seeder
         }
 
         User::firstOrCreate(
-            ['email' => 'test@example.com'],
+            ['email' => 'tester@truthshield.local'],
             [
-                'name' => 'Test User',
-                'email' => 'test@example.com',
-                'password' => Hash::make('password'),
+                'name' => 'TruthShield Tester',
+                'email' => 'tester@truthshield.local',
+                'password' => Hash::make('password123'),
                 'auth_provider' => 'dev',
                 'trust_score' => 1.0,
                 'email_verified_at' => now(),
@@ -70,7 +70,7 @@ class DatabaseSeeder extends Seeder
             ['email' => 'admin@truthshield.local'],
             [
                 'name' => 'TruthShield Admin',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('admin123456'),
                 'is_admin' => true,
                 'trust_score' => 3.0,
                 'auth_provider' => 'dev',

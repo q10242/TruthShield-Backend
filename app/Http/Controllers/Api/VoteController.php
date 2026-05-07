@@ -17,6 +17,7 @@ use App\Services\TrustScoreService;
 use App\Services\UrlFingerprintService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
 
 class VoteController extends Controller
@@ -135,6 +136,10 @@ class VoteController extends Controller
         );
 
         $newsAggregation->forgetStatusCache($newsUrl);
+        $cache = Cache::store(config('truthshield.status_cache_store'));
+        foreach (['leaderboard:media:v1', 'transparency:summary:v1', 'system:health:metrics:v1'] as $key) {
+            $cache->forget($key);
+        }
         $evidenceSync->syncFromVote($vote, $evidence);
         $auditLog->record($request, 'vote.upserted', $vote, [
             'news_url_id' => $newsUrl->id,

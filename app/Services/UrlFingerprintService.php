@@ -36,12 +36,40 @@ class UrlFingerprintService
 
         $query = $this->normalizeQuery($parts['query'] ?? '');
         $normalizedUrl = $scheme . '://' . $host . $portSuffix . $path . $query;
+        $normalizedUrl = $this->normalizeVideoUrl($scheme, $host, $path, $parts['query'] ?? '') ?? $normalizedUrl;
 
         return [
             'original_url' => $originalUrl,
             'normalized_url' => $normalizedUrl,
             'hash' => hash('sha256', $normalizedUrl),
         ];
+    }
+
+    private function normalizeVideoUrl(string $scheme, string $host, string $path, string $query): ?string
+    {
+        if (in_array($host, ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com'], true)) {
+            parse_str($query, $values);
+
+            $videoId = match (true) {
+                $path === '/watch' => $values['v'] ?? null,
+                preg_match('#^/(shorts|live|embed)/([^/?]+)#', $path, $matches) === 1 => $matches[2],
+                default => null,
+            };
+
+            if ($videoId) {
+                return "{$scheme}://www.youtube.com/watch?v=" . rawurlencode((string) $videoId);
+            }
+        }
+
+        if ($host === 'youtu.be') {
+            $videoId = collect(explode('/', trim($path, '/')))->filter()->first();
+
+            if ($videoId) {
+                return "{$scheme}://www.youtube.com/watch?v=" . rawurlencode((string) $videoId);
+            }
+        }
+
+        return null;
     }
 
     private function normalizeQuery(string $query): string

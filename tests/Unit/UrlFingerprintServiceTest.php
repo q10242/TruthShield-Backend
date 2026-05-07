@@ -28,4 +28,19 @@ class UrlFingerprintServiceTest extends TestCase
         $this->assertSame($second['hash'], $first['hash']);
         $this->assertSame('https://example.com/story?a=1', $first['normalized_url']);
     }
+
+    public function test_youtube_video_urls_share_one_fingerprint(): void
+    {
+        $service = new UrlFingerprintService;
+
+        $watch = $service->fingerprint('https://www.youtube.com/watch?v=abc123&utm_source=share&t=315s');
+        $short = $service->fingerprint('https://youtu.be/abc123?t=315');
+        $shorts = $service->fingerprint('https://m.youtube.com/shorts/abc123?feature=share');
+        $live = $service->fingerprint('https://youtube.com/live/abc123?si=test');
+
+        $this->assertSame('https://www.youtube.com/watch?v=abc123', $watch['normalized_url']);
+        $this->assertSame($watch['hash'], $short['hash']);
+        $this->assertSame($watch['hash'], $shorts['hash']);
+        $this->assertSame($watch['hash'], $live['hash']);
+    }
 }

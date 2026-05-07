@@ -16,7 +16,7 @@ return [
 
     'trusted_evidence_hosts' => array_values(array_filter(array_map(
         'trim',
-        explode(',', env('TRUTHSHIELD_TRUSTED_EVIDENCE_HOSTS', 'imgur.com,www.imgur.com,i.imgur.com,archive.ph,web.archive.org')),
+        explode(',', env('TRUTHSHIELD_TRUSTED_EVIDENCE_HOSTS', 'imgur.com,www.imgur.com,i.imgur.com,archive.ph,web.archive.org,youtube.com,www.youtube.com,m.youtube.com,youtu.be')),
     ))),
 
     'cloud_drive_evidence_hosts' => array_values(array_filter(array_map(
@@ -74,6 +74,10 @@ return [
         'www.setn.com',
         'news.ltn.com.tw',
         'tw.news.yahoo.com',
+        'youtube.com',
+        'www.youtube.com',
+        'm.youtube.com',
+        'youtu.be',
     ],
 
     'donation_amounts' => array_values(array_filter(array_map(

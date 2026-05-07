@@ -57,14 +57,21 @@ class DatabaseSeeder extends Seeder
         );
 
         foreach (config('truthshield.news_domains') as $domain) {
+            $isYoutube = in_array($domain, ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be'], true);
             $outlet = MediaOutlet::query()->firstOrCreate(
-                ['slug' => Str::slug($domain)],
-                ['name' => $domain, 'type' => 'news', 'region' => 'TW', 'is_active' => true],
+                ['slug' => $isYoutube ? 'youtube' : Str::slug($domain)],
+                ['name' => $isYoutube ? 'YouTube' : $domain, 'type' => $isYoutube ? 'video_platform' : 'news', 'region' => $isYoutube ? 'global' : 'TW', 'is_active' => true],
             );
 
             NewsDomain::query()->updateOrCreate(
                 ['domain' => $domain],
-                ['media_outlet_id' => $outlet->id, 'is_active' => true],
+                [
+                    'media_outlet_id' => $outlet->id,
+                    'is_active' => true,
+                    'article_url_pattern' => $isYoutube ? '^/(watch|shorts/|live/)' : null,
+                    'list_url_pattern' => $isYoutube ? '^/(feed|channel|@|results|playlist|shorts/?$)' : null,
+                    'priority' => $isYoutube ? 20 : 100,
+                ],
             );
         }
 

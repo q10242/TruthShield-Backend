@@ -90,6 +90,20 @@ class TruthShieldApiTest extends TestCase
             ]);
     }
 
+    public function test_seeded_youtube_domains_are_available_for_video_pages(): void
+    {
+        $this->seed();
+
+        $this->getJson('/api/news-domains')
+            ->assertOk()
+            ->assertJsonFragment([
+                'domain' => 'www.youtube.com',
+                'article_url_pattern' => '^/(watch|shorts/|live/)',
+                'list_url_pattern' => '^/(feed|channel|@|results|playlist|shorts/?$)',
+            ])
+            ->assertJsonFragment(['domain' => 'youtu.be']);
+    }
+
     public function test_tags_response_shape(): void
     {
         $this->seed(TagSeeder::class);
@@ -451,6 +465,31 @@ class TruthShieldApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('vote.evidence_host', 'i.imgur.com')
             ->assertJsonPath('vote.evidence_safety', 'trusted');
+    }
+
+    public function test_youtube_evidence_url_is_supported_as_trusted_link(): void
+    {
+        config(['truthshield.trusted_evidence_hosts' => ['www.youtube.com', 'youtu.be']]);
+
+        $this->seed(TagSeeder::class);
+        $user = User::factory()->create();
+        $tag = Tag::query()->where('slug', 'out-of-context')->firstOrFail();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/vote', [
+                'url' => 'https://www.youtube.com/watch?v=newsVideo123',
+                'tag_id' => $tag->id,
+                'evidence_url' => 'https://youtu.be/sourceVideo456?t=315',
+                'evidence_note' => '5:15 開始的原始片段可對照此影片剪輯。',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('vote.evidence_host', 'youtu.be')
+            ->assertJsonPath('vote.evidence_type', 'link')
+            ->assertJsonPath('vote.evidence_safety', 'trusted');
+
+        $this->assertDatabaseHas('news_urls', [
+            'normalized_url' => 'https://www.youtube.com/watch?v=newsVideo123',
+        ]);
     }
 
     public function test_cloud_drive_evidence_url_is_supported_without_mirroring_images(): void

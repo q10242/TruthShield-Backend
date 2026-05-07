@@ -13,7 +13,9 @@ use App\Models\EvidenceReport;
 use App\Models\ExtensionSelectorCheck;
 use App\Models\ExtensionEvent;
 use App\Models\NewsDomainReport;
+use App\Models\NewsChangeReport;
 use App\Models\NewsUrl;
+use App\Models\NewsUrlSnapshot;
 use App\Models\ModerationEvent;
 use App\Models\OperationalEvent;
 use App\Models\RateLimitPolicy;
@@ -30,7 +32,7 @@ class TransparencyController extends Controller
 {
     public function show(): JsonResponse
     {
-        return response()->json(Cache::store(config('truthshield.status_cache_store'))->remember('transparency:summary:v1', now()->addSeconds(30), fn () => [
+        return response()->json(Cache::store(config('truthshield.status_cache_store'))->remember('transparency:summary:v2', now()->addSeconds(30), fn () => [
             'users' => User::query()->count(),
             'news_urls' => NewsUrl::query()->count(),
             'votes' => Vote::query()->count(),
@@ -38,7 +40,12 @@ class TransparencyController extends Controller
             'trusted_evidence' => Vote::query()->where('evidence_safety', 'trusted')->count(),
             'unread_notifications' => UserNotification::query()->whereNull('read_at')->count(),
             'finalized_news' => NewsUrl::query()->whereNotNull('finalized_at')->count(),
+            'news_snapshots' => NewsUrlSnapshot::query()->count(),
+            'changed_news_snapshots' => NewsUrlSnapshot::query()->where('snapshot_type', 'changed')->count(),
+            'unavailable_news' => NewsUrl::query()->where('availability_status', 'deleted_or_unavailable')->count(),
             'pending_domain_reports' => NewsDomainReport::query()->where('status', 'pending')->count(),
+            'pending_news_change_reports' => NewsChangeReport::query()->where('status', 'pending')->count(),
+            'reviewed_news_change_reports' => NewsChangeReport::query()->where('status', 'reviewed')->count(),
             'pending_evidence_reports' => EvidenceReport::query()->where('status', 'pending')->count(),
             'open_abuse_events' => AbuseEvent::query()->where('reviewed', false)->count(),
             'pending_appeals' => Appeal::query()->where('status', 'pending')->count(),
@@ -63,6 +70,12 @@ class TransparencyController extends Controller
                 'watched' => User::query()->where('risk_status', 'watched')->count(),
                 'limited' => User::query()->where('risk_status', 'limited')->count(),
                 'suspended_weight' => User::query()->where('risk_status', 'suspended_weight')->count(),
+            ],
+            'governance_distribution' => [
+                'evidence_reports_pending' => EvidenceReport::query()->where('status', 'pending')->count(),
+                'appeals_pending' => Appeal::query()->where('status', 'pending')->count(),
+                'change_reports_pending' => NewsChangeReport::query()->where('status', 'pending')->count(),
+                'abuse_events_open' => AbuseEvent::query()->where('reviewed', false)->count(),
             ],
         ]));
     }

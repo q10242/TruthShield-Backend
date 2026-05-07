@@ -32,6 +32,8 @@ class DatabaseSeeder extends Seeder
             ['name' => '閱讀紀律', 'slug' => 'reading-discipline', 'description' => '累積 5 篇新聞閱讀紀錄。', 'color' => '#facc15'],
             ['name' => '信用成長', 'slug' => 'trust-growth', 'description' => '累積 3 筆信用分歷史。', 'color' => '#fb7185'],
             ['name' => '護盾支持者', 'slug' => 'shield-supporter', 'description' => '完成第一筆專案捐款支持。', 'color' => '#f0abfc'],
+            ['name' => '快照守門員', 'slug' => 'snapshot-guardian', 'description' => '回報第一筆新聞改稿、刪文或存證需求。', 'color' => '#f97316'],
+            ['name' => '媒體觀察員', 'slug' => 'media-watchkeeper', 'description' => '參與過至少 5 筆具快照紀錄的新聞。', 'color' => '#a78bfa'],
         ] as $badge) {
             Badge::query()->updateOrCreate(['slug' => $badge['slug']], $badge);
         }

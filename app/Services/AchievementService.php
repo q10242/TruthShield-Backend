@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Badge;
 use App\Models\Donation;
 use App\Models\EvidenceReaction;
+use App\Models\NewsChangeReport;
+use App\Models\NewsUrlSnapshot;
 use App\Models\User;
 
 class AchievementService
@@ -125,6 +127,10 @@ class AchievementService
             'read_sessions' => $user->readSessions()->count(),
             'trust_history_entries' => $user->trustScoreHistories()->count(),
             'paid_donations' => Donation::query()->where('user_id', $user->id)->where('status', Donation::STATUS_PAID)->count(),
+            'snapshot_reports' => NewsChangeReport::query()->where('user_id', $user->id)->count(),
+            'snapshots_guarded' => NewsUrlSnapshot::query()
+                ->whereHas('newsUrl.votes', fn ($query) => $query->where('user_id', $user->id))
+                ->count(),
             'badges' => $user->badges()->count(),
         ];
     }
@@ -212,6 +218,24 @@ class AchievementService
                 'metric' => 'trust_history_entries',
                 'target' => 3,
                 'reason' => '累積 3 筆信用分歷史。',
+            ],
+            [
+                'name' => '快照守門員',
+                'slug' => 'snapshot-guardian',
+                'description' => '回報第一筆新聞改稿、刪文或存證需求。',
+                'color' => '#f97316',
+                'metric' => 'snapshot_reports',
+                'target' => 1,
+                'reason' => '回報第一筆新聞變更狀態。',
+            ],
+            [
+                'name' => '媒體觀察員',
+                'slug' => 'media-watchkeeper',
+                'description' => '參與過至少 5 筆具快照紀錄的新聞。',
+                'color' => '#a78bfa',
+                'metric' => 'snapshots_guarded',
+                'target' => 5,
+                'reason' => '參與多筆新聞快照守護。',
             ],
         ];
     }

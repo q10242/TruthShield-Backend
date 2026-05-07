@@ -27,6 +27,8 @@ class ProfileController extends Controller
                 'helpful_evidence_received' => $achievementStats['helpful_evidence_received'],
                 'trust_history_entries' => $achievementStats['trust_history_entries'],
                 'read_sessions' => $achievementStats['read_sessions'],
+                'snapshot_reports' => $achievementStats['snapshot_reports'],
+                'snapshots_guarded' => $achievementStats['snapshots_guarded'],
                 'unread_notifications' => $user->notifications()->whereNull('read_at')->count(),
             ],
             'achievement_summary' => [

@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Donation;
 use App\Models\MediaOutlet;
+use App\Models\ModerationEvent;
+use App\Models\NewsChangeReport;
 use App\Models\NewsUrl;
+use App\Models\NewsUrlSnapshot;
 use App\Models\UserDataRequest;
 use App\Models\Vote;
 use Illuminate\Http\Request;
@@ -162,5 +165,81 @@ class ExportController extends Controller
                     }
                 });
         }, 'truthshield-user-data-requests.csv', ['Content-Type' => 'text/csv']);
+    }
+
+    public function snapshotsCsv(): StreamedResponse
+    {
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['id', 'news_url_id', 'news_url', 'title', 'snapshot_type', 'availability_status', 'archive_url', 'change_count', 'captured_at']);
+
+            NewsUrlSnapshot::query()
+                ->with('newsUrl:id,normalized_url')
+                ->latest('captured_at')
+                ->chunk(200, function ($rows) use ($handle): void {
+                    foreach ($rows as $row) {
+                        fputcsv($handle, [
+                            $row->id,
+                            $row->news_url_id,
+                            $row->newsUrl?->normalized_url,
+                            $row->title,
+                            $row->snapshot_type,
+                            $row->availability_status,
+                            $row->archive_url,
+                            count($row->change_summary ?: []),
+                            $row->captured_at?->toJSON(),
+                        ]);
+                    }
+                });
+        }, 'truthshield-news-snapshots.csv', ['Content-Type' => 'text/csv']);
+    }
+
+    public function changeReportsCsv(): StreamedResponse
+    {
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['id', 'news_url_id', 'report_type', 'status', 'url', 'page_title', 'note', 'created_at', 'reviewed_at']);
+
+            NewsChangeReport::query()
+                ->latest()
+                ->chunk(200, function ($rows) use ($handle): void {
+                    foreach ($rows as $row) {
+                        fputcsv($handle, [
+                            $row->id,
+                            $row->news_url_id,
+                            $row->report_type,
+                            $row->status,
+                            $row->url,
+                            $row->page_title,
+                            $row->note,
+                            $row->created_at?->toJSON(),
+                            $row->reviewed_at?->toJSON(),
+                        ]);
+                    }
+                });
+        }, 'truthshield-news-change-reports.csv', ['Content-Type' => 'text/csv']);
+    }
+
+    public function governanceCsv(): StreamedResponse
+    {
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['id', 'event_type', 'subject_type', 'subject_id', 'public_reason', 'created_at']);
+
+            ModerationEvent::query()
+                ->latest()
+                ->chunk(200, function ($rows) use ($handle): void {
+                    foreach ($rows as $row) {
+                        fputcsv($handle, [
+                            $row->id,
+                            $row->event_type,
+                            $row->subject_type,
+                            $row->subject_id,
+                            $row->public_reason,
+                            $row->created_at?->toJSON(),
+                        ]);
+                    }
+                });
+        }, 'truthshield-governance-events.csv', ['Content-Type' => 'text/csv']);
     }
 }

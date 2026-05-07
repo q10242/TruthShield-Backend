@@ -28,7 +28,14 @@ class NewsController extends Controller
         }
 
         return response()
-            ->json($newsAggregation->statusForFingerprint($fingerprint))
+            ->json($newsAggregation->statusForFingerprint($fingerprint, $this->locale($request)))
             ->header('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
+    }
+
+    private function locale(Request $request): string
+    {
+        $requested = $request->query('locale') ?: $request->header('Accept-Language', '');
+
+        return str_starts_with(strtolower($requested), 'en') ? 'en' : 'zh-TW';
     }
 }

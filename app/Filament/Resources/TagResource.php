@@ -49,6 +49,23 @@ class TagResource extends Resource
                 Forms\Components\Toggle::make('requires_evidence')
                     ->required(),
                 Forms\Components\Textarea::make('description')
+                    ->label('英文說明 fallback')
+                    ->columnSpanFull(),
+                Forms\Components\Section::make('雙語顯示')
+                    ->description('API 會依使用者語言回傳這些顯示名稱與說明；未填時使用主欄位。')
+                    ->schema([
+                        Forms\Components\TextInput::make('translations.zh-TW.name')
+                            ->label('中文名稱')
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('translations.en.name')
+                            ->label('英文名稱')
+                            ->maxLength(255),
+                        Forms\Components\Textarea::make('translations.zh-TW.description')
+                            ->label('中文說明'),
+                        Forms\Components\Textarea::make('translations.en.description')
+                            ->label('英文說明'),
+                    ])
+                    ->columns(2)
                     ->columnSpanFull(),
             ]);
     }

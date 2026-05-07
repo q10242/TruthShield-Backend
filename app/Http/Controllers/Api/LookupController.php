@@ -6,26 +6,37 @@ use App\Http\Controllers\Controller;
 use App\Models\NewsDomain;
 use App\Models\Tag;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
 class LookupController extends Controller
 {
-    public function tags(): JsonResponse
+    public function tags(Request $request): JsonResponse
     {
+        $locale = $this->locale($request);
+
         return response()
             ->json([
                 'data' => Cache::store(config('truthshield.status_cache_store'))->remember(
-                    'lookup:tags:v1',
+                    "lookup:tags:v2:{$locale}",
                     now()->addMinutes(10),
                     fn () => Tag::query()
-                        ->select('id', 'name', 'slug', 'color', 'severity', 'requires_evidence', 'description')
+                        ->select('id', 'name', 'slug', 'color', 'severity', 'requires_evidence', 'description', 'translations')
                         ->orderBy('id')
                         ->get()
+                        ->map(fn (Tag $tag) => $tag->localizedPayload($locale))
                         ->values()
                         ->all(),
                 ),
             ])
             ->header('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+    }
+
+    private function locale(Request $request): string
+    {
+        $requested = $request->query('locale') ?: $request->header('Accept-Language', '');
+
+        return str_starts_with(strtolower($requested), 'en') ? 'en' : 'zh-TW';
     }
 
     public function evidenceReportReasons(): JsonResponse

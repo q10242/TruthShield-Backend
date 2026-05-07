@@ -117,6 +117,11 @@ class TruthShieldApiTest extends TestCase
                     ['id', 'name', 'slug', 'color', 'severity', 'requires_evidence', 'description'],
                 ],
             ]);
+
+        $this->getJson('/api/tags?locale=en')
+            ->assertOk()
+            ->assertJsonFragment(['slug' => 'clickbait-title'])
+            ->assertJsonFragment(['name' => 'Clickbait headline']);
     }
 
     public function test_news_domain_report_can_be_submitted(): void
@@ -223,7 +228,7 @@ class TruthShieldApiTest extends TestCase
     {
         $this->seed(TagSeeder::class);
 
-        $this->getJson('/api/news/status?url=' . urlencode('https://www.cna.com.tw/news/aipl/202605060001.aspx'))
+        $this->getJson('/api/news/status?url=' . urlencode('https://www.cna.com.tw/news/aipl/202605060001.aspx') . '&locale=zh-TW')
             ->assertOk()
             ->assertJsonPath('top_tag', null)
             ->assertJsonPath('display_text', '尚無足夠投票資料')
@@ -236,6 +241,11 @@ class TruthShieldApiTest extends TestCase
                 'voting_closes_at',
                 'finalized_at',
             ]);
+
+        $this->getJson('/api/news/status?url=' . urlencode('https://www.cna.com.tw/news/aipl/202605060001.aspx') . '&locale=en')
+            ->assertOk()
+            ->assertJsonPath('display_text', 'Not enough voting data yet')
+            ->assertJsonPath('is_open', true);
     }
 
     public function test_news_snapshot_records_metadata_and_detects_changes(): void

@@ -38,7 +38,14 @@ class EvidenceController extends Controller
             return response()->json(['message' => $exception->getMessage()], 422);
         }
 
-        return response()->json(['data' => $newsAggregation->evidenceForFingerprint($fingerprint)]);
+        return response()->json(['data' => $newsAggregation->evidenceForFingerprint($fingerprint, $this->locale($request))]);
+    }
+
+    private function locale(Request $request): string
+    {
+        $requested = $request->query('locale') ?: $request->header('Accept-Language', '');
+
+        return str_starts_with(strtolower($requested), 'en') ? 'en' : 'zh-TW';
     }
 
     public function react(

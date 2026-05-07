@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\NewsUrl;
+use App\Models\Tag;
 use App\Models\Vote;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -14,13 +15,14 @@ class NewsAggregationService
     {
     }
 
-    public function statusForFingerprint(array $fingerprint): array
+    public function statusForFingerprint(array $fingerprint, string $locale = 'zh-TW'): array
     {
+        $locale = $this->normalizeLocale($locale);
         $missingCacheKey = $this->missingStatusCacheKey($fingerprint['hash']);
         $cachedMissing = Cache::store(config('truthshield.status_cache_store'))->get($missingCacheKey);
 
         if (is_array($cachedMissing)) {
-            return $this->normalizeEmptyStatus($cachedMissing);
+            return $this->localizeStatusPayload($this->normalizeEmptyStatus($cachedMissing), $locale);
         }
 
         $newsUrl = NewsUrl::query()->where('hash', $fingerprint['hash'])->first();
@@ -29,23 +31,24 @@ class NewsAggregationService
             $empty = $this->emptyStatus($fingerprint['hash'], $fingerprint['normalized_url']);
             Cache::store(config('truthshield.status_cache_store'))->put($missingCacheKey, $empty, now()->addMinutes(2));
 
-            return $empty;
+            return $this->localizeStatusPayload($empty, $locale);
         }
 
         $this->ensureVotingWindow($newsUrl);
 
         if (! $this->isOpen($newsUrl)) {
-            return $this->withCurrentSnapshot($newsUrl, $this->finalize($newsUrl)['status']);
+            return $this->localizeStatusPayload($this->withCurrentSnapshot($newsUrl, $this->finalize($newsUrl)['status']), $locale);
         }
 
-        $cacheKey = $this->statusCacheKey($newsUrl);
+        $cacheKey = $this->statusCacheKey($newsUrl, $locale);
         $ttl = now()->addSeconds(max(1, min(600, now()->diffInSeconds($newsUrl->voting_closes_at, false))));
 
-        return Cache::store(config('truthshield.status_cache_store'))->remember($cacheKey, $ttl, fn () => $this->buildStatusPayload($newsUrl));
+        return Cache::store(config('truthshield.status_cache_store'))->remember($cacheKey, $ttl, fn () => $this->localizeStatusPayload($this->buildStatusPayload($newsUrl), $locale));
     }
 
-    public function evidenceForFingerprint(array $fingerprint): array
+    public function evidenceForFingerprint(array $fingerprint, string $locale = 'zh-TW'): array
     {
+        $locale = $this->normalizeLocale($locale);
         $newsUrl = NewsUrl::query()->where('hash', $fingerprint['hash'])->first();
 
         if (! $newsUrl) {
@@ -55,10 +58,10 @@ class NewsAggregationService
         $this->ensureVotingWindow($newsUrl);
 
         if (! $this->isOpen($newsUrl)) {
-            return $this->finalize($newsUrl)['evidence'];
+            return $this->localizeEvidencePayload($this->finalize($newsUrl)['evidence'], $locale);
         }
 
-        return $this->buildEvidencePayload($newsUrl);
+        return $this->localizeEvidencePayload($this->buildEvidencePayload($newsUrl), $locale);
     }
 
     public function ensureVotingWindow(NewsUrl $newsUrl): void
@@ -81,7 +84,8 @@ class NewsAggregationService
 
     public function forgetStatusCache(NewsUrl $newsUrl): void
     {
-        Cache::store(config('truthshield.status_cache_store'))->forget($this->statusCacheKey($newsUrl));
+        Cache::store(config('truthshield.status_cache_store'))->forget($this->statusCacheKey($newsUrl, 'zh-TW'));
+        Cache::store(config('truthshield.status_cache_store'))->forget($this->statusCacheKey($newsUrl, 'en'));
         $this->forgetMissingStatusCache($newsUrl->hash);
     }
 
@@ -154,7 +158,7 @@ class NewsAggregationService
     {
         $rows = $newsUrl->votes()
             ->select('tag_id', DB::raw('SUM(weight_score) as total_weight'))
-            ->with('tag:id,name,slug,color,severity,requires_evidence')
+            ->with('tag:id,name,slug,color,severity,requires_evidence,description,translations')
             ->groupBy('tag_id')
             ->orderByDesc('total_weight')
             ->get();
@@ -192,7 +196,7 @@ class NewsAggregationService
         return $newsUrl->votes()
             ->where('hidden', false)
             ->whereNotNull('evidence_url')
-            ->with(['tag:id,name,slug,color,severity', 'user:id,name,trust_score', 'evidence:id,vote_id,archive_url,preview_url,quality_score,snapshot_status'])
+            ->with(['tag:id,name,slug,color,severity,description,translations', 'user:id,name,trust_score', 'evidence:id,vote_id,archive_url,preview_url,quality_score,snapshot_status'])
             ->withSum(['reactions as helpful_weight' => fn ($query) => $query->where('helpful', true)], 'weight_score')
             ->withSum(['reactions as unhelpful_weight' => fn ($query) => $query->where('helpful', false)], 'weight_score')
             ->withCount(['reactions as helpful_count' => fn ($query) => $query->where('helpful', true)])
@@ -303,17 +307,89 @@ class NewsAggregationService
         return $status;
     }
 
-    private function displayText(?string $severity, float $percentage, ?string $tagName): string
+    private function localizeStatusPayload(array $status, string $locale): array
+    {
+        $status['top_tag'] = $this->localizeTagPayload($status['top_tag'] ?? null, $locale);
+        $status['distribution'] = collect($status['distribution'] ?? [])
+            ->map(fn (array $row) => [
+                ...$row,
+                'tag' => $this->localizeTagPayload($row['tag'] ?? null, $locale),
+            ])
+            ->all();
+        $status['secondary_distribution'] = collect($status['secondary_distribution'] ?? [])
+            ->map(fn (array $row) => [
+                ...$row,
+                'tag' => $this->localizeTagPayload($row['tag'] ?? null, $locale),
+            ])
+            ->all();
+
+        $status['display_text'] = $this->displayText(
+            $status['top_tag']['severity'] ?? null,
+            (float) ($status['percentage'] ?? 0),
+            $status['top_tag']['name'] ?? null,
+            $locale,
+        );
+
+        return $status;
+    }
+
+    private function localizeEvidencePayload(array $evidence, string $locale): array
+    {
+        return collect($evidence)
+            ->map(fn (array $row) => [
+                ...$row,
+                'tag' => $this->localizeTagPayload($row['tag'] ?? null, $locale),
+            ])
+            ->all();
+    }
+
+    private function localizeTagPayload(mixed $tag, string $locale): ?array
+    {
+        if (! $tag) {
+            return null;
+        }
+
+        if ($tag instanceof Tag) {
+            return $tag->localizedPayload($locale);
+        }
+
+        $payload = is_array($tag) ? $tag : (array) $tag;
+        $translation = data_get($payload, "translations.{$locale}", []);
+
+        if (! $translation && isset($payload['slug'])) {
+            $fresh = Tag::query()
+                ->where('slug', $payload['slug'])
+                ->first(['id', 'name', 'slug', 'color', 'severity', 'requires_evidence', 'description', 'translations']);
+
+            if ($fresh) {
+                return $fresh->localizedPayload($locale);
+            }
+        }
+
+        unset($payload['translations']);
+
+        return [
+            ...$payload,
+            'name' => $translation['name'] ?? $payload['name'] ?? null,
+            'description' => $translation['description'] ?? $payload['description'] ?? null,
+        ];
+    }
+
+    private function displayText(?string $severity, float $percentage, ?string $tagName, string $locale = 'zh-TW'): string
     {
         if (! $tagName) {
-            return '尚無足夠投票資料';
+            return $locale === 'en' ? 'Not enough voting data yet' : '尚無足夠投票資料';
         }
 
         if ($severity === 'positive') {
-            return '✅ 多數專家推薦：' . $tagName;
+            return $locale === 'en'
+                ? '✅ Majority recommendation: ' . $tagName
+                : '✅ 多數專家推薦：' . $tagName;
         }
 
-        return '⚠️ ' . (int) round($percentage) . '% 使用者標註：' . $tagName;
+        return $locale === 'en'
+            ? '⚠️ ' . (int) round($percentage) . '% users labeled: ' . $tagName
+            : '⚠️ ' . (int) round($percentage) . '% 使用者標註：' . $tagName;
     }
 
     private function secondaryTagDistribution(NewsUrl $newsUrl): array
@@ -334,9 +410,9 @@ class NewsAggregationService
         }
 
         arsort($weights);
-        $tags = \App\Models\Tag::query()
+        $tags = Tag::query()
             ->whereIn('id', array_keys($weights))
-            ->get(['id', 'name', 'slug', 'color', 'severity'])
+            ->get(['id', 'name', 'slug', 'color', 'severity', 'requires_evidence', 'description', 'translations'])
             ->keyBy('id');
         $total = array_sum($weights);
 
@@ -361,11 +437,12 @@ class NewsAggregationService
         };
     }
 
-    private function statusCacheKey(NewsUrl $newsUrl): string
+    private function statusCacheKey(NewsUrl $newsUrl, string $locale = 'zh-TW'): string
     {
         $version = config('truthshield.status_cache_version', 'v1');
+        $locale = $this->normalizeLocale($locale);
 
-        return "news:status:{$version}:{$newsUrl->hash}";
+        return "news:status:{$version}:{$locale}:{$newsUrl->hash}";
     }
 
     private function missingStatusCacheKey(string $hash): string
@@ -373,5 +450,10 @@ class NewsAggregationService
         $version = config('truthshield.status_cache_version', 'v1');
 
         return "news:status:missing:{$version}:{$hash}";
+    }
+
+    private function normalizeLocale(string $locale): string
+    {
+        return str_starts_with(strtolower($locale), 'en') ? 'en' : 'zh-TW';
     }
 }

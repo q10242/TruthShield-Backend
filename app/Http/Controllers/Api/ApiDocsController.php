@@ -49,6 +49,7 @@ class ApiDocsController extends Controller
                 ['method' => 'POST', 'path' => '/api/donations/ecpay/notify', 'description' => 'ECPay server notification callback with CheckMacValue verification.'],
                 ['method' => 'GET', 'path' => '/api/donations/summary', 'description' => 'Public donation totals for transparency pages.'],
                 ['method' => 'GET', 'path' => '/api/exports/donations.csv', 'description' => 'Donation CSV export for operations.'],
+                ['method' => 'POST', 'path' => '/api/user-data-requests', 'description' => 'Submit privacy data export, deletion, or correction requests.'],
                 ['method' => 'GET', 'path' => '/api/algorithm', 'description' => 'Public algorithm summary.'],
             ],
         ]);

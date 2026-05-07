@@ -45,6 +45,7 @@ class OpenApiController extends Controller
                 '/api/donations/summary' => ['get' => ['summary' => 'Donation transparency summary']],
                 '/api/donations/supporters' => ['get' => ['summary' => 'Recent public donation supporters']],
                 '/api/donations/monthly' => ['get' => ['summary' => 'Monthly donation trend']],
+                '/api/user-data-requests' => ['post' => ['summary' => 'Submit a privacy data request']],
                 '/api/me/appeals' => ['get' => ['summary' => 'List current user appeals'], 'post' => ['summary' => 'Create current user appeal']],
                 '/api/moderation-events' => ['get' => ['summary' => 'Public moderation event summaries']],
                 '/api/extension/events' => ['post' => ['summary' => 'Record extension telemetry']],

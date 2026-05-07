@@ -124,7 +124,7 @@ class AchievementService
                 ->count(),
             'read_sessions' => $user->readSessions()->count(),
             'trust_history_entries' => $user->trustScoreHistories()->count(),
-            'paid_donations' => Donation::query()->where('user_id', $user->id)->where('status', 'paid')->count(),
+            'paid_donations' => Donation::query()->where('user_id', $user->id)->where('status', Donation::STATUS_PAID)->count(),
             'badges' => $user->badges()->count(),
         ];
     }

@@ -68,21 +68,21 @@ class DonationController extends Controller
 
     public function summary(): JsonResponse
     {
-        $paid = Donation::query()->where('status', 'paid');
+        $paid = Donation::query()->where('status', Donation::STATUS_PAID);
 
         return response()->json([
             'total_amount' => (int) (clone $paid)->sum('amount'),
             'paid_count' => (clone $paid)->count(),
             'month_amount' => (int) (clone $paid)->where('paid_at', '>=', now()->startOfMonth())->sum('amount'),
             'month_count' => (clone $paid)->where('paid_at', '>=', now()->startOfMonth())->count(),
-            'pending_count' => Donation::query()->where('status', 'pending')->count(),
+            'pending_count' => Donation::query()->where('status', Donation::STATUS_PENDING)->count(),
         ]);
     }
 
     public function supporters(): JsonResponse
     {
         $supporters = Donation::query()
-            ->where('status', 'paid')
+            ->where('status', Donation::STATUS_PAID)
             ->latest('paid_at')
             ->limit(24)
             ->get()
@@ -102,7 +102,7 @@ class DonationController extends Controller
             ->map(function (int $monthsAgo) {
                 $month = now()->startOfMonth()->subMonths($monthsAgo);
                 $query = Donation::query()
-                    ->where('status', 'paid')
+                    ->where('status', Donation::STATUS_PAID)
                     ->whereBetween('paid_at', [$month, $month->copy()->endOfMonth()]);
 
                 return [
@@ -128,7 +128,7 @@ class DonationController extends Controller
 
         $isPaid = (string) ($payload['RtnCode'] ?? '') === '1';
         $donation->forceFill([
-            'status' => $isPaid ? 'paid' : 'failed',
+            'status' => $isPaid ? Donation::STATUS_PAID : Donation::STATUS_FAILED,
             'provider_payload' => $payload,
             'paid_at' => $isPaid ? now() : $donation->paid_at,
         ])->save();

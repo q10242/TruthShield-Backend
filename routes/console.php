@@ -199,9 +199,9 @@ Artisan::command('truthshield:check-production-env', function () {
 Artisan::command('truthshield:expire-pending-donations {--hours=24}', function () {
     $hours = max(1, (int) $this->option('hours'));
     $count = Donation::query()
-        ->where('status', 'pending')
+        ->where('status', Donation::STATUS_PENDING)
         ->where('created_at', '<=', now()->subHours($hours))
-        ->update(['status' => 'expired']);
+        ->update(['status' => Donation::STATUS_EXPIRED]);
 
     $this->info("Expired {$count} pending donation orders older than {$hours} hours.");
 })->purpose('Expire stale pending donation orders.');

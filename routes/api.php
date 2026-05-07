@@ -100,6 +100,7 @@ Route::get('/exports/news-snapshots.csv', [ExportController::class, 'snapshotsCs
 Route::get('/exports/news-change-reports.csv', [ExportController::class, 'changeReportsCsv']);
 Route::get('/exports/governance-events.csv', [ExportController::class, 'governanceCsv']);
 Route::get('/exports/community-signals.csv', [ExportController::class, 'communitySignalsCsv']);
+Route::get('/exports/bug-reports.csv', [ExportController::class, 'bugReportsCsv']);
 Route::get('/media/{mediaOutlet:slug}', [MediaOutletController::class, 'show']);
 Route::get('/transparency', [TransparencyController::class, 'show']);
 Route::get('/system/health', [SystemHealthController::class, 'show']);

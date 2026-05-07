@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\CommunitySignal;
+use App\Models\BugReport;
 use App\Models\Donation;
 use App\Models\MediaOutlet;
 use App\Models\ModerationEvent;
@@ -268,5 +269,33 @@ class ExportController extends Controller
                     }
                 });
         }, 'truthshield-community-signals.csv', ['Content-Type' => 'text/csv']);
+    }
+
+    public function bugReportsCsv(): StreamedResponse
+    {
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['id', 'report_type', 'severity', 'status', 'title', 'source', 'page_url', 'contact_email', 'extension_version', 'created_at', 'reviewed_at']);
+
+            BugReport::query()
+                ->latest()
+                ->chunk(200, function ($rows) use ($handle): void {
+                    foreach ($rows as $row) {
+                        fputcsv($handle, [
+                            $row->id,
+                            $row->report_type,
+                            $row->severity,
+                            $row->status,
+                            $row->title,
+                            $row->source,
+                            $row->page_url,
+                            $row->contact_email,
+                            $row->extension_version,
+                            $row->created_at?->toJSON(),
+                            $row->reviewed_at?->toJSON(),
+                        ]);
+                    }
+                });
+        }, 'truthshield-bug-reports.csv', ['Content-Type' => 'text/csv']);
     }
 }

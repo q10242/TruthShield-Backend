@@ -97,6 +97,8 @@ class OpenApiController extends Controller
                 '/api/donations/supporters' => ['get' => ['summary' => 'Recent public donation supporters']],
                 '/api/donations/monthly' => ['get' => ['summary' => 'Monthly donation trend']],
                 '/api/user-data-requests' => ['post' => ['summary' => 'Submit a privacy data request']],
+                '/api/bug-reports' => ['post' => ['summary' => 'Submit a bug, extension, data, UX, translation, or security report']],
+                '/api/exports/bug-reports.csv' => ['get' => ['summary' => 'Export bug and security reports CSV']],
                 '/api/me/profile' => [
                     'get' => ['summary' => 'Authenticated profile with badges, claimant status, and contribution summary'],
                     'put' => ['summary' => 'Update public display identity and profile preferences'],

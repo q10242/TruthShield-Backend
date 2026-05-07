@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AccountEdge;
 use App\Models\AbuseEvent;
 use App\Models\ApiClient;
+use App\Models\BugReport;
 use App\Models\Donation;
 use App\Models\EvidenceReport;
 use App\Models\ExtensionSelectorCheck;
@@ -41,7 +42,7 @@ class SystemHealthController extends Controller
         }
 
         $metrics = Cache::store(config('truthshield.status_cache_store'))->remember(
-            'system:health:metrics:v1',
+            'system:health:metrics:v2',
             now()->addSeconds(15),
             function (): array {
                 $latestHeartbeat = OperationalEvent::query()
@@ -77,6 +78,9 @@ class SystemHealthController extends Controller
                         'pending_donations' => Donation::query()->where('status', Donation::STATUS_PENDING)->count(),
                         'paid_donations_24h' => Donation::query()->where('status', Donation::STATUS_PAID)->where('paid_at', '>=', now()->subDay())->count(),
                         'pending_user_data_requests' => UserDataRequest::query()->where('status', 'pending')->count(),
+                        'open_bug_reports' => BugReport::query()->whereIn('status', ['new', 'triaged', 'in_progress'])->count(),
+                        'open_security_reports' => BugReport::query()->where('report_type', 'security')->whereIn('status', ['new', 'triaged', 'in_progress'])->count(),
+                        'critical_bug_reports' => BugReport::query()->where('severity', 'critical')->whereIn('status', ['new', 'triaged', 'in_progress'])->count(),
                     ],
                 ];
             },
@@ -88,6 +92,8 @@ class SystemHealthController extends Controller
             + ($metrics['counts']['pending_evidence_reports'] ?? 0)
             + (($metrics['counts']['open_abuse_events'] ?? 0) * 2)
             + ($metrics['counts']['pending_user_data_requests'] ?? 0)
+            + ($metrics['counts']['open_bug_reports'] ?? 0)
+            + (($metrics['counts']['critical_bug_reports'] ?? 0) * 3)
         );
         $degradedReasons = [];
         if (! $database) $degradedReasons[] = 'database';

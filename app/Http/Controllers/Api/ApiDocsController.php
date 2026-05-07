@@ -64,6 +64,8 @@ class ApiDocsController extends Controller
                 ['method' => 'GET', 'path' => '/api/donations/summary', 'description' => 'Public donation totals for transparency pages.'],
                 ['method' => 'GET', 'path' => '/api/exports/donations.csv', 'description' => 'Donation CSV export for operations.'],
                 ['method' => 'POST', 'path' => '/api/user-data-requests', 'description' => 'Submit privacy data export, deletion, or correction requests.'],
+                ['method' => 'POST', 'path' => '/api/bug-reports', 'description' => 'Submit general bug, extension, data, UX, translation, or security reports for admin triage.'],
+                ['method' => 'GET', 'path' => '/api/exports/bug-reports.csv', 'description' => 'Bug and security report CSV export for operations triage.'],
                 ['method' => 'GET', 'path' => '/api/algorithm', 'description' => 'Public algorithm summary.'],
             ],
         ]);

@@ -16,6 +16,7 @@ use App\Models\Tag;
 use App\Models\User;
 use App\Models\Vote;
 use App\Models\Badge;
+use App\Models\BugReport;
 use App\Models\Donation;
 use App\Models\AbuseEvent;
 use App\Models\AbuseCluster;
@@ -715,7 +716,7 @@ class TruthShieldApiTest extends TestCase
 
         $this->getJson('/api/transparency')
             ->assertOk()
-            ->assertJsonStructure(['users', 'news_urls', 'votes', 'pending_domain_reports', 'open_abuse_events']);
+            ->assertJsonStructure(['users', 'news_urls', 'votes', 'pending_domain_reports', 'open_abuse_events', 'open_bug_reports']);
     }
 
     public function test_profile_logout_health_search_media_and_report_reason_endpoints(): void
@@ -807,7 +808,8 @@ class TruthShieldApiTest extends TestCase
         $this->getJson('/api/docs')
             ->assertOk()
             ->assertJsonPath('name', 'TruthShield API')
-            ->assertJsonPath('version', '0.9.0');
+            ->assertJsonPath('version', '0.9.0')
+            ->assertJsonFragment(['path' => '/api/bug-reports']);
 
         $this->getJson('/api/openapi.json')
             ->assertOk()
@@ -833,6 +835,10 @@ class TruthShieldApiTest extends TestCase
             ->assertHeader('content-type', 'text/csv; charset=utf-8');
 
         $this->get('/api/exports/evidence.csv')
+            ->assertOk()
+            ->assertHeader('content-type', 'text/csv; charset=utf-8');
+
+        $this->get('/api/exports/bug-reports.csv')
             ->assertOk()
             ->assertHeader('content-type', 'text/csv; charset=utf-8');
 
@@ -1479,6 +1485,13 @@ class TruthShieldApiTest extends TestCase
     public function test_health_and_transparency_include_operational_defense_fields(): void
     {
         OperationalEvent::query()->create(['type' => 'queue_worker', 'status' => 'ok']);
+        BugReport::query()->create([
+            'report_type' => 'security',
+            'severity' => 'critical',
+            'status' => 'new',
+            'title' => 'Token leak',
+            'description' => 'Token is visible in logs.',
+        ]);
         AccountEdge::query()->create([
             'source_user_id' => User::factory()->create()->id,
             'target_user_id' => User::factory()->create()->id,
@@ -1490,11 +1503,15 @@ class TruthShieldApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('queue.healthy', true)
             ->assertJsonPath('counts.high_risk_account_edges', 1)
+            ->assertJsonPath('counts.open_security_reports', 1)
+            ->assertJsonPath('counts.critical_bug_reports', 1)
             ->assertJsonPath('thresholds.status_cache_version', 'v1');
 
         $this->getJson('/api/transparency')
             ->assertOk()
             ->assertJsonPath('high_risk_account_edges', 1)
+            ->assertJsonPath('open_security_reports', 1)
+            ->assertJsonPath('bug_report_distribution.new', 1)
             ->assertJsonStructure(['active_api_clients', 'operational_events_24h', 'status_cache_version']);
     }
 

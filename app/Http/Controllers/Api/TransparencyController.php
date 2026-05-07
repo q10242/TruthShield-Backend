@@ -8,6 +8,7 @@ use App\Models\AbuseEvent;
 use App\Models\Appeal;
 use App\Models\ApiClient;
 use App\Models\AuditLog;
+use App\Models\BugReport;
 use App\Models\CommunitySignal;
 use App\Models\CommunityTask;
 use App\Models\Donation;
@@ -38,7 +39,7 @@ class TransparencyController extends Controller
 {
     public function show(): JsonResponse
     {
-        return response()->json(Cache::store(config('truthshield.status_cache_store'))->remember('transparency:summary:v3', now()->addSeconds(30), fn () => [
+        return response()->json(Cache::store(config('truthshield.status_cache_store'))->remember('transparency:summary:v4', now()->addSeconds(30), fn () => [
             'users' => User::query()->count(),
             'news_urls' => NewsUrl::query()->count(),
             'votes' => Vote::query()->count(),
@@ -56,6 +57,9 @@ class TransparencyController extends Controller
             'open_abuse_events' => AbuseEvent::query()->where('reviewed', false)->count(),
             'pending_appeals' => Appeal::query()->where('status', 'pending')->count(),
             'pending_user_data_requests' => UserDataRequest::query()->where('status', 'pending')->count(),
+            'open_bug_reports' => BugReport::query()->whereIn('status', ['new', 'triaged', 'in_progress'])->count(),
+            'open_security_reports' => BugReport::query()->where('report_type', 'security')->whereIn('status', ['new', 'triaged', 'in_progress'])->count(),
+            'critical_bug_reports' => BugReport::query()->where('severity', 'critical')->whereIn('status', ['new', 'triaged', 'in_progress'])->count(),
             'pending_verified_claimants' => VerifiedClaimant::query()->where('status', 'pending')->count(),
             'approved_verified_claimants' => VerifiedClaimant::query()->where('status', 'approved')->count(),
             'pending_official_responses' => OfficialResponse::query()->where('status', 'pending')->count(),
@@ -98,6 +102,15 @@ class TransparencyController extends Controller
                 'abuse_events_open' => AbuseEvent::query()->where('reviewed', false)->count(),
                 'community_tasks_open' => CommunityTask::query()->where('status', 'open')->count(),
                 'community_tasks_escalated' => CommunityTask::query()->where('status', 'escalated')->count(),
+                'bug_reports_open' => BugReport::query()->whereIn('status', ['new', 'triaged', 'in_progress'])->count(),
+                'security_reports_open' => BugReport::query()->where('report_type', 'security')->whereIn('status', ['new', 'triaged', 'in_progress'])->count(),
+            ],
+            'bug_report_distribution' => [
+                'new' => BugReport::query()->where('status', 'new')->count(),
+                'triaged' => BugReport::query()->where('status', 'triaged')->count(),
+                'in_progress' => BugReport::query()->where('status', 'in_progress')->count(),
+                'fixed' => BugReport::query()->where('status', 'fixed')->count(),
+                'wont_fix' => BugReport::query()->where('status', 'wont_fix')->count(),
             ],
             'official_response_distribution' => [
                 'pending' => OfficialResponse::query()->where('status', 'pending')->count(),
@@ -118,6 +131,8 @@ class TransparencyController extends Controller
             'governance_pressure_score' => min(100, (
                 EvidenceReport::query()->where('status', 'pending')->count()
                 + Appeal::query()->where('status', 'pending')->count()
+                + BugReport::query()->whereIn('status', ['new', 'triaged', 'in_progress'])->count()
+                + BugReport::query()->where('severity', 'critical')->whereIn('status', ['new', 'triaged', 'in_progress'])->count()
                 + NewsChangeReport::query()->where('status', 'pending')->count()
                 + AbuseEvent::query()->where('reviewed', false)->count() * 2
             ) * 10),

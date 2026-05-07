@@ -21,7 +21,7 @@ class AppealController extends Controller
     public function store(Request $request, AuditLogService $auditLog, ModerationEventService $moderation): JsonResponse
     {
         $validated = $request->validate([
-            'subject_type' => ['required', 'string', 'in:evidence,trust,user_restriction'],
+            'subject_type' => ['required', 'string', 'in:evidence,trust,user_restriction,verified_claimant,official_response'],
             'subject_id' => ['required', 'integer', 'min:1'],
             'reason' => ['required', 'string', 'max:120'],
             'statement' => ['required', 'string', 'max:2000'],

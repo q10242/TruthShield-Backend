@@ -177,7 +177,7 @@ class DonationController extends Controller
             'paid_at' => $isPaid ? now() : $donation->paid_at,
         ])->save();
 
-        if ($isPaid && ! $donation->receipt_email_sent_at) {
+        if ($isPaid && ! in_array($donation->receipt_email_status, ['sent', 'rate_limited_duplicate'], true)) {
             $emailResult = $emails->sendDonationReceipt($donation->refresh());
             $donation->forceFill([
                 'receipt_email_status' => $emailResult['status'],

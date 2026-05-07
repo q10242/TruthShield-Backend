@@ -108,8 +108,8 @@ Route::get('/exports/bug-reports.csv', [ExportController::class, 'bugReportsCsv'
 Route::get('/media/{mediaOutlet:slug}', [MediaOutletController::class, 'show']);
 Route::get('/transparency', [TransparencyController::class, 'show']);
 Route::get('/system/health', [SystemHealthController::class, 'show']);
-Route::post('/user-data-requests', [UserDataRequestController::class, 'store'])->middleware('throttle:5,1');
-Route::post('/bug-reports', [BugReportController::class, 'store'])->middleware('throttle:10,1');
+Route::post('/user-data-requests', [UserDataRequestController::class, 'store'])->middleware('throttle:email-intake');
+Route::post('/bug-reports', [BugReportController::class, 'store'])->middleware('throttle:email-intake');
 Route::get('/donations/summary', [DonationController::class, 'summary']);
 Route::get('/donations/config', [DonationController::class, 'config']);
 Route::get('/donations/supporters', [DonationController::class, 'supporters']);

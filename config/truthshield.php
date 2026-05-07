@@ -95,4 +95,9 @@ return [
         'bug_report' => true,
         'product' => false,
     ],
+    'email_limits' => [
+        'per_address_hour' => (int) env('TRUTHSHIELD_EMAIL_PER_ADDRESS_HOUR', 6),
+        'per_address_day' => (int) env('TRUTHSHIELD_EMAIL_PER_ADDRESS_DAY', 24),
+        'duplicate_ttl_seconds' => (int) env('TRUTHSHIELD_EMAIL_DUPLICATE_TTL_SECONDS', 600),
+    ],
 ];

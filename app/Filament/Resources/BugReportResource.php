@@ -93,6 +93,16 @@ class BugReportResource extends Resource
                 ])
                 ->visible(fn (BugReport $record): bool => filled($record->contact_email))
                 ->action(function (BugReport $record, array $data, TransactionalEmailService $emails): void {
+                    if ($record->reporter_email_status === 'sent' && $record->admin_response === $data['admin_response']) {
+                        $record->forceFill([
+                            'status' => $data['status'],
+                            'reviewed_by' => auth()->id(),
+                            'reviewed_at' => now(),
+                        ])->save();
+
+                        return;
+                    }
+
                     $result = $emails->sendBugReportResponse($record, $data['admin_response']);
                     $record->forceFill([
                         'status' => $data['status'],

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\BugReport;
 use App\Models\Donation;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
 
@@ -14,6 +15,10 @@ class TransactionalEmailService
     {
         if (! config('truthshield.email_enabled', true)) {
             return ['status' => 'disabled', 'error' => null];
+        }
+
+        if ($limited = $this->rateLimitResult($email, $subject)) {
+            return $limited;
         }
 
         try {
@@ -93,5 +98,47 @@ class TransactionalEmailService
                 '安全回報的細節可能不會在 email 中完整揭露，請以後台紀錄為準。',
             ]),
         );
+    }
+
+    private function rateLimitResult(string $email, string $subject): ?array
+    {
+        $cache = Cache::store(config('truthshield.status_cache_store'));
+        $addressKey = hash('sha256', mb_strtolower(trim($email)));
+        $subjectKey = hash('sha256', mb_strtolower(trim($subject)));
+        $duplicateKey = "email:duplicate:{$addressKey}:{$subjectKey}";
+
+        if ($cache->has($duplicateKey)) {
+            return ['status' => 'rate_limited_duplicate', 'error' => null];
+        }
+
+        $hourKey = "email:limit:hour:{$addressKey}:" . now()->format('YmdH');
+        $dayKey = "email:limit:day:{$addressKey}:" . now()->format('Ymd');
+        $hourCount = (int) $cache->increment($hourKey);
+        $dayCount = (int) $cache->increment($dayKey);
+
+        if ($hourCount === 1) {
+            $cache->put($hourKey, 1, now()->addHour());
+        }
+        if ($dayCount === 1) {
+            $cache->put($dayKey, 1, now()->addDay());
+        }
+
+        $hourLimit = (int) config('truthshield.email_limits.per_address_hour', 6);
+        $dayLimit = (int) config('truthshield.email_limits.per_address_day', 24);
+
+        if ($hourCount > $hourLimit || $dayCount > $dayLimit) {
+            return [
+                'status' => 'rate_limited',
+                'error' => "Email rate limit exceeded for recipient. hour={$hourCount}/{$hourLimit}, day={$dayCount}/{$dayLimit}",
+            ];
+        }
+
+        $cache->put(
+            $duplicateKey,
+            true,
+            now()->addSeconds((int) config('truthshield.email_limits.duplicate_ttl_seconds', 600)),
+        );
+
+        return null;
     }
 }

@@ -113,6 +113,7 @@ class SystemHealthController extends Controller
                 'enabled' => (bool) config('truthshield.email_enabled', true),
                 'mailer' => config('mail.default'),
                 'from_address_configured' => filled(config('mail.from.address')),
+                'limits' => config('truthshield.email_limits', []),
             ],
             'counts' => $metrics['counts'],
             'governance_pressure_score' => min(100, $governancePressure * 10),

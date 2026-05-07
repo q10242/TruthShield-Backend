@@ -1258,6 +1258,26 @@ class TruthShieldApiTest extends TestCase
         ]);
     }
 
+    public function test_transactional_email_is_deduplicated_and_rate_limited(): void
+    {
+        Mail::fake();
+        config([
+            'truthshield.email_limits.per_address_hour' => 1,
+            'truthshield.email_limits.per_address_day' => 2,
+            'truthshield.email_limits.duplicate_ttl_seconds' => 600,
+        ]);
+
+        $emails = app(\App\Services\TransactionalEmailService::class);
+
+        $first = $emails->sendToAddress('limited@example.com', '重複主旨', '第一次');
+        $duplicate = $emails->sendToAddress('limited@example.com', '重複主旨', '第二次');
+        $limited = $emails->sendToAddress('limited@example.com', '另一個主旨', '第三次');
+
+        $this->assertSame('sent', $first['status']);
+        $this->assertSame('rate_limited_duplicate', $duplicate['status']);
+        $this->assertSame('rate_limited', $limited['status']);
+    }
+
     public function test_domain_report_rolls_up_pending_reports_for_same_domain(): void
     {
         $payload = [

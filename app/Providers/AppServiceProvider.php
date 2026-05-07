@@ -54,5 +54,9 @@ class AppServiceProvider extends ServiceProvider
             $max = $request->user()?->risk_status === 'normal' ? 40 : 10;
             return Limit::perMinute($max)->by($request->user()?->id ?: $request->ip());
         });
+        RateLimiter::for('email-intake', fn (Request $request) => [
+            Limit::perMinute(5)->by($request->ip()),
+            Limit::perHour(20)->by($request->ip()),
+        ]);
     }
 }

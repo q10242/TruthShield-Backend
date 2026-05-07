@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AccountEdge;
 use App\Models\AbuseEvent;
 use App\Models\ApiClient;
+use App\Models\Donation;
 use App\Models\EvidenceReport;
 use App\Models\ExtensionSelectorCheck;
 use App\Models\ExtensionEvent;
@@ -72,6 +73,8 @@ class SystemHealthController extends Controller
                         'active_trusted_evidence_sources' => TrustedEvidenceSource::query()->where('is_active', true)->count(),
                         'active_rate_limit_policies' => RateLimitPolicy::query()->where('is_active', true)->count(),
                         'pending_evidence_snapshots' => \App\Models\Evidence::query()->where('snapshot_status', 'pending')->count(),
+                        'pending_donations' => Donation::query()->where('status', 'pending')->count(),
+                        'paid_donations_24h' => Donation::query()->where('status', 'paid')->where('paid_at', '>=', now()->subDay())->count(),
                     ],
                 ];
             },

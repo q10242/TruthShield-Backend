@@ -14,7 +14,13 @@ class EvidenceResource extends Resource
 {
     protected static ?string $model = Evidence::class;
     protected static ?string $navigationIcon = 'heroicon-o-photo';
-    protected static ?string $navigationGroup = 'News Data';
+
+    protected static ?string $modelLabel = '證據';
+
+    protected static ?string $pluralModelLabel = '證據庫';
+
+    protected static ?string $navigationLabel = '證據庫';
+    protected static ?string $navigationGroup = '新聞資料';
 
     public static function form(Form $form): Form
     {

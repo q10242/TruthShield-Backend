@@ -19,7 +19,13 @@ class NewsDomainReportResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-inbox-stack';
 
-    protected static ?string $navigationGroup = 'News Sources';
+    protected static ?string $modelLabel = '新聞站回報';
+
+    protected static ?string $pluralModelLabel = '新聞站回報';
+
+    protected static ?string $navigationLabel = '新聞站回報';
+
+    protected static ?string $navigationGroup = '新聞來源';
 
     public static function form(Form $form): Form
     {
@@ -55,7 +61,7 @@ class NewsDomainReportResource extends Resource
                 Tables\Columns\TextColumn::make('page_title')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('report_count')
-                    ->label('Reports')
+                    ->label('回報數')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('last_reported_at')
                     ->dateTime()

@@ -14,7 +14,13 @@ class SystemSettingResource extends Resource
 {
     protected static ?string $model = SystemSetting::class;
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
-    protected static ?string $navigationGroup = 'System Settings';
+
+    protected static ?string $modelLabel = '系統設定';
+
+    protected static ?string $pluralModelLabel = '系統設定';
+
+    protected static ?string $navigationLabel = '系統設定';
+    protected static ?string $navigationGroup = '系統設定';
 
     public static function form(Form $form): Form
     {

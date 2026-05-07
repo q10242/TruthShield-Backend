@@ -14,7 +14,13 @@ class TrustedEvidenceSourceResource extends Resource
 {
     protected static ?string $model = TrustedEvidenceSource::class;
     protected static ?string $navigationIcon = 'heroicon-o-shield-check';
-    protected static ?string $navigationGroup = 'Governance';
+
+    protected static ?string $modelLabel = '可信證據來源';
+
+    protected static ?string $pluralModelLabel = '可信證據來源';
+
+    protected static ?string $navigationLabel = '可信證據來源';
+    protected static ?string $navigationGroup = '治理審核';
 
     public static function form(Form $form): Form
     {

@@ -16,16 +16,22 @@ class ReadSessionResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clock';
 
-    protected static ?string $navigationGroup = 'Reputation';
+    protected static ?string $modelLabel = '閱讀紀錄';
+
+    protected static ?string $pluralModelLabel = '閱讀紀錄';
+
+    protected static ?string $navigationLabel = '閱讀紀錄';
+
+    protected static ?string $navigationGroup = '信譽引擎';
 
     public static function form(Form $form): Form
     {
         return $form->schema([
             Forms\Components\Placeholder::make('user_email')
-                ->label('User')
+                ->label('使用者')
                 ->content(fn (?ReadSession $record): string => $record?->user?->email ?? '-'),
             Forms\Components\Placeholder::make('news_url')
-                ->label('News URL')
+                ->label('新聞網址')
                 ->content(fn (?ReadSession $record): string => $record?->newsUrl?->normalized_url ?? '-')
                 ->columnSpanFull(),
             Forms\Components\TextInput::make('seconds_read')
@@ -43,7 +49,7 @@ class ReadSessionResource extends Resource
                 Tables\Columns\TextColumn::make('user.email')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('newsUrl.title_snapshot')
-                    ->label('News')
+                    ->label('新聞')
                     ->limit(48)
                     ->searchable(),
                 Tables\Columns\TextColumn::make('seconds_read')

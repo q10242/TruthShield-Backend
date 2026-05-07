@@ -18,11 +18,13 @@ class UserResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
 
-    protected static ?string $navigationGroup = 'Identity';
+    protected static ?string $navigationGroup = '身份與信任';
 
-    protected static ?string $modelLabel = 'User';
+    protected static ?string $modelLabel = '使用者';
 
-    protected static ?string $pluralModelLabel = 'Users';
+    protected static ?string $pluralModelLabel = '使用者';
+
+    protected static ?string $navigationLabel = '使用者';
 
     public static function form(Form $form): Form
     {
@@ -67,7 +69,7 @@ class UserResource extends Resource
                     ->numeric()
                     ->default(1),
                 Forms\Components\Toggle::make('is_admin')
-                    ->label('Admin access'),
+                    ->label('後台權限'),
                 Forms\Components\Select::make('badges')
                     ->relationship('badges', 'name')
                     ->multiple()
@@ -100,7 +102,7 @@ class UserResource extends Resource
                     ->sortable(),
                 Tables\Columns\IconColumn::make('is_admin')
                     ->boolean()
-                    ->label('Admin'),
+                    ->label('管理員'),
                 Tables\Columns\TextColumn::make('email_verified_at')
                     ->dateTime()
                     ->sortable(),
@@ -115,13 +117,13 @@ class UserResource extends Resource
             ])
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_admin')
-                    ->label('Admin users'),
+                    ->label('管理員帳號'),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\Action::make('adjustTrust')
-                    ->label('Adjust trust')
+                    ->label('調整信任分數')
                     ->icon('heroicon-o-scale')
                     ->form([
                         Forms\Components\TextInput::make('delta')
@@ -141,11 +143,11 @@ class UserResource extends Resource
                         );
                     }),
                 Tables\Actions\Action::make('limitWeight')
-                    ->label('Limit weight')
+                    ->label('限制權重')
                     ->color('warning')
                     ->action(fn (User $record): bool => $record->forceFill(['risk_status' => 'limited', 'abuse_multiplier' => 0.1])->save()),
                 Tables\Actions\Action::make('restoreWeight')
-                    ->label('Restore weight')
+                    ->label('恢復權重')
                     ->color('success')
                     ->action(fn (User $record): bool => $record->forceFill(['risk_status' => 'normal', 'abuse_multiplier' => 1.0])->save()),
             ])

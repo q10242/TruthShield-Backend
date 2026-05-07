@@ -12,7 +12,13 @@ class ExtensionEventResource extends Resource
 {
     protected static ?string $model = ExtensionEvent::class;
     protected static ?string $navigationIcon = 'heroicon-o-puzzle-piece';
-    protected static ?string $navigationGroup = 'Operations';
+
+    protected static ?string $modelLabel = '插件事件';
+
+    protected static ?string $pluralModelLabel = '插件事件';
+
+    protected static ?string $navigationLabel = '插件事件';
+    protected static ?string $navigationGroup = '營運管理';
 
     public static function table(Table $table): Table
     {

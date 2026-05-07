@@ -12,7 +12,13 @@ class OauthLoginStateResource extends Resource
 {
     protected static ?string $model = OauthLoginState::class;
     protected static ?string $navigationIcon = 'heroicon-o-lock-closed';
-    protected static ?string $navigationGroup = 'Identity';
+
+    protected static ?string $modelLabel = 'OAuth 登入狀態';
+
+    protected static ?string $pluralModelLabel = 'OAuth 登入狀態';
+
+    protected static ?string $navigationLabel = 'OAuth 登入狀態';
+    protected static ?string $navigationGroup = '身份與信任';
 
     public static function table(Table $table): Table
     {

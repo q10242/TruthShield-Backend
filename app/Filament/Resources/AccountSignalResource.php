@@ -12,7 +12,13 @@ class AccountSignalResource extends Resource
 {
     protected static ?string $model = AccountSignal::class;
     protected static ?string $navigationIcon = 'heroicon-o-finger-print';
-    protected static ?string $navigationGroup = 'Anti-Abuse';
+
+    protected static ?string $modelLabel = '帳號訊號';
+
+    protected static ?string $pluralModelLabel = '帳號訊號';
+
+    protected static ?string $navigationLabel = '帳號訊號';
+    protected static ?string $navigationGroup = '反操縱';
 
     public static function table(Table $table): Table
     {

@@ -14,7 +14,13 @@ class BadgeResource extends Resource
 {
     protected static ?string $model = Badge::class;
     protected static ?string $navigationIcon = 'heroicon-o-star';
-    protected static ?string $navigationGroup = 'Identity';
+
+    protected static ?string $modelLabel = '徽章';
+
+    protected static ?string $pluralModelLabel = '徽章';
+
+    protected static ?string $navigationLabel = '徽章';
+    protected static ?string $navigationGroup = '身份與信任';
 
     public static function form(Form $form): Form
     {
@@ -31,7 +37,7 @@ class BadgeResource extends Resource
         return $table->columns([
             Tables\Columns\TextColumn::make('name')->searchable(),
             Tables\Columns\TextColumn::make('slug')->searchable(),
-            Tables\Columns\TextColumn::make('users_count')->counts('users')->label('Users'),
+            Tables\Columns\TextColumn::make('users_count')->counts('users')->label('使用者數'),
         ])->actions([
             Tables\Actions\EditAction::make(),
         ])->bulkActions([

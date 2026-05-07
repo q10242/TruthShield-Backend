@@ -12,7 +12,13 @@ class OperationalEventResource extends Resource
 {
     protected static ?string $model = OperationalEvent::class;
     protected static ?string $navigationIcon = 'heroicon-o-heart';
-    protected static ?string $navigationGroup = 'Operations';
+
+    protected static ?string $modelLabel = '營運事件';
+
+    protected static ?string $pluralModelLabel = '營運事件';
+
+    protected static ?string $navigationLabel = '營運事件';
+    protected static ?string $navigationGroup = '營運管理';
 
     public static function table(Table $table): Table
     {

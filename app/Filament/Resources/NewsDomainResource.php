@@ -16,7 +16,13 @@ class NewsDomainResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-globe-alt';
 
-    protected static ?string $navigationGroup = 'News Sources';
+    protected static ?string $modelLabel = '新聞網域';
+
+    protected static ?string $pluralModelLabel = '新聞網域';
+
+    protected static ?string $navigationLabel = '新聞網域';
+
+    protected static ?string $navigationGroup = '新聞來源';
 
     public static function form(Form $form): Form
     {
@@ -70,7 +76,7 @@ class NewsDomainResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('mediaOutlet.name')
-                    ->label('Media')
+                    ->label('媒體')
                     ->searchable(),
                 Tables\Columns\IconColumn::make('is_active')
                     ->boolean()

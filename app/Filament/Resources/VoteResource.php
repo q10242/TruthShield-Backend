@@ -16,7 +16,13 @@ class VoteResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-hand-thumb-up';
 
-    protected static ?string $navigationGroup = 'News Data';
+    protected static ?string $modelLabel = '投票';
+
+    protected static ?string $pluralModelLabel = '投票';
+
+    protected static ?string $navigationLabel = '投票';
+
+    protected static ?string $navigationGroup = '新聞資料';
 
     public static function form(Form $form): Form
     {
@@ -68,7 +74,7 @@ class VoteResource extends Resource
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('newsUrl.normalized_url')
-                    ->label('URL')
+                    ->label('網址')
                     ->searchable()
                     ->limit(60),
                 Tables\Columns\TextColumn::make('tag.name')

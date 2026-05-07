@@ -14,7 +14,13 @@ class AbuseEventResource extends Resource
 {
     protected static ?string $model = AbuseEvent::class;
     protected static ?string $navigationIcon = 'heroicon-o-shield-exclamation';
-    protected static ?string $navigationGroup = 'Operations';
+
+    protected static ?string $modelLabel = '濫用事件';
+
+    protected static ?string $pluralModelLabel = '濫用事件';
+
+    protected static ?string $navigationLabel = '濫用事件';
+    protected static ?string $navigationGroup = '營運管理';
 
     public static function form(Form $form): Form
     {

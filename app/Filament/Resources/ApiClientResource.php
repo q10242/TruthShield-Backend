@@ -14,7 +14,13 @@ class ApiClientResource extends Resource
 {
     protected static ?string $model = ApiClient::class;
     protected static ?string $navigationIcon = 'heroicon-o-key';
-    protected static ?string $navigationGroup = 'Operations';
+
+    protected static ?string $modelLabel = 'API 用戶端';
+
+    protected static ?string $pluralModelLabel = 'API 用戶端';
+
+    protected static ?string $navigationLabel = 'API 用戶端';
+    protected static ?string $navigationGroup = '營運管理';
 
     public static function form(Form $form): Form
     {

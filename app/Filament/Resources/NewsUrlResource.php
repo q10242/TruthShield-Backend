@@ -18,7 +18,13 @@ class NewsUrlResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-link';
 
-    protected static ?string $navigationGroup = 'News Data';
+    protected static ?string $modelLabel = '新聞網址';
+
+    protected static ?string $pluralModelLabel = '新聞網址';
+
+    protected static ?string $navigationLabel = '新聞網址';
+
+    protected static ?string $navigationGroup = '新聞資料';
 
     public static function form(Form $form): Form
     {
@@ -66,14 +72,14 @@ class NewsUrlResource extends Resource
                     ->searchable()
                     ->limit(50),
                 Tables\Columns\TextColumn::make('mediaOutlet.name')
-                    ->label('Media')
+                    ->label('媒體')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('normalized_url')
                     ->searchable()
                     ->limit(70),
                 Tables\Columns\TextColumn::make('votes_count')
                     ->counts('votes')
-                    ->label('Votes')
+                    ->label('投票數')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()

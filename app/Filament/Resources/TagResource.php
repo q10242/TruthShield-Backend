@@ -16,7 +16,13 @@ class TagResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-tag';
 
-    protected static ?string $navigationGroup = 'System Settings';
+    protected static ?string $modelLabel = '標籤';
+
+    protected static ?string $pluralModelLabel = '標籤';
+
+    protected static ?string $navigationLabel = '標籤';
+
+    protected static ?string $navigationGroup = '系統設定';
 
     public static function form(Form $form): Form
     {

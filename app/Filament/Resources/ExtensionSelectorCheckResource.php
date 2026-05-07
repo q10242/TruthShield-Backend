@@ -12,7 +12,13 @@ class ExtensionSelectorCheckResource extends Resource
 {
     protected static ?string $model = ExtensionSelectorCheck::class;
     protected static ?string $navigationIcon = 'heroicon-o-window';
-    protected static ?string $navigationGroup = 'Operations';
+
+    protected static ?string $modelLabel = '選擇器檢查';
+
+    protected static ?string $pluralModelLabel = '選擇器檢查';
+
+    protected static ?string $navigationLabel = '選擇器檢查';
+    protected static ?string $navigationGroup = '營運管理';
 
     public static function table(Table $table): Table
     {

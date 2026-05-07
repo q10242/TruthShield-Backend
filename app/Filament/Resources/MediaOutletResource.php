@@ -14,7 +14,13 @@ class MediaOutletResource extends Resource
 {
     protected static ?string $model = MediaOutlet::class;
     protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
-    protected static ?string $navigationGroup = 'News Sources';
+
+    protected static ?string $modelLabel = '媒體';
+
+    protected static ?string $pluralModelLabel = '媒體管理';
+
+    protected static ?string $navigationLabel = '媒體管理';
+    protected static ?string $navigationGroup = '新聞來源';
 
     public static function form(Form $form): Form
     {
@@ -35,8 +41,8 @@ class MediaOutletResource extends Resource
             Tables\Columns\TextColumn::make('slug')->searchable(),
             Tables\Columns\TextColumn::make('type')->badge(),
             Tables\Columns\IconColumn::make('is_active')->boolean(),
-            Tables\Columns\TextColumn::make('domains_count')->counts('domains')->label('Domains'),
-            Tables\Columns\TextColumn::make('news_urls_count')->counts('newsUrls')->label('URLs'),
+            Tables\Columns\TextColumn::make('domains_count')->counts('domains')->label('網域數'),
+            Tables\Columns\TextColumn::make('news_urls_count')->counts('newsUrls')->label('網址數'),
         ])->filters([
             Tables\Filters\TernaryFilter::make('is_active'),
         ])->actions([

@@ -16,7 +16,13 @@ class AppealResource extends Resource
 {
     protected static ?string $model = Appeal::class;
     protected static ?string $navigationIcon = 'heroicon-o-inbox';
-    protected static ?string $navigationGroup = 'Operations';
+
+    protected static ?string $modelLabel = '申訴';
+
+    protected static ?string $pluralModelLabel = '申訴';
+
+    protected static ?string $navigationLabel = '申訴';
+    protected static ?string $navigationGroup = '營運管理';
 
     public static function form(Form $form): Form
     {

@@ -16,7 +16,13 @@ class UserNotificationResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-bell-alert';
 
-    protected static ?string $navigationGroup = 'Identity';
+    protected static ?string $modelLabel = '使用者通知';
+
+    protected static ?string $pluralModelLabel = '使用者通知';
+
+    protected static ?string $navigationLabel = '使用者通知';
+
+    protected static ?string $navigationGroup = '身份與信任';
 
     public static function form(Form $form): Form
     {
@@ -49,7 +55,7 @@ class UserNotificationResource extends Resource
                 Tables\Columns\TextColumn::make('user.email')->searchable(),
                 Tables\Columns\TextColumn::make('type')->badge()->searchable(),
                 Tables\Columns\TextColumn::make('title')->searchable()->limit(40),
-                Tables\Columns\IconColumn::make('read_at')->label('Read')->boolean(),
+                Tables\Columns\IconColumn::make('read_at')->label('已讀')->boolean(),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
             ])
             ->filters([

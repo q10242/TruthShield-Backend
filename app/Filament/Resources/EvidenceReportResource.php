@@ -15,7 +15,13 @@ class EvidenceReportResource extends Resource
 {
     protected static ?string $model = EvidenceReport::class;
     protected static ?string $navigationIcon = 'heroicon-o-flag';
-    protected static ?string $navigationGroup = 'Operations';
+
+    protected static ?string $modelLabel = '證據檢舉';
+
+    protected static ?string $pluralModelLabel = '證據檢舉';
+
+    protected static ?string $navigationLabel = '證據檢舉';
+    protected static ?string $navigationGroup = '營運管理';
 
     public static function form(Form $form): Form
     {
@@ -31,7 +37,7 @@ class EvidenceReportResource extends Resource
     public static function table(Table $table): Table
     {
         return $table->columns([
-            Tables\Columns\TextColumn::make('vote.evidence_note')->label('Evidence')->limit(50),
+            Tables\Columns\TextColumn::make('vote.evidence_note')->label('證據')->limit(50),
             Tables\Columns\TextColumn::make('user.email')->searchable(),
             Tables\Columns\TextColumn::make('reason')->badge(),
             Tables\Columns\TextColumn::make('status')->badge(),
@@ -45,7 +51,7 @@ class EvidenceReportResource extends Resource
         ])->actions([
             Tables\Actions\EditAction::make(),
             Tables\Actions\Action::make('hideEvidence')
-                ->label('Hide evidence')
+                ->label('隱藏證據')
                 ->color('danger')
                 ->action(function (EvidenceReport $record, NotificationService $notifications): void {
                     $record->vote?->forceFill(['hidden' => true, 'moderation_status' => 'hidden'])->save();
@@ -63,7 +69,7 @@ class EvidenceReportResource extends Resource
                     }
                 }),
             Tables\Actions\Action::make('restoreEvidence')
-                ->label('Restore evidence')
+                ->label('恢復證據')
                 ->color('success')
                 ->action(function (EvidenceReport $record, NotificationService $notifications): void {
                     $record->vote?->forceFill(['hidden' => false, 'moderation_status' => 'visible'])->save();

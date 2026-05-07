@@ -14,7 +14,13 @@ class UserIdentityResource extends Resource
 {
     protected static ?string $model = UserIdentity::class;
     protected static ?string $navigationIcon = 'heroicon-o-identification';
-    protected static ?string $navigationGroup = 'Identity';
+
+    protected static ?string $modelLabel = '身份綁定';
+
+    protected static ?string $pluralModelLabel = '身份綁定';
+
+    protected static ?string $navigationLabel = '身份綁定';
+    protected static ?string $navigationGroup = '身份與信任';
 
     public static function form(Form $form): Form
     {

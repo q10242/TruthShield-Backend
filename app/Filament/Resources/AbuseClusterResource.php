@@ -14,7 +14,13 @@ class AbuseClusterResource extends Resource
 {
     protected static ?string $model = AbuseCluster::class;
     protected static ?string $navigationIcon = 'heroicon-o-share';
-    protected static ?string $navigationGroup = 'Operations';
+
+    protected static ?string $modelLabel = '操縱叢集';
+
+    protected static ?string $pluralModelLabel = '操縱叢集';
+
+    protected static ?string $navigationLabel = '操縱叢集';
+    protected static ?string $navigationGroup = '營運管理';
 
     public static function form(Form $form): Form
     {

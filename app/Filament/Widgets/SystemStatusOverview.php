@@ -15,14 +15,14 @@ class SystemStatusOverview extends BaseWidget
     protected function getStats(): array
     {
         return [
-            Stat::make('Users', User::query()->count())
-                ->description('registered identities'),
-            Stat::make('Tracked URLs', NewsUrl::query()->count())
-                ->description('normalized news fingerprints'),
-            Stat::make('Votes', Vote::query()->count())
-                ->description('weighted user judgments'),
-            Stat::make('Pending Domains', NewsDomainReport::query()->where('status', 'pending')->count())
-                ->description(NewsDomain::query()->where('is_active', true)->count() . ' active domains'),
+            Stat::make('使用者', User::query()->count())
+                ->description('已註冊身份'),
+            Stat::make('追蹤新聞', NewsUrl::query()->count())
+                ->description('已正規化 URL 指紋'),
+            Stat::make('投票', Vote::query()->count())
+                ->description('加權使用者判斷'),
+            Stat::make('待審新聞站', NewsDomainReport::query()->where('status', 'pending')->count())
+                ->description(NewsDomain::query()->where('is_active', true)->count() . ' 個啟用網域'),
         ];
     }
 }

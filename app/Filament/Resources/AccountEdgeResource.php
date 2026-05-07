@@ -14,7 +14,13 @@ class AccountEdgeResource extends Resource
 {
     protected static ?string $model = AccountEdge::class;
     protected static ?string $navigationIcon = 'heroicon-o-share';
-    protected static ?string $navigationGroup = 'Anti-Abuse';
+
+    protected static ?string $modelLabel = '帳號關聯';
+
+    protected static ?string $pluralModelLabel = '帳號關聯';
+
+    protected static ?string $navigationLabel = '帳號關聯';
+    protected static ?string $navigationGroup = '反操縱';
 
     public static function form(Form $form): Form
     {

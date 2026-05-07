@@ -12,7 +12,13 @@ class AuditLogResource extends Resource
 {
     protected static ?string $model = AuditLog::class;
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
-    protected static ?string $navigationGroup = 'Operations';
+
+    protected static ?string $modelLabel = '稽核紀錄';
+
+    protected static ?string $pluralModelLabel = '稽核紀錄';
+
+    protected static ?string $navigationLabel = '稽核紀錄';
+    protected static ?string $navigationGroup = '營運管理';
 
     public static function table(Table $table): Table
     {

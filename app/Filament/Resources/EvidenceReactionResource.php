@@ -16,7 +16,13 @@ class EvidenceReactionResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-chat-bubble-left-right';
 
-    protected static ?string $navigationGroup = 'News Data';
+    protected static ?string $modelLabel = '證據評價';
+
+    protected static ?string $pluralModelLabel = '證據評價';
+
+    protected static ?string $navigationLabel = '證據評價';
+
+    protected static ?string $navigationGroup = '新聞資料';
 
     public static function form(Form $form): Form
     {

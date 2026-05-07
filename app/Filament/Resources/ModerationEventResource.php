@@ -12,7 +12,13 @@ class ModerationEventResource extends Resource
 {
     protected static ?string $model = ModerationEvent::class;
     protected static ?string $navigationIcon = 'heroicon-o-eye';
-    protected static ?string $navigationGroup = 'Operations';
+
+    protected static ?string $modelLabel = '審核事件';
+
+    protected static ?string $pluralModelLabel = '審核事件';
+
+    protected static ?string $navigationLabel = '審核事件';
+    protected static ?string $navigationGroup = '營運管理';
 
     public static function table(Table $table): Table
     {

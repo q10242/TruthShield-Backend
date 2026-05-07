@@ -42,6 +42,8 @@ class AdminChineseLabels
         'TrustedEvidenceSourceResource' => '管理可信證據來源，例如雲端硬碟、圖床、封存服務與查核機構。這會影響證據安全性與品質加權。',
         'TrustedSourceSuggestionResource' => '管理使用者提議的可信來源。通過後會擴充可接受的證據來源與信任加成。',
         'UrlClassificationReportResource' => '管理使用者回報的 URL 類型，例如新聞頁、分類頁或首頁。這會影響插件是否注入橫幅。',
+        'YoutubeChannelResource' => '管理可被視為新聞或公共議題來源的 YouTube 頻道。這會影響影音新聞納入範圍與後續插件精準控管。',
+        'YoutubeChannelReportResource' => '管理使用者回報的 YouTube 頻道。通過後會建立頻道名冊，讓影音報導也能被社群標記與治理。',
         'UserDataRequestResource' => '管理使用者資料權利請求。這涉及隱私、刪除、更正與資料匯出處理。',
         'UserIdentityResource' => '管理使用者綁定的第三方身份。這會影響身份等級、登入追蹤與未來 OAuth 替換。',
         'UserNotificationResource' => '管理站內通知。這會影響使用者是否得知審核、申訴、證據或系統狀態。',

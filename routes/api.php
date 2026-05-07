@@ -44,6 +44,7 @@ use App\Http\Controllers\Api\UserVoteController;
 use App\Http\Controllers\Api\UserDataExportController;
 use App\Http\Controllers\Api\UserDataRequestController;
 use App\Http\Controllers\Api\VisionReadinessController;
+use App\Http\Controllers\Api\YoutubeChannelController;
 use App\Services\TrustScoreService;
 
 Route::post('/auth/dev-login', [AuthController::class, 'devLogin'])->middleware('throttle:auth');
@@ -71,6 +72,9 @@ Route::post('/extension/events', [ExtensionEventController::class, 'store'])->mi
 Route::post('/extension/events/batch', [ExtensionEventController::class, 'storeBatch'])->middleware('throttle:30,1');
 Route::get('/extension/coverage', [ExtensionEventController::class, 'coverage']);
 Route::get('/news-domains', [LookupController::class, 'newsDomains']);
+Route::get('/youtube-channels', [YoutubeChannelController::class, 'index']);
+Route::post('/youtube-channel-reports', [YoutubeChannelController::class, 'report'])->middleware('throttle:20,1');
+Route::get('/youtube-channel-reports/status', [YoutubeChannelController::class, 'status'])->middleware('throttle:60,1');
 Route::post('/news-domain-reports', [NewsDomainReportController::class, 'store'])->middleware('throttle:10,1');
 Route::get('/news-domain-reports/status', [NewsDomainReportController::class, 'status'])->middleware('throttle:60,1');
 Route::post('/url-classification-reports', [CommunityMaintenanceController::class, 'storeUrlClassification'])->middleware('throttle:20,1');

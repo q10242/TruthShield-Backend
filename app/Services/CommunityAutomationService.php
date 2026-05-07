@@ -15,6 +15,7 @@ use App\Models\TrustedEvidenceSource;
 use App\Models\TrustedSourceSuggestion;
 use App\Models\UrlClassificationReport;
 use App\Models\Vote;
+use App\Models\YoutubeChannelReport;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -57,6 +58,7 @@ class CommunityAutomationService
             'auto_approved_domains' => NewsDomainReport::query()->where('status', 'community_approved')->count(),
             'auto_applied_url_rules' => UrlClassificationReport::query()->where('status', 'community_approved')->count(),
             'auto_approved_sources' => TrustedSourceSuggestion::query()->where('status', 'community_approved')->count(),
+            'pending_youtube_channel_reports' => YoutubeChannelReport::query()->where('status', 'pending')->count(),
             'community_demoted_evidence' => Evidence::query()->where('moderation_status', 'community_demoted')->count(),
             'official_response_tasks' => CommunityTask::query()->where('type', 'needs_official_response')->whereIn('status', ['open', 'escalated'])->count(),
             'auto_governance_events' => ModerationEvent::query()->where('event_type', 'like', 'community.%')->count(),
@@ -328,6 +330,13 @@ class CommunityAutomationService
             $count++;
         });
 
+        YoutubeChannelReport::query()->where('status', 'pending')->get()->each(function (YoutubeChannelReport $report) use (&$count): void {
+            $key = $this->youtubeChannelKey($report);
+            $label = $report->channel_title ?: ($report->handle ? '@' . $report->handle : $report->channel_url);
+            $this->upsertTask('youtube_channel_candidate', $report, $key, '確認 YouTube 新聞頻道', "{$label} / {$report->channel_type}", 45, '/report-domain', $this->signalSummary('youtube_channel_report', $key), true);
+            $count++;
+        });
+
         return $count;
     }
 
@@ -506,6 +515,7 @@ class CommunityAutomationService
             'domain_candidate' => 'domain_report',
             'url_rule_candidate' => 'url_classification',
             'trusted_source_candidate' => 'trusted_source',
+            'youtube_channel_candidate' => 'youtube_channel_report',
             'evidence_quality_review' => 'evidence_unhelpful',
             'needs_official_response' => 'official_response_request',
             default => null,
@@ -518,6 +528,7 @@ class CommunityAutomationService
             'domain_candidate' => 'domain_report',
             'url_rule_candidate' => 'url_classification',
             'trusted_source_candidate' => 'trusted_source',
+            'youtube_channel_candidate' => 'domain_report',
             'evidence_quality_review' => 'evidence_unhelpful',
             'needs_official_response' => 'official_response_request',
             default => null,
@@ -538,6 +549,10 @@ class CommunityAutomationService
             'trusted_source_candidate' => [
                 ['value' => 'confirm_trusted_source', 'label' => '我確認這是穩定可信來源'],
                 ['value' => 'reject_trusted_source', 'label' => '這個來源不適合自動信任'],
+            ],
+            'youtube_channel_candidate' => [
+                ['value' => 'confirm_youtube_channel', 'label' => '我確認這是新聞或公共議題頻道'],
+                ['value' => 'reject_youtube_channel', 'label' => '這不適合作為新聞來源'],
             ],
             'evidence_quality_review' => [
                 ['value' => 'confirm_evidence_unhelpful', 'label' => '這個證據沒幫助'],
@@ -573,6 +588,19 @@ class CommunityAutomationService
     public function trustedSourceKey(string $host, string $sourceType): string
     {
         return "{$host}|{$sourceType}";
+    }
+
+    private function youtubeChannelKey(YoutubeChannelReport $report): string
+    {
+        if ($report->channel_id) {
+            return "channel:{$report->channel_id}";
+        }
+
+        if ($report->handle) {
+            return "handle:{$report->handle}";
+        }
+
+        return "url:{$report->channel_url}";
     }
 
     private function recordEvent(string $type, Model $subject, string $reason, array $metadata): void

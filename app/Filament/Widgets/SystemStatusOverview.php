@@ -14,6 +14,8 @@ use App\Models\EvidenceReport;
 use App\Models\User;
 use App\Models\UserDataRequest;
 use App\Models\Vote;
+use App\Models\YoutubeChannel;
+use App\Models\YoutubeChannelReport;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\Cache;
@@ -40,6 +42,8 @@ class SystemStatusOverview extends BaseWidget
                 'active_domains' => NewsDomain::query()->where('is_active', true)->count(),
                 'community_open_tasks' => CommunityTask::query()->where('status', 'open')->count(),
                 'community_escalated_tasks' => CommunityTask::query()->where('status', 'escalated')->count(),
+                'active_youtube_channels' => YoutubeChannel::query()->where('is_active', true)->count(),
+                'pending_youtube_reports' => YoutubeChannelReport::query()->where('status', 'pending')->count(),
             ],
         );
 
@@ -65,6 +69,9 @@ class SystemStatusOverview extends BaseWidget
             Stat::make('社群自治任務', $stats['community_open_tasks'])
                 ->description("人工升級 {$stats['community_escalated_tasks']} 件")
                 ->color($stats['community_escalated_tasks'] > 0 ? 'warning' : 'success'),
+            Stat::make('YouTube 頻道', $stats['active_youtube_channels'])
+                ->description("待審回報 {$stats['pending_youtube_reports']} 件")
+                ->color($stats['pending_youtube_reports'] > 0 ? 'warning' : 'info'),
         ];
     }
 }

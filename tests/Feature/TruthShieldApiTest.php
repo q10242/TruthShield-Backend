@@ -38,6 +38,8 @@ use App\Models\TrustedSourceSuggestion;
 use App\Models\UrlClassificationReport;
 use App\Models\UserIdentity;
 use App\Models\VerifiedClaimant;
+use App\Models\YoutubeChannel;
+use App\Models\YoutubeChannelReport;
 use App\Models\TrustSettlement;
 use App\Models\UserNotification;
 use App\Jobs\FinalizeNewsUrlJob;
@@ -1281,6 +1283,53 @@ class TruthShieldApiTest extends TestCase
         $this->assertSame(1, TrustedSourceSuggestion::query()->where('host', 'drive.google.com')->count());
         $this->assertSame(2, TrustedSourceSuggestion::query()->where('host', 'drive.google.com')->value('report_count'));
         $this->assertSame(4.8, round((float) TrustedSourceSuggestion::query()->where('host', 'drive.google.com')->value('weighted_score'), 2));
+    }
+
+    public function test_youtube_channel_report_rolls_up_and_status_endpoint_is_stable(): void
+    {
+        $trustedUser = User::factory()->create(['trust_score' => 2.2]);
+        $token = $trustedUser->createToken('youtube-maintenance')->plainTextToken;
+        $payload = [
+            'channel_url' => 'https://www.youtube.com/@CNA',
+            'channel_title' => '中央社 YouTube',
+            'channel_type' => 'news',
+            'note' => '影音新聞頻道。',
+        ];
+
+        $this->postJson('/api/youtube-channel-reports', $payload)
+            ->assertCreated()
+            ->assertJsonPath('report.handle', 'cna')
+            ->assertJsonPath('report.status', 'pending')
+            ->assertJsonPath('report.report_count', 1);
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/youtube-channel-reports', $payload)
+            ->assertCreated()
+            ->assertJsonPath('report.report_count', 2);
+
+        $this->assertSame(1, YoutubeChannelReport::query()->where('handle', 'cna')->count());
+        $this->assertSame(2, YoutubeChannelReport::query()->where('handle', 'cna')->value('report_count'));
+        $this->assertSame(2.45, round((float) YoutubeChannelReport::query()->where('handle', 'cna')->value('weighted_score'), 2));
+
+        $this->getJson('/api/youtube-channel-reports/status?channel_url=' . urlencode('https://www.youtube.com/@CNA'))
+            ->assertOk()
+            ->assertJsonPath('is_reported', true)
+            ->assertJsonPath('report.report_count', 2)
+            ->assertJsonPath('is_active', false);
+
+        YoutubeChannel::query()->create([
+            'handle' => 'cna',
+            'title' => '中央社 YouTube',
+            'channel_url' => 'https://www.youtube.com/@CNA',
+            'channel_type' => 'news',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        $this->getJson('/api/youtube-channels')
+            ->assertOk()
+            ->assertJsonPath('data.0.handle', 'cna')
+            ->assertJsonPath('data.0.is_active', true);
     }
 
     public function test_community_signals_are_deduplicated_and_anonymous_reports_do_not_auto_approve(): void

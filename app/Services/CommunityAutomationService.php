@@ -34,11 +34,13 @@ class CommunityAutomationService
             'evidences_soft_demoted' => $this->softDemoteEvidence(),
             'controversy_tasks_created' => $this->createControversyTasks(),
             'maintenance_tasks_synced' => $this->syncMaintenanceTasks(),
+            'official_response_tasks_created' => $this->createOfficialResponseTasks(),
             'community_abuse_events_created' => $this->detectCommunitySignalAbuse(),
             'stale_tasks_expired' => $this->expireStaleTasks(),
         ];
 
         Cache::store(config('truthshield.status_cache_store'))->forget('transparency:summary:v2');
+        Cache::store(config('truthshield.status_cache_store'))->forget('transparency:summary:v3');
         Cache::store(config('truthshield.status_cache_store'))->forget('vision:readiness:v2');
 
         return $stats;
@@ -56,6 +58,7 @@ class CommunityAutomationService
             'auto_applied_url_rules' => UrlClassificationReport::query()->where('status', 'community_approved')->count(),
             'auto_approved_sources' => TrustedSourceSuggestion::query()->where('status', 'community_approved')->count(),
             'community_demoted_evidence' => Evidence::query()->where('moderation_status', 'community_demoted')->count(),
+            'official_response_tasks' => CommunityTask::query()->where('type', 'needs_official_response')->whereIn('status', ['open', 'escalated'])->count(),
             'auto_governance_events' => ModerationEvent::query()->where('event_type', 'like', 'community.%')->count(),
             'automation_success_rate' => $this->automationSuccessRate(),
             'community_signal_abuse_events' => AbuseEvent::query()->where('type', 'community_signal_spike')->where('reviewed', false)->count(),
@@ -328,6 +331,44 @@ class CommunityAutomationService
         return $count;
     }
 
+    private function createOfficialResponseTasks(): int
+    {
+        $created = 0;
+
+        NewsUrl::query()
+            ->whereDoesntHave('officialResponses', fn ($query) => $query->whereIn('status', ['published', 'pending']))
+            ->whereHas('votes')
+            ->withCount('votes')
+            ->orderByDesc('votes_count')
+            ->limit(100)
+            ->get()
+            ->each(function (NewsUrl $newsUrl) use (&$created): void {
+                if ($newsUrl->votes_count < 2 && ! $newsUrl->finalized_at) {
+                    return;
+                }
+
+                $task = $this->upsertTask(
+                    'needs_official_response',
+                    $newsUrl,
+                    "news:official-response:{$newsUrl->id}",
+                    '需要官方或本人澄清',
+                    $newsUrl->title_snapshot ?: $newsUrl->normalized_url,
+                    $newsUrl->finalized_at ? 70 : 60,
+                    "/news/{$newsUrl->id}",
+                    [
+                        'votes_count' => (int) $newsUrl->votes_count,
+                        'finalized_at' => $newsUrl->finalized_at?->toJSON(),
+                    ],
+                );
+
+                if ($task->wasRecentlyCreated) {
+                    $created++;
+                }
+            });
+
+        return $created;
+    }
+
     private function upsertTask(string $type, Model $subject, string $key, string $title, string $description, int $priority, string $actionUrl, array $metrics = [], bool $escalated = false): CommunityTask
     {
         $policy = $this->policy->all();
@@ -466,6 +507,7 @@ class CommunityAutomationService
             'url_rule_candidate' => 'url_classification',
             'trusted_source_candidate' => 'trusted_source',
             'evidence_quality_review' => 'evidence_unhelpful',
+            'needs_official_response' => 'official_response_request',
             default => null,
         };
     }
@@ -477,6 +519,7 @@ class CommunityAutomationService
             'url_rule_candidate' => 'url_classification',
             'trusted_source_candidate' => 'trusted_source',
             'evidence_quality_review' => 'evidence_unhelpful',
+            'needs_official_response' => 'official_response_request',
             default => null,
         };
     }
@@ -502,6 +545,10 @@ class CommunityAutomationService
             ],
             'controversial_news' => [
                 ['value' => 'needs_more_evidence', 'label' => '這則新聞需要更多證據'],
+            ],
+            'needs_official_response' => [
+                ['value' => 'needs_official_response', 'label' => '這則新聞需要官方或本人澄清'],
+                ['value' => 'reject_official_response_need', 'label' => '目前不需要官方澄清'],
             ],
             default => [],
         };

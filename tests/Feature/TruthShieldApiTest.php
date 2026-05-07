@@ -47,6 +47,7 @@ use App\Jobs\SnapshotEvidenceJob;
 use Database\Seeders\TagSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
@@ -1630,6 +1631,7 @@ class TruthShieldApiTest extends TestCase
     public function test_health_and_transparency_include_operational_defense_fields(): void
     {
         OperationalEvent::query()->create(['type' => 'queue_worker', 'status' => 'ok']);
+        OperationalEvent::query()->create(['type' => 'scheduler', 'status' => 'ok']);
         BugReport::query()->create([
             'report_type' => 'security',
             'severity' => 'critical',
@@ -1647,6 +1649,7 @@ class TruthShieldApiTest extends TestCase
         $this->getJson('/api/system/health')
             ->assertOk()
             ->assertJsonPath('queue.healthy', true)
+            ->assertJsonPath('scheduler.healthy', true)
             ->assertJsonPath('counts.high_risk_account_edges', 1)
             ->assertJsonPath('counts.open_security_reports', 1)
             ->assertJsonPath('counts.critical_bug_reports', 1)
@@ -1658,6 +1661,23 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonPath('open_security_reports', 1)
             ->assertJsonPath('bug_report_distribution.new', 1)
             ->assertJsonStructure(['active_api_clients', 'operational_events_24h', 'status_cache_version']);
+    }
+
+    public function test_bootstrap_admin_command_creates_production_admin_user(): void
+    {
+        $this->artisan('truthshield:bootstrap-admin', [
+            '--email' => 'launch-admin@example.test',
+            '--name' => 'Launch Admin',
+            '--password' => 'launch-admin-password-2026',
+        ])->assertExitCode(0);
+
+        $admin = User::query()->where('email', 'launch-admin@example.test')->firstOrFail();
+
+        $this->assertTrue($admin->is_admin);
+        $this->assertSame('trusted_reviewer', $admin->identity_level);
+        $this->assertSame('manual', $admin->auth_provider);
+        $this->assertTrue(Hash::check('launch-admin-password-2026', $admin->password));
+        $this->assertDatabaseHas('operational_events', ['type' => 'admin_bootstrap', 'status' => 'ok']);
     }
 
     public function test_oauth_begin_state_and_identity_link_flow(): void

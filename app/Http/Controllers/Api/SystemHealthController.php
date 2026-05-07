@@ -49,7 +49,12 @@ class SystemHealthController extends Controller
                     ->where('type', 'queue_worker')
                     ->latest()
                     ->first();
-                $queueHealthy = ! $latestHeartbeat || $latestHeartbeat->created_at->gte(now()->subMinutes(10));
+                $latestScheduleHeartbeat = OperationalEvent::query()
+                    ->where('type', 'scheduler')
+                    ->latest()
+                    ->first();
+                $queueHealthy = $this->heartbeatHealthy($latestHeartbeat, 10);
+                $schedulerHealthy = $this->heartbeatHealthy($latestScheduleHeartbeat, 3);
 
                 return [
                     'queue' => [
@@ -57,6 +62,10 @@ class SystemHealthController extends Controller
                         'pending_jobs' => $this->tableCount('jobs'),
                         'failed_jobs' => $this->tableCount('failed_jobs'),
                         'latest_worker_heartbeat_at' => $latestHeartbeat?->created_at?->toJSON(),
+                    ],
+                    'scheduler' => [
+                        'healthy' => $schedulerHealthy,
+                        'latest_scheduler_heartbeat_at' => $latestScheduleHeartbeat?->created_at?->toJSON(),
                     ],
                     'counts' => [
                         'expired_unfinalized_news' => NewsUrl::query()
@@ -87,6 +96,7 @@ class SystemHealthController extends Controller
         );
 
         $queueHealthy = (bool) $metrics['queue']['healthy'];
+        $schedulerHealthy = (bool) $metrics['scheduler']['healthy'];
         $governancePressure = (int) (
             ($metrics['counts']['pending_domain_reports'] ?? 0)
             + ($metrics['counts']['pending_evidence_reports'] ?? 0)
@@ -99,9 +109,10 @@ class SystemHealthController extends Controller
         if (! $database) $degradedReasons[] = 'database';
         if (! $cache) $degradedReasons[] = 'cache';
         if (! $queueHealthy) $degradedReasons[] = 'queue';
+        if (! $schedulerHealthy) $degradedReasons[] = 'scheduler';
 
         return response()->json([
-            'ok' => $database && $cache && $queueHealthy,
+            'ok' => $database && $cache && $queueHealthy && $schedulerHealthy,
             'database' => $database,
             'cache' => $cache,
             'degraded_reasons' => $degradedReasons,
@@ -109,6 +120,7 @@ class SystemHealthController extends Controller
                 'connection' => config('queue.default'),
                 ...$metrics['queue'],
             ],
+            'scheduler' => $metrics['scheduler'],
             'mail' => [
                 'enabled' => (bool) config('truthshield.email_enabled', true),
                 'mailer' => config('mail.default'),
@@ -124,7 +136,7 @@ class SystemHealthController extends Controller
                 'status_cache_version' => config('truthshield.status_cache_version', 'v1'),
             ],
             'timestamp' => now()->toJSON(),
-        ], $database && $cache && $queueHealthy ? 200 : 503);
+        ], $database && $cache && $queueHealthy && $schedulerHealthy ? 200 : 503);
     }
 
     private function tableCount(string $table): int
@@ -134,5 +146,14 @@ class SystemHealthController extends Controller
         }
 
         return (int) DB::table($table)->count();
+    }
+
+    private function heartbeatHealthy(?OperationalEvent $event, int $freshMinutes): bool
+    {
+        if (! $event) {
+            return config('app.env') !== 'production';
+        }
+
+        return $event->created_at->gte(now()->subMinutes($freshMinutes));
     }
 }

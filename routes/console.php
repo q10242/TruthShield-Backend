@@ -4,6 +4,7 @@ use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schedule;
 use App\Jobs\DetectAbuseClustersJob;
@@ -22,6 +23,7 @@ use App\Models\NewsUrl;
 use App\Models\NewsDomain;
 use App\Models\RateLimitPolicy;
 use App\Models\TrustedEvidenceSource;
+use App\Models\User;
 use App\Models\Vote;
 use App\Services\AlgorithmVersionService;
 use App\Services\CommunityAutomationService;
@@ -174,6 +176,47 @@ Artisan::command('truthshield:record-operational-heartbeat {type=queue_worker}',
     $this->info('Heartbeat recorded.');
 })->purpose('Record operational heartbeat for health checks.');
 
+Artisan::command('truthshield:bootstrap-admin {--email=} {--name=TruthShield Admin} {--password=}', function () {
+    $email = (string) $this->option('email');
+    $password = (string) $this->option('password');
+
+    if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $this->error('Provide a valid --email for the first admin.');
+        return 1;
+    }
+
+    if (strlen($password) < 12) {
+        $this->error('Provide --password with at least 12 characters. Do not reuse local seed passwords.');
+        return 1;
+    }
+
+    $user = User::query()->updateOrCreate(
+        ['email' => $email],
+        [
+            'name' => (string) $this->option('name'),
+            'display_name' => (string) $this->option('name'),
+            'auth_provider' => 'manual',
+            'identity_level' => 'trusted_reviewer',
+            'email_verified_at' => now(),
+            'trust_score' => 1.5,
+            'identity_multiplier' => 1.3,
+            'abuse_multiplier' => 1.0,
+            'risk_status' => 'normal',
+            'password' => Hash::make($password),
+            'is_admin' => true,
+        ],
+    );
+
+    OperationalEvent::query()->create([
+        'type' => 'admin_bootstrap',
+        'status' => 'ok',
+        'metadata' => ['user_id' => $user->id, 'email_hash' => hash('sha256', $email)],
+    ]);
+
+    $this->info("Admin ready: {$email}");
+    return 0;
+})->purpose('Create or update the first production admin account.');
+
 Artisan::command('truthshield:check-production-env', function () {
     $required = [
         'APP_KEY',
@@ -204,6 +247,81 @@ Artisan::command('truthshield:check-production-env', function () {
     $this->info('Production environment checklist passed.');
     return 0;
 })->purpose('Validate required TruthShield production environment variables.');
+
+Artisan::command('truthshield:preflight-production {--require-external}', function () {
+    $failures = [];
+    $warnings = [];
+
+    $check = function (bool $condition, string $message) use (&$failures): void {
+        if (! $condition) {
+            $failures[] = $message;
+        }
+    };
+    $warn = function (bool $condition, string $message) use (&$warnings): void {
+        if (! $condition) {
+            $warnings[] = $message;
+        }
+    };
+
+    $check(filled(config('app.key')), 'APP_KEY is missing.');
+    $check(config('app.debug') === false, 'APP_DEBUG must be false.');
+    $check(config('app.env') === 'production', 'APP_ENV should be production.');
+    $check(filled(config('app.url')) && ! str_contains(config('app.url'), 'localhost'), 'APP_URL must be a production URL.');
+    $check(filled(config('app.frontend_url') ?? env('FRONTEND_URL')), 'FRONTEND_URL is missing.');
+    $check(! config('truthshield.dev_login_enabled'), 'TRUTHSHIELD_DEV_LOGIN_ENABLED must be false.');
+
+    try {
+        DB::select('select 1');
+    } catch (Throwable $exception) {
+        $failures[] = 'Database connection failed: ' . $exception->getMessage();
+    }
+
+    try {
+        cache()->store(config('truthshield.status_cache_store'))->put('preflight:cache', 'ok', 10);
+        $check(cache()->store(config('truthshield.status_cache_store'))->get('preflight:cache') === 'ok', 'Redis/cache read-write check failed.');
+    } catch (Throwable $exception) {
+        $failures[] = 'Redis/cache connection failed: ' . $exception->getMessage();
+    }
+
+    $check(User::query()->where('is_admin', true)->exists(), 'No admin user exists. Run truthshield:bootstrap-admin.');
+    $check(DB::getSchemaBuilder()->hasTable('jobs'), 'jobs table missing; queue cannot run.');
+    $check(DB::getSchemaBuilder()->hasTable('operational_events'), 'operational_events table missing.');
+    $warn(config('queue.default') !== 'sync', 'QUEUE_CONNECTION should not be sync in production.');
+    $warn(config('mail.default') !== 'array', 'MAIL_MAILER=array is test-only. Use log or a real provider.');
+
+    $latestQueue = OperationalEvent::query()->where('type', 'queue_worker')->latest()->first();
+    $latestSchedule = OperationalEvent::query()->where('type', 'scheduler')->latest()->first();
+    $warn($latestQueue?->created_at?->gte(now()->subMinutes(10)) ?? false, 'No fresh queue_worker heartbeat in the last 10 minutes.');
+    $warn($latestSchedule?->created_at?->gte(now()->subMinutes(3)) ?? false, 'No fresh scheduler heartbeat in the last 3 minutes.');
+
+    $external = [
+        'ECPAY_MERCHANT_ID' => env('ECPAY_MERCHANT_ID'),
+        'ECPAY_HASH_KEY' => env('ECPAY_HASH_KEY'),
+        'ECPAY_HASH_IV' => env('ECPAY_HASH_IV'),
+        'FACEBOOK_CLIENT_ID' => env('FACEBOOK_CLIENT_ID'),
+        'GOOGLE_CLIENT_ID' => env('GOOGLE_CLIENT_ID'),
+        'GITHUB_CLIENT_ID' => env('GITHUB_CLIENT_ID'),
+    ];
+    foreach ($external as $key => $value) {
+        $message = "{$key} is not configured.";
+        $this->option('require-external') ? $check(filled($value), $message) : $warn(filled($value), $message);
+    }
+
+    foreach ($warnings as $message) {
+        $this->warn($message);
+    }
+    foreach ($failures as $message) {
+        $this->error($message);
+    }
+
+    if ($failures !== []) {
+        $this->error('Production preflight failed.');
+        return 1;
+    }
+
+    $this->info('Production preflight passed with ' . count($warnings) . ' warning(s).');
+    return 0;
+})->purpose('Run production readiness checks that do not require external credentials unless requested.');
 
 Artisan::command('truthshield:expire-pending-donations {--hours=24}', function () {
     $hours = max(1, (int) $this->option('hours'));
@@ -535,7 +653,8 @@ Schedule::command('truthshield:sync-evidence --limit=500')->hourly();
 Schedule::command('truthshield:snapshot-evidence --limit=100')->everyThirtyMinutes();
 Schedule::command('truthshield:detect-abuse-clusters')->hourly();
 Schedule::command('truthshield:build-account-graph')->hourly();
-Schedule::command('truthshield:record-operational-heartbeat')->everyFiveMinutes();
+Schedule::command('truthshield:record-operational-heartbeat scheduler')->everyMinute();
+Schedule::command('truthshield:record-operational-heartbeat queue_worker')->everyFiveMinutes();
 Schedule::command('truthshield:run-community-automation')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('truthshield:seed-launch-policies')->daily();
 Schedule::command('truthshield:check-extension-selectors')->daily();

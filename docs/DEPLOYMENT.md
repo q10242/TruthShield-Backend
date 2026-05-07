@@ -92,10 +92,12 @@ Package the extension:
 
 ```bash
 cd truth-shield-web
+TRUTHSHIELD_EXTENSION_WEB_ORIGIN=https://truthshield.example \
+TRUTHSHIELD_EXTENSION_API_ORIGIN=https://api.truthshield.example \
 npm run package:extension
 ```
 
-Before packaging, set extension options to production origins or update the default origins in the extension if you want production defaults.
+The package script rewrites the extension default origins inside the zip. Users can still override origins from the extension options page.
 
 ## First Production Run
 
@@ -106,7 +108,9 @@ php artisan migrate --force
 php artisan db:seed --class=TagSeeder --force
 php artisan truthshield:seed-launch-policies
 php artisan truthshield:ensure-algorithm-version
+php artisan truthshield:bootstrap-admin --email=admin@example.com --name="TruthShield Admin" --password='use-a-long-random-password'
 php artisan truthshield:check-production-env
+php artisan truthshield:preflight-production
 ```
 
 Then verify:
@@ -115,6 +119,7 @@ Then verify:
 curl https://api.truthshield.example/api/system/health
 curl https://api.truthshield.example/api/tags?locale=en
 curl https://api.truthshield.example/api/news/status?url=https%3A%2F%2Fwww.cna.com.tw%2Fnews%2Faipl%2F202605060001.aspx
+BASE_URL=https://api.truthshield.example ./deploy/smoke-test.sh
 ```
 
 ## Rollback

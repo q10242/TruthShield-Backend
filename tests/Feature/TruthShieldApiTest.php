@@ -20,6 +20,8 @@ use App\Models\Donation;
 use App\Models\AbuseEvent;
 use App\Models\AbuseCluster;
 use App\Models\AlgorithmVersion;
+use App\Models\CommunitySignal;
+use App\Models\CommunityTask;
 use App\Models\EvidenceReport;
 use App\Models\Evidence;
 use App\Models\EvidenceSnapshot;
@@ -1081,6 +1083,128 @@ class TruthShieldApiTest extends TestCase
         $this->assertSame(4.8, round((float) TrustedSourceSuggestion::query()->where('host', 'drive.google.com')->value('weighted_score'), 2));
     }
 
+    public function test_community_signals_are_deduplicated_and_anonymous_reports_do_not_auto_approve(): void
+    {
+        config([
+            'truthshield_community.min_distinct_users' => 2,
+            'truthshield_community.thresholds.domain_report' => 2.0,
+        ]);
+
+        $user = User::factory()->create(['trust_score' => 3]);
+        $token = $user->createToken('community')->plainTextToken;
+        $payload = ['url' => 'https://self-managed-news.test/story/1'];
+
+        $this->postJson('/api/news-domain-reports', $payload)->assertCreated();
+        $this->postJson('/api/news-domain-reports', $payload)->assertCreated();
+
+        $this->withToken($token)->postJson('/api/news-domain-reports', $payload)->assertCreated();
+        $this->withToken($token)->postJson('/api/news-domain-reports', $payload)->assertCreated();
+
+        $this->assertSame(4, NewsDomainReport::query()->where('domain', 'self-managed-news.test')->value('report_count'));
+        $this->assertSame(3, CommunitySignal::query()->where('signal_type', 'domain_report')->where('subject_key', 'self-managed-news.test')->count());
+
+        $this->artisan('truthshield:run-community-automation')->assertExitCode(0);
+        $this->assertDatabaseMissing('news_domains', ['domain' => 'self-managed-news.test']);
+        $this->assertDatabaseHas('community_tasks', [
+            'type' => 'domain_candidate',
+            'subject_key' => 'self-managed-news.test',
+            'status' => 'open',
+        ]);
+    }
+
+    public function test_community_automation_auto_approves_low_risk_domain_url_rule_and_trusted_source(): void
+    {
+        config([
+            'truthshield_community.min_distinct_users' => 2,
+            'truthshield_community.thresholds.domain_report' => 2.0,
+            'truthshield_community.thresholds.url_classification' => 2.0,
+            'truthshield_community.thresholds.trusted_source' => 2.0,
+        ]);
+
+        $users = User::factory()->count(2)->create(['trust_score' => 1.5]);
+        $domainPayload = ['url' => 'https://auto-news.test/news/202605070001', 'page_title' => 'Auto News'];
+        $rulePayload = ['url' => 'https://auto-news.test/news/202605070001', 'classification' => 'article'];
+        $sourcePayload = ['host' => 'drive.google.com', 'source_type' => 'cloud_drive'];
+
+        foreach ($users as $user) {
+            $token = $user->createToken('community')->plainTextToken;
+            $this->withToken($token)->postJson('/api/news-domain-reports', $domainPayload)->assertCreated();
+            $this->withToken($token)->postJson('/api/url-classification-reports', $rulePayload)->assertCreated();
+            $this->withToken($token)->postJson('/api/trusted-source-suggestions', $sourcePayload)->assertCreated();
+        }
+
+        $this->artisan('truthshield:run-community-automation')->assertExitCode(0);
+
+        $this->assertDatabaseHas('news_domains', [
+            'domain' => 'auto-news.test',
+            'is_active' => true,
+        ]);
+        $this->assertNotNull(NewsDomain::query()->where('domain', 'auto-news.test')->value('article_url_pattern'));
+        $this->assertDatabaseHas('trusted_evidence_sources', [
+            'host' => 'drive.google.com',
+            'source_type' => 'cloud_drive',
+            'is_active' => true,
+        ]);
+        $this->assertDatabaseHas('news_domain_reports', ['domain' => 'auto-news.test', 'status' => 'community_approved']);
+        $this->assertDatabaseHas('url_classification_reports', ['domain' => 'auto-news.test', 'status' => 'community_approved']);
+        $this->assertDatabaseHas('trusted_source_suggestions', ['host' => 'drive.google.com', 'status' => 'community_approved']);
+    }
+
+    public function test_high_risk_source_escalates_and_evidence_can_be_soft_demoted(): void
+    {
+        config([
+            'truthshield_community.min_distinct_users' => 2,
+            'truthshield_community.thresholds.trusted_source' => 2.0,
+            'truthshield_community.thresholds.evidence_unhelpful' => 1.0,
+            'truthshield.evidence_reaction_min_trust_score' => 0.5,
+        ]);
+
+        $users = User::factory()->count(2)->create(['trust_score' => 1.5]);
+        foreach ($users as $user) {
+            $this->actingAs($user, 'sanctum')
+                ->postJson('/api/trusted-source-suggestions', ['host' => 'sponsored.example', 'source_type' => 'sponsored'])
+                ->assertCreated();
+        }
+
+        $this->seed(TagSeeder::class);
+        $author = User::factory()->create(['trust_score' => 1.2]);
+        $tag = Tag::query()->where('slug', 'out-of-context')->firstOrFail();
+        $this->actingAs($author, 'sanctum')
+            ->postJson('/api/vote', [
+                'url' => 'https://www.cna.com.tw/news/aipl/202605070002.aspx',
+                'tag_id' => $tag->id,
+                'evidence_url' => 'https://example.com/weak-evidence',
+                'evidence_note' => '需要更多來源確認。',
+            ])
+            ->assertCreated();
+
+        $vote = Vote::query()->firstOrFail();
+        foreach ($users as $user) {
+            $this->actingAs($user, 'sanctum')
+                ->postJson("/api/evidence/{$vote->id}/reaction", ['helpful' => false])
+                ->assertOk();
+        }
+
+        $this->artisan('truthshield:run-community-automation')->assertExitCode(0);
+
+        $this->assertDatabaseMissing('trusted_evidence_sources', ['host' => 'sponsored.example']);
+        $this->assertDatabaseHas('community_tasks', [
+            'type' => 'trusted_source_candidate',
+            'subject_key' => 'sponsored.example|sponsored',
+            'status' => 'escalated',
+        ]);
+        $this->assertSame('community_demoted', $vote->evidence->refresh()->moderation_status);
+
+        $this->getJson('/api/community/tasks?status=escalated')
+            ->assertOk()
+            ->assertJsonStructure(['meta', 'data' => [['id', 'type', 'priority', 'status', 'metrics']]]);
+
+        $this->getJson('/api/community/tasks/stats')
+            ->assertOk()
+            ->assertJsonPath('escalated_tasks', 1)
+            ->assertJsonPath('community_demoted_evidence', 1);
+    }
+
     public function test_api_clients_can_be_created_listed_and_revoked(): void
     {
         $owner = User::factory()->create();
@@ -1619,6 +1743,7 @@ class TruthShieldApiTest extends TestCase
                 'production_checklist',
                 'security_report_flow',
                 'live_pressure',
+                'community_self_management',
                 'launch_dependencies',
             ]);
     }

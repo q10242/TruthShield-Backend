@@ -17,6 +17,7 @@ class EvidenceLibraryController extends Controller
             'domain' => ['nullable', 'string', 'max:255'],
             'trusted' => ['nullable', 'boolean'],
             'sort' => ['nullable', 'in:latest,helpful,controversial,quality'],
+            'focus' => ['nullable', 'string', 'in:community'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -51,6 +52,14 @@ class EvidenceLibraryController extends Controller
             $query->where('evidence_safety', $validated['trusted'] ? 'trusted' : 'unverified');
         }
 
+        if (($validated['focus'] ?? null) === 'community') {
+            $query->whereHas('evidence', fn ($evidenceQuery) => $evidenceQuery->whereIn('moderation_status', ['visible', 'community_demoted']))
+                ->where(fn ($builder) => $builder
+                    ->whereHas('reports', fn ($reportQuery) => $reportQuery->where('status', 'pending'))
+                    ->orWhereHas('evidence', fn ($evidenceQuery) => $evidenceQuery->where('moderation_status', 'community_demoted'))
+                    ->orWhereHas('reactions', fn ($reactionQuery) => $reactionQuery->where('helpful', false)));
+        }
+
         match ($validated['sort'] ?? 'helpful') {
             'latest' => $query->latest('votes.updated_at'),
             'controversial' => $query
@@ -81,6 +90,7 @@ class EvidenceLibraryController extends Controller
                     'domain' => $validated['domain'] ?? null,
                     'trusted' => $validated['trusted'] ?? null,
                     'sort' => $validated['sort'] ?? 'helpful',
+                    'focus' => $validated['focus'] ?? null,
                 ],
             ],
             'data' => $rows->map(fn (Vote $vote) => [

@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Models\NewsDomain;
+use App\Models\CommunityTask;
 use App\Models\NewsDomainReport;
 use App\Models\NewsChangeReport;
 use App\Models\NewsUrl;
@@ -35,6 +36,8 @@ class SystemStatusOverview extends BaseWidget
                 'pending_data_requests' => UserDataRequest::query()->where('status', 'pending')->count(),
                 'unavailable_news' => NewsUrl::query()->where('availability_status', 'deleted_or_unavailable')->count(),
                 'active_domains' => NewsDomain::query()->where('is_active', true)->count(),
+                'community_open_tasks' => CommunityTask::query()->where('status', 'open')->count(),
+                'community_escalated_tasks' => CommunityTask::query()->where('status', 'escalated')->count(),
             ],
         );
 
@@ -57,6 +60,9 @@ class SystemStatusOverview extends BaseWidget
             Stat::make('資料權利請求', $stats['pending_data_requests'])
                 ->description('待管理員處理')
                 ->color('gray'),
+            Stat::make('社群自治任務', $stats['community_open_tasks'])
+                ->description("人工升級 {$stats['community_escalated_tasks']} 件")
+                ->color($stats['community_escalated_tasks'] > 0 ? 'warning' : 'success'),
         ];
     }
 }

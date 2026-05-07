@@ -9,6 +9,7 @@ use App\Models\EvidenceReport;
 use App\Models\Vote;
 use App\Services\AccountSignalService;
 use App\Services\AuditLogService;
+use App\Services\CommunitySignalService;
 use App\Services\NewsAggregationService;
 use App\Services\NotificationService;
 use App\Services\EvidenceSyncService;
@@ -47,6 +48,7 @@ class EvidenceController extends Controller
         AuditLogService $auditLog,
         EvidenceSyncService $evidenceSync,
         AccountSignalService $accountSignals,
+        CommunitySignalService $communitySignals,
     ): JsonResponse
     {
         $validated = $request->validate([
@@ -88,6 +90,14 @@ class EvidenceController extends Controller
             'helpful' => $validated['helpful'],
         ]);
         $accountSignals->record($request, $request->user(), $vote->newsUrl, 'evidence_reaction');
+        $communitySignals->record(
+            $request,
+            $validated['helpful'] ? 'evidence_helpful' : 'evidence_unhelpful',
+            $vote,
+            "vote:{$vote->id}",
+            $validated['helpful'] ? 'helpful' : 'unhelpful',
+            ['news_url_id' => $vote->news_url_id],
+        );
         InspectAbuseSignalsJob::dispatch($request->user()->id, $vote->newsUrl->id, $vote->id, 'reaction');
         $evidenceSync->syncFromVote($vote->refresh());
 
@@ -97,7 +107,7 @@ class EvidenceController extends Controller
         ]);
     }
 
-    public function report(Request $request, Vote $vote, AuditLogService $auditLog, NotificationService $notifications): JsonResponse
+    public function report(Request $request, Vote $vote, AuditLogService $auditLog, NotificationService $notifications, CommunitySignalService $communitySignals): JsonResponse
     {
         $validated = $request->validate([
             'reason' => ['required', 'string', 'max:80'],
@@ -120,6 +130,14 @@ class EvidenceController extends Controller
             'vote_id' => $vote->id,
             'reason' => $validated['reason'],
         ]);
+        $communitySignals->record(
+            $request,
+            'evidence_report',
+            $report,
+            "vote:{$vote->id}",
+            $validated['reason'],
+            ['vote_id' => $vote->id],
+        );
 
         $vote->loadMissing(['user', 'newsUrl']);
         if ($vote->user && $vote->user->id !== $request->user()?->id) {

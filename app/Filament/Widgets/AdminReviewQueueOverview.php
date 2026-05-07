@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Models\AbuseEvent;
 use App\Models\Appeal;
+use App\Models\CommunityTask;
 use App\Models\EvidenceReport;
 use App\Models\NewsChangeReport;
 use App\Models\NewsDomainReport;
@@ -52,6 +53,7 @@ class AdminReviewQueueOverview extends BaseWidget
             ['queue_label' => '申訴', 'title' => '待審使用者申訴', 'count' => Appeal::query()->where('status', 'pending')->count(), 'priority' => 'medium', 'admin_url' => '/admin/appeals'],
             ['queue_label' => 'URL 分類', 'title' => '待審文章/分類頁回報', 'count' => UrlClassificationReport::query()->where('status', 'pending')->count(), 'priority' => 'medium', 'admin_url' => '/admin/url-classification-reports'],
             ['queue_label' => '可信來源', 'title' => '待審可信證據來源建議', 'count' => TrustedSourceSuggestion::query()->where('status', 'pending')->count(), 'priority' => 'medium', 'admin_url' => '/admin/trusted-source-suggestions'],
+            ['queue_label' => '社群自治', 'title' => '升級人工處理的社群任務', 'count' => CommunityTask::query()->where('status', 'escalated')->count(), 'priority' => 'high', 'admin_url' => '/admin/community-tasks'],
         ])->filter(fn ($row) => $row['count'] > 0)->values();
 
         if ($rows->isEmpty()) {

@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\AccountGraphController;
 use App\Http\Controllers\Api\ApiClientController;
 use App\Http\Controllers\Api\AppealController;
 use App\Http\Controllers\Api\CommunityMaintenanceController;
+use App\Http\Controllers\Api\CommunityTaskController;
 use App\Http\Controllers\Api\DonationController;
 use App\Http\Controllers\Api\EvidenceController;
 use App\Http\Controllers\Api\EvidenceLibraryController;
@@ -69,6 +70,8 @@ Route::post('/news-domain-reports', [NewsDomainReportController::class, 'store']
 Route::get('/news-domain-reports/status', [NewsDomainReportController::class, 'status'])->middleware('throttle:60,1');
 Route::post('/url-classification-reports', [CommunityMaintenanceController::class, 'storeUrlClassification'])->middleware('throttle:20,1');
 Route::post('/trusted-source-suggestions', [CommunityMaintenanceController::class, 'storeTrustedSourceSuggestion'])->middleware('throttle:20,1');
+Route::get('/community/tasks', [CommunityTaskController::class, 'index']);
+Route::get('/community/tasks/stats', [CommunityTaskController::class, 'stats']);
 Route::get('/news/status', [NewsController::class, 'status'])->middleware('throttle:hover');
 Route::post('/news/snapshot', [NewsSnapshotController::class, 'store'])->middleware('throttle:30,1');
 Route::post('/news/change-reports', [NewsChangeReportController::class, 'store'])->middleware('throttle:20,1');

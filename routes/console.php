@@ -24,6 +24,7 @@ use App\Models\RateLimitPolicy;
 use App\Models\TrustedEvidenceSource;
 use App\Models\Vote;
 use App\Services\AlgorithmVersionService;
+use App\Services\CommunityAutomationService;
 use App\Services\EvidenceSyncService;
 use App\Services\NewsAggregationService;
 use App\Services\TrustScoreService;
@@ -108,6 +109,14 @@ Artisan::command('truthshield:detect-abuse-clusters', function () {
     DetectAbuseClustersJob::dispatchSync();
     $this->info('Abuse cluster detection job completed.');
 })->purpose('Aggregate recent abuse events into reviewable clusters.');
+
+Artisan::command('truthshield:run-community-automation', function (CommunityAutomationService $automation) {
+    $stats = $automation->run();
+
+    foreach ($stats as $key => $value) {
+        $this->line("{$key}: {$value}");
+    }
+})->purpose('Apply low-risk community consensus and refresh community task queues.');
 
 Artisan::command('truthshield:build-account-graph', function () {
     $edges = 0;

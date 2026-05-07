@@ -4,12 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\NewsDomainReport;
+use App\Services\CommunitySignalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class NewsDomainReportController extends Controller
 {
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, CommunitySignalService $signals): JsonResponse
     {
         $validated = $request->validate([
             'url' => ['required', 'url', 'max:4096'],
@@ -49,6 +50,15 @@ class NewsDomainReportController extends Controller
                 'last_reported_at' => now(),
             ]);
         }
+
+        $signals->record(
+            $request,
+            'domain_report',
+            $report,
+            $domain,
+            'missing_news_domain',
+            ['url' => $validated['url'], 'page_title' => $validated['page_title'] ?? null],
+        );
 
         return response()->json([
             'message' => 'News domain report received.',

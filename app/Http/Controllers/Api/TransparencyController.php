@@ -8,7 +8,10 @@ use App\Models\AbuseEvent;
 use App\Models\Appeal;
 use App\Models\ApiClient;
 use App\Models\AuditLog;
+use App\Models\CommunitySignal;
+use App\Models\CommunityTask;
 use App\Models\Donation;
+use App\Models\Evidence;
 use App\Models\EvidenceReport;
 use App\Models\ExtensionSelectorCheck;
 use App\Models\ExtensionEvent;
@@ -60,6 +63,12 @@ class TransparencyController extends Controller
             'selector_failures_24h' => ExtensionSelectorCheck::query()->where('success', false)->where('checked_at', '>=', now()->subDay())->count(),
             'active_trusted_evidence_sources' => TrustedEvidenceSource::query()->where('is_active', true)->count(),
             'active_rate_limit_policies' => RateLimitPolicy::query()->where('is_active', true)->count(),
+            'community_open_tasks' => CommunityTask::query()->where('status', 'open')->count(),
+            'community_escalated_tasks' => CommunityTask::query()->where('status', 'escalated')->count(),
+            'community_resolved_tasks' => CommunityTask::query()->where('status', 'resolved')->count(),
+            'community_signals' => CommunitySignal::query()->count(),
+            'community_authenticated_signals' => CommunitySignal::query()->whereNotNull('user_id')->count(),
+            'community_demoted_evidence' => Evidence::query()->where('moderation_status', 'community_demoted')->count(),
             'donation_total_amount' => (int) Donation::query()->where('status', Donation::STATUS_PAID)->sum('amount'),
             'donation_paid_count' => Donation::query()->where('status', Donation::STATUS_PAID)->count(),
             'donation_month_amount' => (int) Donation::query()->where('status', Donation::STATUS_PAID)->where('paid_at', '>=', now()->startOfMonth())->sum('amount'),
@@ -76,6 +85,8 @@ class TransparencyController extends Controller
                 'appeals_pending' => Appeal::query()->where('status', 'pending')->count(),
                 'change_reports_pending' => NewsChangeReport::query()->where('status', 'pending')->count(),
                 'abuse_events_open' => AbuseEvent::query()->where('reviewed', false)->count(),
+                'community_tasks_open' => CommunityTask::query()->where('status', 'open')->count(),
+                'community_tasks_escalated' => CommunityTask::query()->where('status', 'escalated')->count(),
             ],
             'governance_pressure_score' => min(100, (
                 EvidenceReport::query()->where('status', 'pending')->count()

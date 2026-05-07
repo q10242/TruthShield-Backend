@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AbuseEvent;
 use App\Models\Appeal;
+use App\Models\CommunityTask;
 use App\Models\EvidenceReport;
 use App\Models\ExtensionEvent;
 use App\Models\NewsChangeReport;
@@ -45,6 +46,7 @@ class VisionReadinessController extends Controller
                 'production_checklist' => config('truthshield_readiness.production_checklist', []),
                 'security_report_flow' => config('truthshield_readiness.security_report_flow', []),
                 'live_pressure' => $this->livePressure(),
+                'community_self_management' => $this->communitySelfManagement(),
                 'launch_dependencies' => $this->launchDependencies(),
             ],
         ));
@@ -201,6 +203,18 @@ class VisionReadinessController extends Controller
                 ->where('created_at', '>=', now()->subDay())
                 ->count(),
             'governance_pressure_score' => $this->governancePressureScore(),
+        ];
+    }
+
+    private function communitySelfManagement(): array
+    {
+        return [
+            'principle' => '低風險資料維護由社群加權共識自動套用，高風險審核仍進後台。',
+            'open_tasks' => CommunityTask::query()->where('status', 'open')->count(),
+            'escalated_tasks' => CommunityTask::query()->where('status', 'escalated')->count(),
+            'resolved_tasks' => CommunityTask::query()->where('status', 'resolved')->count(),
+            'thresholds' => config('truthshield_community.thresholds', []),
+            'min_distinct_users' => config('truthshield_community.min_distinct_users', 3),
         ];
     }
 

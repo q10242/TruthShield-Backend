@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Badge;
+use App\Models\CommunitySignal;
 use App\Models\Donation;
 use App\Models\EvidenceReaction;
 use App\Models\NewsChangeReport;
@@ -113,6 +114,46 @@ class AchievementService
             ->all();
     }
 
+    public function communityRolesFor(User $user, array $stats): array
+    {
+        $roles = [];
+        $trustScore = (float) $user->trust_score;
+
+        if ($trustScore >= 1.5 && $stats['helpful_evidence_received'] >= 5) {
+            $roles[] = [
+                'key' => 'evidence_curator',
+                'name' => '證據整理者',
+                'description' => '提交的證據多次被社群評為有用，適合協助整理爭議新聞證據。',
+            ];
+        }
+
+        if ($trustScore >= 1.2 && $stats['community_signals'] >= 5) {
+            $roles[] = [
+                'key' => 'domain_steward',
+                'name' => '新聞站維護者',
+                'description' => '持續協助回報新聞站、URL 分類與可信來源。',
+            ];
+        }
+
+        if ($trustScore >= 2.0 && ($stats['evidence_reactions'] + $stats['community_signals']) >= 10) {
+            $roles[] = [
+                'key' => 'abuse_watcher',
+                'name' => '濫用觀察員',
+                'description' => '可協助辨識低品質證據、異常回報與協同行為。',
+            ];
+        }
+
+        if ($trustScore >= 3.0 || $stats['badges'] >= 6) {
+            $roles[] = [
+                'key' => 'trusted_reviewer',
+                'name' => '可信審查者',
+                'description' => '高信用使用者，社群自治門檻會更重視你的訊號。',
+            ];
+        }
+
+        return $roles;
+    }
+
     public function statsFor(User $user): array
     {
         return [
@@ -123,6 +164,13 @@ class AchievementService
             'helpful_evidence_received' => EvidenceReaction::query()
                 ->where('helpful', true)
                 ->whereHas('vote', fn ($query) => $query->where('user_id', $user->id))
+                ->count(),
+            'community_signals' => CommunitySignal::query()->where('user_id', $user->id)->count(),
+            'accepted_community_signals' => CommunitySignal::query()
+                ->where('user_id', $user->id)
+                ->whereHas('user')
+                ->whereIn('signal_type', ['domain_report', 'url_classification', 'trusted_source'])
+                ->where('weight_score', '>=', config('truthshield_community.trust_floor', 1.0))
                 ->count(),
             'read_sessions' => $user->readSessions()->count(),
             'trust_history_entries' => $user->trustScoreHistories()->count(),

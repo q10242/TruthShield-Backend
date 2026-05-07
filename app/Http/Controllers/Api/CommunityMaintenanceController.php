@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\TrustedSourceSuggestion;
 use App\Models\User;
 use App\Models\UrlClassificationReport;
+use App\Services\CommunityAutomationService;
+use App\Services\CommunitySignalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -13,7 +15,7 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class CommunityMaintenanceController extends Controller
 {
-    public function storeUrlClassification(Request $request): JsonResponse
+    public function storeUrlClassification(Request $request, CommunitySignalService $signals, CommunityAutomationService $automation): JsonResponse
     {
         $validated = $request->validate([
             'url' => ['required', 'url', 'max:4096'],
@@ -70,13 +72,22 @@ class CommunityMaintenanceController extends Controller
             ]);
         }
 
+        $signals->record(
+            $request,
+            'url_classification',
+            $report,
+            $automation->urlClassificationKey($host, $pathSignature, $classification),
+            $classification,
+            ['domain' => $host, 'path_signature' => $pathSignature],
+        );
+
         return response()->json([
             'message' => 'URL classification report received.',
             'report' => $report,
         ], 201);
     }
 
-    public function storeTrustedSourceSuggestion(Request $request): JsonResponse
+    public function storeTrustedSourceSuggestion(Request $request, CommunitySignalService $signals, CommunityAutomationService $automation): JsonResponse
     {
         $validated = $request->validate([
             'url' => ['nullable', 'url', 'max:2048'],
@@ -131,6 +142,15 @@ class CommunityMaintenanceController extends Controller
                 'weighted_score' => round($weight, 4),
             ]);
         }
+
+        $signals->record(
+            $request,
+            'trusted_source',
+            $suggestion,
+            $automation->trustedSourceKey($host, $sourceType),
+            $sourceType,
+            ['host' => $host, 'example_url' => $validated['url'] ?? null],
+        );
 
         return response()->json([
             'message' => 'Trusted source suggestion received.',

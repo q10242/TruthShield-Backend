@@ -25,6 +25,8 @@ class ProfileController extends Controller
                 'evidence_reactions' => $achievementStats['evidence_reactions'],
                 'helpful_reactions' => $achievementStats['helpful_reactions'],
                 'helpful_evidence_received' => $achievementStats['helpful_evidence_received'],
+                'community_signals' => $achievementStats['community_signals'],
+                'accepted_community_signals' => $achievementStats['accepted_community_signals'],
                 'trust_history_entries' => $achievementStats['trust_history_entries'],
                 'read_sessions' => $achievementStats['read_sessions'],
                 'snapshot_reports' => $achievementStats['snapshot_reports'],
@@ -36,6 +38,7 @@ class ProfileController extends Controller
                 'unlocked_count' => $achievementStats['badges'],
                 'total_count' => count($achievements->definitions()),
             ],
+            'community_roles' => $achievements->communityRolesFor($user, $achievementStats),
             'achievements' => $achievements->achievementsFor($user),
             'recent_votes' => $user->votes()
                 ->with(['tag:id,name,slug,color,severity', 'newsUrl:id,normalized_url,title_snapshot,finalized_at,voting_closes_at'])

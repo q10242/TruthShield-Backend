@@ -1509,4 +1509,22 @@ class TruthShieldApiTest extends TestCase
         $this->postJson('/api/donations/ecpay', ['amount' => 360])
             ->assertCreated();
     }
+
+    public function test_user_data_request_can_be_submitted(): void
+    {
+        $this->postJson('/api/user-data-requests', [
+            'email' => 'privacy@example.com',
+            'request_type' => 'deletion',
+            'reason' => '請協助刪除帳號相關資料。',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('request.email', 'privacy@example.com')
+            ->assertJsonPath('request.status', 'pending');
+
+        $this->assertDatabaseHas('user_data_requests', [
+            'email' => 'privacy@example.com',
+            'request_type' => 'deletion',
+            'status' => 'pending',
+        ]);
+    }
 }

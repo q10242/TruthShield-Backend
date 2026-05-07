@@ -76,6 +76,23 @@ class DonationController extends Controller
         ]);
     }
 
+    public function supporters(): JsonResponse
+    {
+        $supporters = Donation::query()
+            ->where('status', 'paid')
+            ->latest('paid_at')
+            ->limit(24)
+            ->get()
+            ->map(fn (Donation $donation) => [
+                'name' => $donation->donor_name ?: '匿名支持者',
+                'amount' => $donation->amount,
+                'message' => $donation->message,
+                'paid_at' => $donation->paid_at?->toISOString(),
+            ]);
+
+        return response()->json(['data' => $supporters]);
+    }
+
     public function notify(Request $request, EcpayDonationService $ecpay)
     {
         $payload = $request->all();

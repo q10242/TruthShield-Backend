@@ -79,6 +79,7 @@ Route::get('/exports/evidence.csv', [ExportController::class, 'evidenceCsv']);
 Route::get('/media/{mediaOutlet:slug}', [MediaOutletController::class, 'show']);
 Route::get('/transparency', [TransparencyController::class, 'show']);
 Route::get('/system/health', [SystemHealthController::class, 'show']);
+Route::get('/donations/summary', [DonationController::class, 'summary']);
 Route::post('/donations/ecpay', [DonationController::class, 'store'])->middleware('throttle:10,1');
 Route::post('/donations/ecpay/notify', [DonationController::class, 'notify'])->middleware('throttle:120,1');
 Route::get('/donations/{tradeNo}', [DonationController::class, 'show'])->whereAlphaNumeric('tradeNo');

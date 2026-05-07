@@ -63,6 +63,19 @@ class DonationController extends Controller
         ]);
     }
 
+    public function summary(): JsonResponse
+    {
+        $paid = Donation::query()->where('status', 'paid');
+
+        return response()->json([
+            'total_amount' => (int) (clone $paid)->sum('amount'),
+            'paid_count' => (clone $paid)->count(),
+            'month_amount' => (int) (clone $paid)->where('paid_at', '>=', now()->startOfMonth())->sum('amount'),
+            'month_count' => (clone $paid)->where('paid_at', '>=', now()->startOfMonth())->count(),
+            'pending_count' => Donation::query()->where('status', 'pending')->count(),
+        ]);
+    }
+
     public function notify(Request $request, EcpayDonationService $ecpay)
     {
         $payload = $request->all();

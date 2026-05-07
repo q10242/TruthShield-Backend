@@ -15,6 +15,7 @@ use App\Models\NewsUrl;
 use App\Models\OperationalEvent;
 use App\Models\RateLimitPolicy;
 use App\Models\TrustedEvidenceSource;
+use App\Models\UserDataRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -75,6 +76,7 @@ class SystemHealthController extends Controller
                         'pending_evidence_snapshots' => \App\Models\Evidence::query()->where('snapshot_status', 'pending')->count(),
                         'pending_donations' => Donation::query()->where('status', Donation::STATUS_PENDING)->count(),
                         'paid_donations_24h' => Donation::query()->where('status', Donation::STATUS_PAID)->where('paid_at', '>=', now()->subDay())->count(),
+                        'pending_user_data_requests' => UserDataRequest::query()->where('status', 'pending')->count(),
                     ],
                 ];
             },

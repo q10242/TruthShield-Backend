@@ -56,6 +56,7 @@ Route::get('/extension/selector-checks', [LaunchOpsController::class, 'selectorC
 Route::post('/extension/selector-checks', [LaunchOpsController::class, 'storeSelectorCheck'])->middleware('throttle:120,1');
 Route::get('/extension/summary', [ExtensionSummaryController::class, 'show']);
 Route::post('/extension/events', [ExtensionEventController::class, 'store'])->middleware('throttle:120,1');
+Route::post('/extension/events/batch', [ExtensionEventController::class, 'storeBatch'])->middleware('throttle:30,1');
 Route::get('/extension/coverage', [ExtensionEventController::class, 'coverage']);
 Route::get('/news-domains', [LookupController::class, 'newsDomains']);
 Route::post('/news-domain-reports', [NewsDomainReportController::class, 'store'])->middleware('throttle:10,1');

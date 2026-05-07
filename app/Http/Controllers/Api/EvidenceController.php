@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\InspectAbuseSignalsJob;
 use App\Models\EvidenceReaction;
 use App\Models\EvidenceReport;
 use App\Models\Vote;
-use App\Services\AbuseDetectionService;
 use App\Services\AccountSignalService;
 use App\Services\AuditLogService;
 use App\Services\NewsAggregationService;
@@ -45,7 +45,6 @@ class EvidenceController extends Controller
         TrustScoreService $trustScores,
         NewsAggregationService $newsAggregation,
         AuditLogService $auditLog,
-        AbuseDetectionService $abuseDetection,
         EvidenceSyncService $evidenceSync,
         AccountSignalService $accountSignals,
     ): JsonResponse
@@ -89,7 +88,7 @@ class EvidenceController extends Controller
             'helpful' => $validated['helpful'],
         ]);
         $accountSignals->record($request, $request->user(), $vote->newsUrl, 'evidence_reaction');
-        $abuseDetection->inspectReaction($request, $request->user(), $vote);
+        InspectAbuseSignalsJob::dispatch($request->user()->id, $vote->newsUrl->id, $vote->id, 'reaction');
         $evidenceSync->syncFromVote($vote->refresh());
 
         return response()->json([

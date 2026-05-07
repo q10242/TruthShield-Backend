@@ -27,6 +27,8 @@ class NewsController extends Controller
             return response()->json(['message' => $exception->getMessage()], 422);
         }
 
-        return response()->json($newsAggregation->statusForFingerprint($fingerprint));
+        return response()
+            ->json($newsAggregation->statusForFingerprint($fingerprint))
+            ->header('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
     }
 }

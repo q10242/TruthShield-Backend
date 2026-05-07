@@ -2,6 +2,7 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schedule;
@@ -318,6 +319,108 @@ Artisan::command('truthshield:stress-http-status {url?} {--requests=50} {--base-
         'p99_ms' => $percentile(0.99),
     ], JSON_PRETTY_PRINT));
 })->purpose('Run real HTTP status endpoint latency smoke test.');
+
+Artisan::command('truthshield:stress-http-launch {url?} {--requests=20} {--base-url=}', function () {
+    $baseUrl = rtrim($this->option('base-url') ?: config('app.url'), '/');
+    $url = $this->argument('url') ?: 'https://www.cna.com.tw/news/aipl/202605060001.aspx';
+    $endpoints = [
+        'status' => ['/api/news/status', ['url' => $url]],
+        'evidence' => ['/api/news/evidence', ['url' => $url]],
+        'domains' => ['/api/news-domains', []],
+        'extension-events' => ['/api/extension/events/batch', null],
+    ];
+    $requests = max(1, (int) $this->option('requests'));
+    $summary = [];
+
+    foreach ($endpoints as $name => [$path, $query]) {
+        $latencies = [];
+        $failures = 0;
+
+        for ($i = 0; $i < $requests; $i++) {
+            $started = microtime(true);
+            try {
+                $response = $query === null
+                    ? Http::timeout(5)->acceptJson()->post($baseUrl . $path, [
+                        'events' => [[
+                            'domain' => 'load-test.local',
+                            'event_type' => 'load_test',
+                            'success' => true,
+                            'metadata' => ['iteration' => $i],
+                        ]],
+                    ])
+                    : Http::timeout(5)->acceptJson()->get($baseUrl . $path, $query);
+
+                if (! $response->successful()) {
+                    $failures++;
+                }
+            } catch (\Throwable) {
+                $failures++;
+            }
+
+            $latencies[] = (microtime(true) - $started) * 1000;
+        }
+
+        sort($latencies);
+        $percentile = fn (float $p) => round($latencies[(int) min(count($latencies) - 1, floor((count($latencies) - 1) * $p))], 2);
+        $summary[$name] = [
+            'requests' => $requests,
+            'failures' => $failures,
+            'p50_ms' => $percentile(0.50),
+            'p95_ms' => $percentile(0.95),
+            'p99_ms' => $percentile(0.99),
+        ];
+    }
+
+    $this->info(json_encode([
+        'base_url' => $baseUrl,
+        'url' => $url,
+        'summary' => $summary,
+    ], JSON_PRETTY_PRINT));
+})->purpose('Run launch hot endpoint HTTP latency smoke tests.');
+
+Artisan::command('truthshield:explain-hot-queries', function () {
+    if (DB::getDriverName() !== 'pgsql') {
+        $this->warn('EXPLAIN checks are only available on PostgreSQL.');
+        return 0;
+    }
+
+    $queries = [
+        'status_aggregation' => <<<'SQL'
+EXPLAIN (FORMAT JSON)
+SELECT tag_id, SUM(weight_score) AS total_weight
+FROM votes
+WHERE news_url_id = (SELECT id FROM news_urls ORDER BY id DESC LIMIT 1)
+GROUP BY tag_id
+ORDER BY total_weight DESC
+SQL,
+        'evidence_library_search' => <<<'SQL'
+EXPLAIN (FORMAT JSON)
+SELECT votes.id
+FROM votes
+WHERE hidden = false
+  AND evidence_url IS NOT NULL
+  AND (evidence_note ILIKE '%test%' OR evidence_url ILIKE '%test%')
+ORDER BY votes.created_at DESC
+LIMIT 50
+SQL,
+        'extension_coverage' => <<<'SQL'
+EXPLAIN (FORMAT JSON)
+SELECT domain, event_type, count(*) AS total
+FROM extension_events
+WHERE created_at >= NOW() - INTERVAL '7 days'
+GROUP BY domain, event_type
+ORDER BY domain
+SQL,
+    ];
+
+    foreach ($queries as $name => $sql) {
+        $this->line("## {$name}");
+        $plan = DB::selectOne($sql);
+        $this->line(json_encode($plan, JSON_PRETTY_PRINT));
+    }
+
+    return 0;
+})->purpose('Run PostgreSQL EXPLAIN plans for launch hot queries.');
 
 Artisan::command('truthshield:backup-postgres {path?}', function () {
     $path = $this->argument('path') ?: storage_path('app/backups/truthshield-' . now()->format('Ymd-His') . '.sql');

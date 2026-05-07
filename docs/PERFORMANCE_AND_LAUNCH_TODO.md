@@ -13,14 +13,14 @@
 
 ## Next Performance Work
 
-- [ ] Move extension telemetry ingestion to queue or batched client upload.
-- [ ] Add frontend URL canonicalization so tracking-query variants share the same hover cache entry before reaching the backend.
-- [ ] Add edge/CDN cache headers for anonymous status and lookup endpoints.
-- [ ] Add PostgreSQL trigram or full-text indexes for evidence library keyword search.
-- [ ] Add load tests for `/api/news/status`, `/api/news/evidence`, `/api/news-domains`, and `/api/extension/events`.
-- [ ] Add EXPLAIN-based checks for high-volume admin resources.
-- [ ] Move abuse detection from synchronous vote/reaction requests into a lightweight immediate check plus queued batch jobs.
-- [ ] Run production queue workers instead of `QUEUE_CONNECTION=sync`.
+- [x] Move extension telemetry ingestion to queue or batched client upload.
+- [x] Add frontend URL canonicalization so tracking-query variants share the same hover cache entry before reaching the backend.
+- [x] Add edge/CDN cache headers for anonymous status and lookup endpoints.
+- [x] Add PostgreSQL trigram or full-text indexes for evidence library keyword search.
+- [x] Add load tests for `/api/news/status`, `/api/news/evidence`, `/api/news-domains`, and `/api/extension/events`.
+- [x] Add EXPLAIN-based checks for high-volume admin resources.
+- [x] Move abuse detection from synchronous vote/reaction requests into a lightweight immediate check plus queued batch jobs.
+- [x] Run production queue workers instead of `QUEUE_CONNECTION=sync`.
 
 ## Remaining Launch Gaps
 

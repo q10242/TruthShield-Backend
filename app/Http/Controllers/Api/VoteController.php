@@ -6,7 +6,7 @@ use App\Models\NewsUrl;
 use App\Models\Tag;
 use App\Models\Vote;
 use App\Http\Controllers\Controller;
-use App\Services\AbuseDetectionService;
+use App\Jobs\InspectAbuseSignalsJob;
 use App\Services\AccountSignalService;
 use App\Services\AuditLogService;
 use App\Services\EvidenceUrlService;
@@ -28,7 +28,6 @@ class VoteController extends Controller
         NewsAggregationService $newsAggregation,
         MediaOutletService $mediaOutlets,
         AuditLogService $auditLog,
-        AbuseDetectionService $abuseDetection,
         EvidenceUrlService $evidenceUrls,
         EvidenceSyncService $evidenceSync,
         AccountSignalService $accountSignals,
@@ -142,7 +141,7 @@ class VoteController extends Controller
             'tag_id' => $validated['tag_id'],
         ]);
         $accountSignals->record($request, $request->user(), $newsUrl, 'vote');
-        $abuseDetection->inspectVote($request, $request->user(), $newsUrl, $vote);
+        InspectAbuseSignalsJob::dispatch($request->user()->id, $newsUrl->id, $vote->id, 'vote');
 
         return response()->json([
             'message' => 'Vote recorded.',

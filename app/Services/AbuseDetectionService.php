@@ -12,6 +12,11 @@ class AbuseDetectionService
 {
     public function inspectVote(Request $request, User $user, NewsUrl $newsUrl, Vote $vote): void
     {
+        $this->inspectVoteSignals($user, $newsUrl, $vote);
+    }
+
+    public function inspectVoteSignals(User $user, NewsUrl $newsUrl, Vote $vote): void
+    {
         $recentUserVotes = Vote::query()
             ->where('user_id', $user->id)
             ->where('created_at', '>=', now()->subMinutes(10))
@@ -67,6 +72,11 @@ class AbuseDetectionService
     }
 
     public function inspectReaction(Request $request, User $user, Vote $vote): void
+    {
+        $this->inspectReactionSignals($user, $vote);
+    }
+
+    public function inspectReactionSignals(User $user, Vote $vote): void
     {
         $recentReactions = $user->evidenceReactions()
             ->where('created_at', '>=', now()->subMinutes(10))

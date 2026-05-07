@@ -51,6 +51,16 @@ class DonationController extends Controller
         ], 201);
     }
 
+    public function config(): JsonResponse
+    {
+        return response()->json([
+            'amounts' => config('truthshield.donation_amounts', [100, 300, 500, 1000, 2000, 5000]),
+            'currency' => 'TWD',
+            'provider' => 'ecpay',
+            'monthly_goal' => (int) config('truthshield.donation_monthly_goal', 15000),
+        ]);
+    }
+
     public function show(string $tradeNo): JsonResponse
     {
         $donation = Donation::query()

@@ -81,6 +81,7 @@ Route::get('/media/{mediaOutlet:slug}', [MediaOutletController::class, 'show']);
 Route::get('/transparency', [TransparencyController::class, 'show']);
 Route::get('/system/health', [SystemHealthController::class, 'show']);
 Route::get('/donations/summary', [DonationController::class, 'summary']);
+Route::get('/donations/config', [DonationController::class, 'config']);
 Route::get('/donations/supporters', [DonationController::class, 'supporters']);
 Route::get('/donations/monthly', [DonationController::class, 'monthly']);
 Route::post('/donations/ecpay', [DonationController::class, 'store'])->middleware('throttle:10,1');

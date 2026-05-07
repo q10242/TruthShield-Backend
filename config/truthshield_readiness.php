@@ -1,0 +1,41 @@
+<?php
+
+return [
+    'local_next_points' => [
+        ['id' => 1, 'category' => 'operations', 'title' => '願景準備頁加入缺口模式', 'impact' => '使用者能分辨已完成、本地待推、外部依賴。'],
+        ['id' => 2, 'category' => 'operations', 'title' => '願景資料抽成 config', 'impact' => '減少 controller 寫死清單，後續可由營運維護。'],
+        ['id' => 3, 'category' => 'governance', 'title' => '後台願景 dashboard widget', 'impact' => '管理員一進後台就看到 readiness 狀態。'],
+        ['id' => 4, 'category' => 'governance', 'title' => '後台待辦連結可點擊', 'impact' => '降低管理員處理待審事項的摩擦。'],
+        ['id' => 5, 'category' => 'operations', 'title' => 'API docs 補 readiness response', 'impact' => '研究者和開發者可理解 readiness API shape。'],
+        ['id' => 6, 'category' => 'operations', 'title' => 'Security 頁升級成通報流程', 'impact' => '讓資安回報有清楚分類與處理 SLA。'],
+        ['id' => 7, 'category' => 'operations', 'title' => 'Backup/restore runbook 頁面化', 'impact' => '本地即可演練備份與還原流程。'],
+        ['id' => 8, 'category' => 'operations', 'title' => 'Launch Ops 加 production checklist', 'impact' => '上線前命令、外部依賴與驗證步驟集中管理。'],
+        ['id' => 9, 'category' => 'extension', 'title' => '插件 popup 加 readiness/status 入口', 'impact' => '測試者可直接開啟系統狀態與願景準備頁。'],
+        ['id' => 10, 'category' => 'extension', 'title' => '插件 options 加 origin 測試', 'impact' => '使用者可確認 Web/API origin 是否可連線。'],
+        ['id' => 11, 'category' => 'extension', 'title' => 'Extension coverage domain 分級', 'impact' => '快速看出穩定、需觀察、失敗的網域。'],
+        ['id' => 12, 'category' => 'extension', 'title' => 'Selector checks 失敗原因統計', 'impact' => '知道是缺 selector、頁型不符或 iframe 失敗。'],
+        ['id' => 13, 'category' => 'governance', 'title' => 'Domain 回報轉規則引導', 'impact' => '把使用者回報導向可維護的新聞站規則。'],
+        ['id' => 14, 'category' => 'journalism', 'title' => 'URL 分類規則可視化', 'impact' => '降低分類頁、首頁、文章頁誤判。'],
+        ['id' => 15, 'category' => 'journalism', 'title' => 'Evidence rubric 公開區塊', 'impact' => '使用者投證據前知道品質標準。'],
+        ['id' => 16, 'category' => 'journalism', 'title' => '投票面板加入標籤準則', 'impact' => '降低標籤濫用與情緒化投票。'],
+        ['id' => 17, 'category' => 'voting', 'title' => 'Evidence Library 高爭議區塊', 'impact' => '優先浮出社群分歧大的證據。'],
+        ['id' => 18, 'category' => 'community', 'title' => 'Profile 下一步貢獻建議', 'impact' => '引導使用者從閱讀走向證據、評分與治理。'],
+        ['id' => 19, 'category' => 'community', 'title' => 'Badge 分類', 'impact' => '讓成就牆更像可追求的身份系統。'],
+        ['id' => 20, 'category' => 'governance', 'title' => '透明儀表板治理壓力總分', 'impact' => '一眼判斷平台審核負載是否過高。'],
+        ['id' => 21, 'category' => 'operations', 'title' => 'Health endpoint 清楚標示 degraded reason', 'impact' => '本地排錯與上線監控更直覺。'],
+        ['id' => 22, 'category' => 'operations', 'title' => 'OpenAPI 補 query/schema', 'impact' => '提高第三方接入與自動測試可用性。'],
+    ],
+    'production_checklist' => [
+        ['key' => 'env', 'title' => 'Production env check', 'command' => 'php artisan truthshield:check-production-env'],
+        ['key' => 'migrate', 'title' => 'Run migrations', 'command' => 'php artisan migrate --force'],
+        ['key' => 'seed_policies', 'title' => 'Seed launch policies', 'command' => 'php artisan truthshield:seed-launch-policies'],
+        ['key' => 'cache', 'title' => 'Warm hot status cache', 'command' => 'php artisan truthshield:warm-cache'],
+        ['key' => 'selectors', 'title' => 'Check extension selectors', 'command' => 'php artisan truthshield:check-extension-selectors'],
+        ['key' => 'backup', 'title' => 'Prepare PostgreSQL backup', 'command' => 'php artisan truthshield:backup-postgres'],
+    ],
+    'security_report_flow' => [
+        ['severity' => 'critical', 'target' => 'token、後台權限、付款 callback、SSRF', 'sla' => '72 小時內確認，7 天內初步修補。'],
+        ['severity' => 'high', 'target' => '投票權重繞過、iframe/postMessage、濫用降權繞過', 'sla' => '7 天內回覆處理計畫。'],
+        ['severity' => 'medium', 'target' => '資料匯出、透明頁、插件相容性資訊洩漏', 'sla' => '14 天內排程。'],
+    ],
+];

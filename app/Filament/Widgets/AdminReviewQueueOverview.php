@@ -32,7 +32,12 @@ class AdminReviewQueueOverview extends BaseWidget
                 Tables\Columns\TextColumn::make('title')->label('事項')->searchable()->limit(80),
                 Tables\Columns\TextColumn::make('count')->label('數量')->sortable(),
                 Tables\Columns\TextColumn::make('priority')->label('優先級')->badge(),
-                Tables\Columns\TextColumn::make('admin_url')->label('後台路徑')->copyable()->limit(60),
+                Tables\Columns\TextColumn::make('admin_url')
+                    ->label('後台路徑')
+                    ->copyable()
+                    ->url(fn ($record) => $record->admin_url)
+                    ->openUrlInNewTab()
+                    ->limit(60),
             ])
             ->paginated(false);
     }

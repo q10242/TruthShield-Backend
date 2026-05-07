@@ -77,6 +77,12 @@ class TransparencyController extends Controller
                 'change_reports_pending' => NewsChangeReport::query()->where('status', 'pending')->count(),
                 'abuse_events_open' => AbuseEvent::query()->where('reviewed', false)->count(),
             ],
+            'governance_pressure_score' => min(100, (
+                EvidenceReport::query()->where('status', 'pending')->count()
+                + Appeal::query()->where('status', 'pending')->count()
+                + NewsChangeReport::query()->where('status', 'pending')->count()
+                + AbuseEvent::query()->where('reviewed', false)->count() * 2
+            ) * 10),
         ]));
     }
 }

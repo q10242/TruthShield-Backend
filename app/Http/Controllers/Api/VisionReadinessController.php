@@ -22,22 +22,26 @@ class VisionReadinessController extends Controller
     public function show(): JsonResponse
     {
         return response()->json(Cache::store(config('truthshield.status_cache_store'))->remember(
-            'vision:readiness:v1',
+            'vision:readiness:v2',
             now()->addSeconds(60),
             fn () => [
                 'summary' => [
                     'name' => 'TruthShield 願景上線準備中心',
                     'local_feature_points' => count($this->featurePoints()),
+                    'local_next_points' => count(config('truthshield_readiness.local_next_points', [])),
                     'external_launch_dependencies' => count($this->launchDependencies()),
                     'completed_local_points' => collect($this->featurePoints())->where('status', 'implemented')->count(),
                     'generated_at' => now()->toJSON(),
                 ],
                 'categories' => $this->categories(),
                 'feature_points' => $this->featurePoints(),
+                'local_next_points' => config('truthshield_readiness.local_next_points', []),
                 'journalism_taxonomy' => $this->journalismTaxonomy(),
                 'evidence_rubric' => $this->evidenceRubric(),
                 'participation_loops' => $this->participationLoops(),
                 'operational_playbooks' => $this->operationalPlaybooks(),
+                'production_checklist' => config('truthshield_readiness.production_checklist', []),
+                'security_report_flow' => config('truthshield_readiness.security_report_flow', []),
                 'live_pressure' => $this->livePressure(),
                 'launch_dependencies' => $this->launchDependencies(),
             ],
@@ -194,7 +198,19 @@ class VisionReadinessController extends Controller
                 ->where('success', false)
                 ->where('created_at', '>=', now()->subDay())
                 ->count(),
+            'governance_pressure_score' => $this->governancePressureScore(),
         ];
+    }
+
+    private function governancePressureScore(): int
+    {
+        $pressure = EvidenceReport::query()->where('status', 'pending')->count()
+            + NewsChangeReport::query()->where('status', 'pending')->count()
+            + Appeal::query()->where('status', 'pending')->count()
+            + AbuseEvent::query()->where('reviewed', false)->count() * 2
+            + NewsDomainReport::query()->where('status', 'pending')->count();
+
+        return min(100, $pressure * 10);
     }
 
     private function launchDependencies(): array

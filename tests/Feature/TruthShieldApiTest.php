@@ -1602,14 +1602,19 @@ class TruthShieldApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('summary.local_feature_points', 55)
             ->assertJsonPath('summary.completed_local_points', 55)
+            ->assertJsonPath('summary.local_next_points', 22)
             ->assertJsonCount(55, 'feature_points')
+            ->assertJsonCount(22, 'local_next_points')
             ->assertJsonStructure([
                 'categories',
                 'feature_points' => [['id', 'category', 'title', 'status']],
+                'local_next_points' => [['id', 'category', 'title', 'impact']],
                 'journalism_taxonomy' => ['negative', 'positive'],
                 'evidence_rubric',
                 'participation_loops',
                 'operational_playbooks',
+                'production_checklist',
+                'security_report_flow',
                 'live_pressure',
                 'launch_dependencies',
             ]);

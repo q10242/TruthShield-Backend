@@ -83,16 +83,28 @@ class SystemHealthController extends Controller
         );
 
         $queueHealthy = (bool) $metrics['queue']['healthy'];
+        $governancePressure = (int) (
+            ($metrics['counts']['pending_domain_reports'] ?? 0)
+            + ($metrics['counts']['pending_evidence_reports'] ?? 0)
+            + (($metrics['counts']['open_abuse_events'] ?? 0) * 2)
+            + ($metrics['counts']['pending_user_data_requests'] ?? 0)
+        );
+        $degradedReasons = [];
+        if (! $database) $degradedReasons[] = 'database';
+        if (! $cache) $degradedReasons[] = 'cache';
+        if (! $queueHealthy) $degradedReasons[] = 'queue';
 
         return response()->json([
             'ok' => $database && $cache && $queueHealthy,
             'database' => $database,
             'cache' => $cache,
+            'degraded_reasons' => $degradedReasons,
             'queue' => [
                 'connection' => config('queue.default'),
                 ...$metrics['queue'],
             ],
             'counts' => $metrics['counts'],
+            'governance_pressure_score' => min(100, $governancePressure * 10),
             'thresholds' => [
                 'min_read_seconds_before_vote' => (int) config('truthshield.min_read_seconds_before_vote', 15),
                 'evidence_reaction_min_trust_score' => (float) config('truthshield.evidence_reaction_min_trust_score', 0.5),

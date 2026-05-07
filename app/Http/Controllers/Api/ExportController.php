@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Donation;
 use App\Models\MediaOutlet;
 use App\Models\NewsUrl;
+use App\Models\UserDataRequest;
 use App\Models\Vote;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -138,5 +139,28 @@ class ExportController extends Controller
                     }
                 });
         }, 'truthshield-donations.csv', ['Content-Type' => 'text/csv']);
+    }
+
+    public function userDataRequestsCsv(): StreamedResponse
+    {
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['id', 'email', 'request_type', 'status', 'created_at', 'reviewed_at']);
+
+            UserDataRequest::query()
+                ->latest()
+                ->chunk(200, function ($rows) use ($handle): void {
+                    foreach ($rows as $row) {
+                        fputcsv($handle, [
+                            $row->id,
+                            $row->email,
+                            $row->request_type,
+                            $row->status,
+                            $row->created_at?->toJSON(),
+                            $row->reviewed_at?->toJSON(),
+                        ]);
+                    }
+                });
+        }, 'truthshield-user-data-requests.csv', ['Content-Type' => 'text/csv']);
     }
 }

@@ -24,11 +24,15 @@ class User extends Authenticatable implements FilamentUser
      */
     protected $fillable = [
         'name',
+        'display_name',
         'email',
         'fb_id',
         'auth_provider',
         'identity_level',
         'risk_status',
+        'public_identity_label',
+        'is_real_name_public',
+        'profile_bio',
         'identity_multiplier',
         'abuse_multiplier',
         'password',
@@ -60,6 +64,7 @@ class User extends Authenticatable implements FilamentUser
             'identity_multiplier' => 'float',
             'abuse_multiplier' => 'float',
             'is_admin' => 'boolean',
+            'is_real_name_public' => 'boolean',
         ];
     }
 
@@ -106,5 +111,24 @@ class User extends Authenticatable implements FilamentUser
     public function badges(): BelongsToMany
     {
         return $this->belongsToMany(Badge::class)->withPivot('reason')->withTimestamps();
+    }
+
+    public function verifiedClaimants(): HasMany
+    {
+        return $this->hasMany(VerifiedClaimant::class);
+    }
+
+    public function officialResponses(): HasMany
+    {
+        return $this->hasMany(OfficialResponse::class);
+    }
+
+    public function publicName(): string
+    {
+        if ($this->is_real_name_public && $this->name) {
+            return $this->name;
+        }
+
+        return $this->display_name ?: $this->name ?: 'TruthShield user';
     }
 }

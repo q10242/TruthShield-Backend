@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\NewsSnapshotController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ModerationEventController;
 use App\Http\Controllers\Api\OpenApiController;
+use App\Http\Controllers\Api\OfficialResponseController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ReadSessionController;
 use App\Http\Controllers\Api\SystemHealthController;
@@ -82,6 +83,7 @@ Route::post('/news/snapshot', [NewsSnapshotController::class, 'store'])->middlew
 Route::post('/news/change-reports', [NewsChangeReportController::class, 'store'])->middleware('throttle:20,1');
 Route::get('/news/search', [NewsSearchController::class, 'index']);
 Route::get('/news/evidence', [EvidenceController::class, 'index']);
+Route::get('/news/official-responses', [OfficialResponseController::class, 'index']);
 Route::get('/news/by-id/{newsUrl}', [NewsDetailController::class, 'show']);
 Route::get('/evidence-library', [EvidenceLibraryController::class, 'index']);
 Route::get('/moderation-events', [ModerationEventController::class, 'index']);
@@ -109,6 +111,10 @@ Route::post('/donations/ecpay', [DonationController::class, 'store'])->middlewar
 Route::post('/donations/ecpay/notify', [DonationController::class, 'notify'])->middleware('throttle:120,1');
 Route::get('/donations/{tradeNo}', [DonationController::class, 'show'])->whereAlphaNumeric('tradeNo');
 Route::get('/me/profile', [ProfileController::class, 'show'])->middleware('auth:sanctum');
+Route::put('/me/profile', [ProfileController::class, 'update'])->middleware('auth:sanctum');
+Route::post('/me/claimants', [OfficialResponseController::class, 'storeClaimant'])->middleware(['auth:sanctum', 'throttle:10,1']);
+Route::post('/official-responses', [OfficialResponseController::class, 'storeResponse'])->middleware(['auth:sanctum', 'throttle:10,1']);
+Route::post('/official-responses/{officialResponse}/reaction', [OfficialResponseController::class, 'react'])->middleware(['auth:sanctum', 'throttle:reaction']);
 Route::get('/me/api-clients', [ApiClientController::class, 'index'])->middleware('auth:sanctum');
 Route::post('/me/api-clients', [ApiClientController::class, 'store'])->middleware('auth:sanctum');
 Route::post('/me/api-clients/{client}/revoke', [ApiClientController::class, 'revoke'])->middleware('auth:sanctum');

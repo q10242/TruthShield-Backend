@@ -92,6 +92,7 @@ class AuthController extends Controller
             ['email' => $validated['email']],
             [
                 'name' => $validated['name'] ?? Str::before($validated['email'], '@'),
+                'display_name' => $validated['name'] ?? Str::before($validated['email'], '@'),
                 'fb_id' => $validated['fb_id'] ?? null,
                 'auth_provider' => filled($validated['fb_id'] ?? null) ? 'facebook-dev' : 'dev',
                 'identity_level' => 'dev',
@@ -162,6 +163,7 @@ class AuthController extends Controller
             ['email' => $validated['email']],
             [
                 'name' => $validated['name'] ?? Str::before($validated['email'], '@'),
+                'display_name' => $validated['name'] ?? Str::before($validated['email'], '@'),
                 'auth_provider' => $provider,
                 'fb_id' => $provider === 'facebook' ? $validated['provider_user_id'] : null,
                 'identity_level' => $identityLevel,

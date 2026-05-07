@@ -33,6 +33,18 @@ class UserResource extends Resource
                 Forms\Components\TextInput::make('name')
                     ->required()
                     ->maxLength(255),
+                Forms\Components\TextInput::make('display_name')
+                    ->label('公開暱稱')
+                    ->maxLength(80),
+                Forms\Components\TextInput::make('public_identity_label')
+                    ->label('公開身份標籤')
+                    ->maxLength(120),
+                Forms\Components\Toggle::make('is_real_name_public')
+                    ->label('公開真名'),
+                Forms\Components\Textarea::make('profile_bio')
+                    ->label('個人簡介')
+                    ->maxLength(500)
+                    ->columnSpanFull(),
                 Forms\Components\TextInput::make('email')
                     ->email()
                     ->required()
@@ -89,6 +101,13 @@ class UserResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('display_name')
+                    ->label('公開暱稱')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('public_identity_label')
+                    ->label('身份標籤')
+                    ->badge()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('email')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('fb_id')

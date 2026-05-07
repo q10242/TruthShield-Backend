@@ -55,6 +55,36 @@ class ProfileController extends Controller
                 ->latest()
                 ->limit(20)
                 ->get(),
+            'verified_claimants' => $user->verifiedClaimants()
+                ->with('newsUrl:id,normalized_url,title_snapshot')
+                ->latest()
+                ->limit(20)
+                ->get(),
+            'official_responses' => $user->officialResponses()
+                ->with('newsUrl:id,normalized_url,title_snapshot')
+                ->latest()
+                ->limit(20)
+                ->get(),
+        ]);
+    }
+
+    public function update(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'display_name' => ['required', 'string', 'max:80'],
+            'is_real_name_public' => ['required', 'boolean'],
+            'profile_bio' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $request->user()->forceFill([
+            'display_name' => $validated['display_name'],
+            'is_real_name_public' => $validated['is_real_name_public'],
+            'profile_bio' => $validated['profile_bio'] ?? null,
+        ])->save();
+
+        return response()->json([
+            'message' => 'Profile updated.',
+            'user' => $request->user()->fresh(),
         ]);
     }
 }

@@ -28,12 +28,15 @@ use App\Models\EvidenceSnapshot;
 use App\Models\ExtensionSelectorCheck;
 use App\Models\ExtensionEvent;
 use App\Models\OperationalEvent;
+use App\Models\OfficialResponse;
+use App\Models\OfficialResponseReaction;
 use App\Models\RateLimitPolicy;
 use App\Models\SystemSetting;
 use App\Models\TrustedEvidenceSource;
 use App\Models\TrustedSourceSuggestion;
 use App\Models\UrlClassificationReport;
 use App\Models\UserIdentity;
+use App\Models\VerifiedClaimant;
 use App\Models\TrustSettlement;
 use App\Models\UserNotification;
 use App\Jobs\FinalizeNewsUrlJob;
@@ -923,6 +926,88 @@ class TruthShieldApiTest extends TestCase
         ])
             ->assertOk()
             ->assertJsonStructure(['token', 'user']);
+    }
+
+    public function test_profile_public_identity_claimant_and_official_response_flow(): void
+    {
+        $user = User::factory()->create(['trust_score' => 2, 'name' => 'Real Name']);
+        $reviewer = User::factory()->create(['trust_score' => 2]);
+        $newsUrl = NewsUrl::query()->create([
+            'hash' => 'official-hash',
+            'original_url' => 'https://www.cna.com.tw/news/aipl/202605070001.aspx',
+            'normalized_url' => 'https://www.cna.com.tw/news/aipl/202605070001.aspx',
+            'title_snapshot' => '測試新聞',
+            'voting_closes_at' => now()->addHours(72),
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/me/profile', [
+                'display_name' => '新聞當事人',
+                'is_real_name_public' => false,
+                'profile_bio' => '我會在必要時提供澄清。',
+            ])
+            ->assertOk()
+            ->assertJsonPath('user.display_name', '新聞當事人')
+            ->assertJsonPath('user.is_real_name_public', false);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/me/claimants', [
+                'claim_type' => 'subject',
+                'domain' => 'cna.com.tw',
+                'news_url_id' => $newsUrl->id,
+                'proof_url' => 'https://drive.google.com/file/d/example/view',
+                'statement' => '我是此新聞中的當事人，申請澄清身份。',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('claimant.status', 'pending');
+
+        $claimant = VerifiedClaimant::query()->firstOrFail();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/official-responses', [
+                'url' => $newsUrl->normalized_url,
+                'verified_claimant_id' => $claimant->id,
+                'response_type' => 'subject_clarification',
+                'response_text' => '這則新聞省略了我的完整說法。',
+                'evidence_url' => 'https://drive.google.com/file/d/clarification/view',
+            ])
+            ->assertForbidden();
+
+        $claimant->forceFill(['status' => 'approved', 'verified_at' => now()])->save();
+        $user->forceFill(['public_identity_label' => '當事人已驗證'])->save();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/official-responses', [
+                'url' => $newsUrl->normalized_url,
+                'verified_claimant_id' => $claimant->id,
+                'response_type' => 'subject_clarification',
+                'response_text' => '這則新聞省略了我的完整說法。',
+                'evidence_url' => 'https://drive.google.com/file/d/clarification/view',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('official_response.status', 'pending');
+
+        $response = OfficialResponse::query()->firstOrFail();
+        $response->forceFill(['status' => 'published', 'published_at' => now()])->save();
+
+        $this->getJson('/api/news/official-responses?url=' . urlencode($newsUrl->normalized_url))
+            ->assertOk()
+            ->assertJsonPath('data.0.author.display_name', '新聞當事人')
+            ->assertJsonPath('data.0.author.identity_label', '當事人已驗證')
+            ->assertJsonPath('data.0.response_text', '這則新聞省略了我的完整說法。');
+
+        $this->actingAs($reviewer, 'sanctum')
+            ->postJson("/api/official-responses/{$response->id}/reaction", ['helpful' => true])
+            ->assertOk();
+
+        $this->assertSame(1, OfficialResponseReaction::query()->count());
+        $this->assertGreaterThan(0, (float) $response->fresh()->helpful_weight);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/me/profile')
+            ->assertOk()
+            ->assertJsonPath('verified_claimants.0.status', 'approved')
+            ->assertJsonPath('official_responses.0.status', 'published');
     }
 
     public function test_extension_nonce_marks_signed_telemetry(): void

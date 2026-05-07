@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\ApiDocsController;
 use App\Http\Controllers\Api\AccountGraphController;
 use App\Http\Controllers\Api\ApiClientController;
 use App\Http\Controllers\Api\AppealController;
+use App\Http\Controllers\Api\CommunityMaintenanceController;
 use App\Http\Controllers\Api\EvidenceController;
 use App\Http\Controllers\Api\EvidenceLibraryController;
 use App\Http\Controllers\Api\ExtensionSummaryController;
@@ -59,6 +60,8 @@ Route::get('/extension/coverage', [ExtensionEventController::class, 'coverage'])
 Route::get('/news-domains', [LookupController::class, 'newsDomains']);
 Route::post('/news-domain-reports', [NewsDomainReportController::class, 'store'])->middleware('throttle:10,1');
 Route::get('/news-domain-reports/status', [NewsDomainReportController::class, 'status'])->middleware('throttle:60,1');
+Route::post('/url-classification-reports', [CommunityMaintenanceController::class, 'storeUrlClassification'])->middleware('throttle:20,1');
+Route::post('/trusted-source-suggestions', [CommunityMaintenanceController::class, 'storeTrustedSourceSuggestion'])->middleware('throttle:20,1');
 Route::get('/news/status', [NewsController::class, 'status'])->middleware('throttle:hover');
 Route::get('/news/search', [NewsSearchController::class, 'index']);
 Route::get('/news/evidence', [EvidenceController::class, 'index']);

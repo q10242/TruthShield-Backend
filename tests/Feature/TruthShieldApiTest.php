@@ -25,6 +25,8 @@ use App\Models\ExtensionEvent;
 use App\Models\OperationalEvent;
 use App\Models\RateLimitPolicy;
 use App\Models\TrustedEvidenceSource;
+use App\Models\TrustedSourceSuggestion;
+use App\Models\UrlClassificationReport;
 use App\Models\UserIdentity;
 use App\Models\TrustSettlement;
 use App\Models\UserNotification;
@@ -965,6 +967,44 @@ class TruthShieldApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('is_reported', true)
             ->assertJsonPath('report.report_count', 2);
+    }
+
+    public function test_community_url_classification_and_trusted_source_suggestions_roll_up(): void
+    {
+        $articlePayload = [
+            'url' => 'https://community-news.test/news/politics/202605070001',
+            'classification' => 'article',
+            'page_title' => '社群分類測試',
+            'note' => '這是單篇新聞。',
+        ];
+
+        $this->postJson('/api/url-classification-reports', $articlePayload)
+            ->assertCreated()
+            ->assertJsonPath('report.domain', 'community-news.test')
+            ->assertJsonPath('report.classification', 'article')
+            ->assertJsonPath('report.report_count', 1);
+
+        $this->postJson('/api/url-classification-reports', $articlePayload)->assertCreated();
+        $this->assertSame(1, UrlClassificationReport::query()->where('domain', 'community-news.test')->count());
+        $this->assertSame(2, UrlClassificationReport::query()->where('domain', 'community-news.test')->value('report_count'));
+        $this->assertNotNull(UrlClassificationReport::query()->where('domain', 'community-news.test')->value('suggested_pattern'));
+
+        $this->postJson('/api/trusted-source-suggestions', [
+            'url' => 'https://drive.google.com/file/d/example/view',
+            'source_type' => 'cloud_drive',
+            'note' => '常用雲端證據來源。',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('suggestion.host', 'drive.google.com')
+            ->assertJsonPath('suggestion.source_type', 'cloud_drive');
+
+        $this->postJson('/api/trusted-source-suggestions', [
+            'host' => 'drive.google.com',
+            'source_type' => 'cloud_drive',
+        ])->assertCreated();
+
+        $this->assertSame(1, TrustedSourceSuggestion::query()->where('host', 'drive.google.com')->count());
+        $this->assertSame(2, TrustedSourceSuggestion::query()->where('host', 'drive.google.com')->value('report_count'));
     }
 
     public function test_api_clients_can_be_created_listed_and_revoked(): void

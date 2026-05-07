@@ -39,7 +39,7 @@ class LookupController extends Controller
             ->where('is_active', true)
             ->orderBy('priority')
             ->orderBy('domain')
-            ->get(['domain', 'article_selector', 'title_selector', 'content_selector', 'blocked_path_pattern', 'priority']);
+            ->get(['domain', 'article_selector', 'title_selector', 'content_selector', 'blocked_path_pattern', 'article_url_pattern', 'list_url_pattern', 'priority']);
 
         if ($domains->isEmpty()) {
             $domains = collect(config('truthshield.news_domains'))
@@ -49,6 +49,8 @@ class LookupController extends Controller
                     'title_selector' => null,
                     'content_selector' => null,
                     'blocked_path_pattern' => null,
+                    'article_url_pattern' => null,
+                    'list_url_pattern' => null,
                     'priority' => 100,
                 ]);
         }
@@ -62,6 +64,8 @@ class LookupController extends Controller
                     'title_selector' => $domain->title_selector,
                     'content_selector' => $domain->content_selector,
                     'blocked_path_pattern' => $domain->blocked_path_pattern,
+                    'article_url_pattern' => $domain->article_url_pattern,
+                    'list_url_pattern' => $domain->list_url_pattern,
                     'priority' => $domain->priority,
                 ])
                 ->all(),

@@ -17,6 +17,8 @@ class NewsDomain extends Model
         'title_selector',
         'content_selector',
         'blocked_path_pattern',
+        'article_url_pattern',
+        'list_url_pattern',
         'priority',
     ];
 

@@ -59,6 +59,16 @@ class NewsDomainResource extends Resource
                 ->maxLength(500)
                 ->helperText('Optional regular expression for paths where the extension should not inject.')
                 ->columnSpanFull(),
+            Forms\Components\TextInput::make('article_url_pattern')
+                ->label('文章 URL 規則')
+                ->maxLength(500)
+                ->helperText('正規表示式。符合時視為單篇新聞，可顯示頂部橫幅。')
+                ->columnSpanFull(),
+            Forms\Components\TextInput::make('list_url_pattern')
+                ->label('列表 URL 規則')
+                ->maxLength(500)
+                ->helperText('正規表示式。符合首頁、分類頁、搜尋頁時不顯示投票橫幅。')
+                ->columnSpanFull(),
             Forms\Components\TextInput::make('priority')
                 ->numeric()
                 ->required()

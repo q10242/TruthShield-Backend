@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\TransparencyController;
 use App\Http\Controllers\Api\TrustLeaderboardController;
 use App\Http\Controllers\Api\UserVoteController;
 use App\Http\Controllers\Api\UserDataExportController;
+use App\Http\Controllers\Api\UserDataRequestController;
 use App\Services\TrustScoreService;
 
 Route::post('/auth/dev-login', [AuthController::class, 'devLogin'])->middleware('throttle:auth');
@@ -80,6 +81,7 @@ Route::get('/exports/donations.csv', [ExportController::class, 'donationsCsv']);
 Route::get('/media/{mediaOutlet:slug}', [MediaOutletController::class, 'show']);
 Route::get('/transparency', [TransparencyController::class, 'show']);
 Route::get('/system/health', [SystemHealthController::class, 'show']);
+Route::post('/user-data-requests', [UserDataRequestController::class, 'store'])->middleware('throttle:5,1');
 Route::get('/donations/summary', [DonationController::class, 'summary']);
 Route::get('/donations/config', [DonationController::class, 'config']);
 Route::get('/donations/supporters', [DonationController::class, 'supporters']);

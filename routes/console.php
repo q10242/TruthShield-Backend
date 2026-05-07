@@ -15,6 +15,7 @@ use App\Models\AccountEdge;
 use App\Models\AccountSignal;
 use App\Models\Evidence;
 use App\Models\EvidenceSnapshot;
+use App\Models\Donation;
 use App\Models\ExtensionSelectorCheck;
 use App\Models\OperationalEvent;
 use App\Models\NewsUrl;
@@ -194,6 +195,16 @@ Artisan::command('truthshield:check-production-env', function () {
     $this->info('Production environment checklist passed.');
     return 0;
 })->purpose('Validate required TruthShield production environment variables.');
+
+Artisan::command('truthshield:expire-pending-donations {--hours=24}', function () {
+    $hours = max(1, (int) $this->option('hours'));
+    $count = Donation::query()
+        ->where('status', 'pending')
+        ->where('created_at', '<=', now()->subHours($hours))
+        ->update(['status' => 'expired']);
+
+    $this->info("Expired {$count} pending donation orders older than {$hours} hours.");
+})->purpose('Expire stale pending donation orders.');
 
 Artisan::command('truthshield:seed-launch-policies', function () {
     $policies = [

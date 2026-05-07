@@ -7,44 +7,52 @@ use App\Models\MediaOutlet;
 use App\Models\NewsDomain;
 use App\Models\Vote;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class LeaderboardController extends Controller
 {
     public function media(): JsonResponse
     {
-        $rows = MediaOutlet::query()
-            ->withCount('newsUrls')
-            ->get()
-            ->map(function (MediaOutlet $outlet) {
-                $weights = Vote::query()
-                    ->join('news_urls', 'news_urls.id', '=', 'votes.news_url_id')
-                    ->join('tags', 'tags.id', '=', 'votes.tag_id')
-                    ->where('news_urls.media_outlet_id', $outlet->id)
-                    ->select('tags.severity', DB::raw('sum(votes.weight_score) as weight'))
-                    ->groupBy('tags.severity')
-                    ->pluck('weight', 'severity');
+        $rows = Cache::store(config('truthshield.status_cache_store'))->remember('leaderboard:media:v1', now()->addSeconds(30), function () {
+            $weightsByOutlet = Vote::query()
+                ->join('news_urls', 'news_urls.id', '=', 'votes.news_url_id')
+                ->join('tags', 'tags.id', '=', 'votes.tag_id')
+                ->whereNotNull('news_urls.media_outlet_id')
+                ->select('news_urls.media_outlet_id', 'tags.severity', DB::raw('sum(votes.weight_score) as weight'))
+                ->groupBy('news_urls.media_outlet_id', 'tags.severity')
+                ->get()
+                ->groupBy('media_outlet_id');
 
-                $positive = (float) ($weights['positive'] ?? 0);
-                $negative = (float) $weights->except('positive')->sum();
-                $total = $positive + $negative;
-                $score = $total > 0 ? round(($positive / $total) * 100, 2) : 50.0;
+            return MediaOutlet::query()
+                ->withCount('newsUrls')
+                ->get()
+                ->map(function (MediaOutlet $outlet) use ($weightsByOutlet) {
+                    $weights = $weightsByOutlet
+                        ->get($outlet->id, collect())
+                        ->pluck('weight', 'severity');
 
-                return [
-                    'id' => $outlet->id,
-                    'name' => $outlet->name,
-                    'slug' => $outlet->slug,
-                    'type' => $outlet->type,
-                    'region' => $outlet->region,
-                    'score' => $score,
-                    'risk' => $score >= 75 ? 'low' : ($score >= 45 ? 'medium' : 'high'),
-                    'positive_weight' => round($positive, 4),
-                    'negative_weight' => round($negative, 4),
-                    'tracked_urls' => $outlet->news_urls_count,
-                ];
-            })
-            ->sortByDesc('score')
-            ->values();
+                    $positive = (float) ($weights['positive'] ?? 0);
+                    $negative = (float) $weights->except('positive')->sum();
+                    $total = $positive + $negative;
+                    $score = $total > 0 ? round(($positive / $total) * 100, 2) : 50.0;
+
+                    return [
+                        'id' => $outlet->id,
+                        'name' => $outlet->name,
+                        'slug' => $outlet->slug,
+                        'type' => $outlet->type,
+                        'region' => $outlet->region,
+                        'score' => $score,
+                        'risk' => $score >= 75 ? 'low' : ($score >= 45 ? 'medium' : 'high'),
+                        'positive_weight' => round($positive, 4),
+                        'negative_weight' => round($negative, 4),
+                        'tracked_urls' => $outlet->news_urls_count,
+                    ];
+                })
+                ->sortByDesc('score')
+                ->values();
+        });
 
         return response()->json(['data' => $rows]);
     }

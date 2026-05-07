@@ -1,0 +1,19 @@
+[Unit]
+Description=TruthShield Laravel Queue Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/truthshield/current/truth-shield-api
+EnvironmentFile=/path/to/worker.env
+ExecStart=/usr/bin/php artisan queue:work database --sleep=1 --tries=3 --timeout=90 --memory=256
+Restart=always
+RestartSec=5
+TimeoutStopSec=90
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

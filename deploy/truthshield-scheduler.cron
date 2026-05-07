@@ -1,0 +1,1 @@
+* * * * * www-data cd /var/www/truthshield/current/truth-shield-api && /usr/bin/php artisan schedule:run >> /var/log/truthshield-schedule.log 2>&1

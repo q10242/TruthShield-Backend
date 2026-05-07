@@ -144,6 +144,20 @@ php artisan schedule:run
 
 In production, the API can run on Cloud Run while a shared worker machine runs queue workers and scheduler cron.
 
+## Cloud Run Container
+
+The Dockerfile listens on Cloud Run's default port `8080`.
+
+```bash
+docker build -t truthshield-api .
+docker run --rm -p 8080:8080 \
+  -e PORT=8080 \
+  -e APP_KEY=base64:replace-me \
+  truthshield-api
+```
+
+For dirty deployment, the container can boot before all integrations are configured. API routes that need PostgreSQL or Redis will fail until production environment variables are attached.
+
 ## Production Dependencies
 
 Required:

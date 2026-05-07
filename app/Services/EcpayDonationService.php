@@ -1,0 +1,98 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Donation;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
+
+class EcpayDonationService
+{
+    public function createPayload(Donation $donation): array
+    {
+        $payload = [
+            'MerchantID' => $this->merchantId(),
+            'MerchantTradeNo' => $donation->merchant_trade_no,
+            'MerchantTradeDate' => $donation->created_at?->format('Y/m/d H:i:s') ?? now()->format('Y/m/d H:i:s'),
+            'PaymentType' => 'aio',
+            'TotalAmount' => (string) $donation->amount,
+            'TradeDesc' => 'TruthShield donation',
+            'ItemName' => 'TruthShield 真相護盾公益捐款',
+            'ReturnURL' => $this->apiUrl('/api/donations/ecpay/notify'),
+            'ChoosePayment' => 'ALL',
+            'ClientBackURL' => $this->webUrl('/donate/return?trade_no=' . urlencode($donation->merchant_trade_no)),
+            'EncryptType' => '1',
+        ];
+
+        $payload['CheckMacValue'] = $this->checkMacValue($payload);
+
+        return $payload;
+    }
+
+    public function checkMacValue(array $parameters): string
+    {
+        $filtered = Arr::except($parameters, ['CheckMacValue']);
+        ksort($filtered, SORT_STRING | SORT_FLAG_CASE);
+
+        $encoded = 'HashKey=' . $this->hashKey();
+        foreach ($filtered as $key => $value) {
+            $encoded .= '&' . $key . '=' . $value;
+        }
+        $encoded .= '&HashIV=' . $this->hashIv();
+
+        $encoded = strtolower(urlencode($encoded));
+        $encoded = str_replace(
+            ['%2d', '%5f', '%2e', '%21', '%2a', '%28', '%29', '%20'],
+            ['-', '_', '.', '!', '*', '(', ')', '+'],
+            $encoded,
+        );
+
+        return strtoupper(hash('sha256', $encoded));
+    }
+
+    public function isValidCallback(array $parameters): bool
+    {
+        $received = strtoupper((string) ($parameters['CheckMacValue'] ?? ''));
+
+        return $received !== '' && hash_equals($received, $this->checkMacValue($parameters));
+    }
+
+    public function nextTradeNo(): string
+    {
+        $prefix = preg_replace('/[^A-Za-z0-9]/', '', (string) config('services.ecpay.trade_prefix', 'TSD'));
+        $prefix = Str::upper(Str::limit($prefix ?: 'TSD', 6, ''));
+
+        return $prefix . Carbon::now()->format('ymdHis') . random_int(1000, 9999);
+    }
+
+    public function checkoutUrl(): string
+    {
+        return (string) config('services.ecpay.checkout_url', 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5');
+    }
+
+    private function merchantId(): string
+    {
+        return (string) config('services.ecpay.merchant_id', '<ECPAY_STAGING_MERCHANT_ID>');
+    }
+
+    private function hashKey(): string
+    {
+        return (string) config('services.ecpay.hash_key', '<ECPAY_STAGING_HASH_KEY>');
+    }
+
+    private function hashIv(): string
+    {
+        return (string) config('services.ecpay.hash_iv', '<ECPAY_STAGING_HASH_IV>');
+    }
+
+    private function apiUrl(string $path): string
+    {
+        return rtrim((string) config('services.ecpay.api_base_url', config('app.url')), '/') . $path;
+    }
+
+    private function webUrl(string $path): string
+    {
+        return rtrim((string) config('services.ecpay.web_base_url', env('FRONTEND_URL', 'http://127.0.0.1:15173')), '/') . $path;
+    }
+}

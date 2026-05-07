@@ -53,4 +53,14 @@ return [
         'redirect' => env('GITHUB_REDIRECT_URI', env('APP_URL') . '/api/auth/github/socialite-callback'),
     ],
 
+    'ecpay' => [
+        'checkout_url' => env('ECPAY_CHECKOUT_URL', 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5'),
+        'merchant_id' => env('ECPAY_MERCHANT_ID', '<ECPAY_STAGING_MERCHANT_ID>'),
+        'hash_key' => env('ECPAY_HASH_KEY', '<ECPAY_STAGING_HASH_KEY>'),
+        'hash_iv' => env('ECPAY_HASH_IV', '<ECPAY_STAGING_HASH_IV>'),
+        'trade_prefix' => env('ECPAY_TRADE_PREFIX', 'TSD'),
+        'api_base_url' => env('ECPAY_API_BASE_URL', env('APP_URL')),
+        'web_base_url' => env('ECPAY_WEB_BASE_URL', env('FRONTEND_URL', 'http://127.0.0.1:15173')),
+    ],
+
 ];

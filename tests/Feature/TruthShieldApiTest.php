@@ -14,6 +14,7 @@ use App\Models\Tag;
 use App\Models\User;
 use App\Models\Vote;
 use App\Models\Badge;
+use App\Models\Donation;
 use App\Models\AbuseEvent;
 use App\Models\AbuseCluster;
 use App\Models\AlgorithmVersion;
@@ -1397,5 +1398,78 @@ class TruthShieldApiTest extends TestCase
 
         $this->assertSame('failed', $evidence->refresh()->snapshot_status);
         $this->assertStringContainsString('content type', data_get($evidence->metadata, 'last_snapshot.error'));
+    }
+
+    public function test_ecpay_donation_checkout_payload_and_callback(): void
+    {
+        config([
+            'services.ecpay.checkout_url' => 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5',
+            'services.ecpay.api_base_url' => 'http://127.0.0.1:18080',
+            'services.ecpay.web_base_url' => 'http://127.0.0.1:15173',
+        ]);
+
+        $checkout = $this->postJson('/api/donations/ecpay', [
+            'amount' => 300,
+            'donor_name' => '測試捐款者',
+            'donor_email' => 'donor@example.com',
+            'message' => '支持真相護盾。',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('donation.amount', 300)
+            ->assertJsonPath('checkout.method', 'POST')
+            ->assertJsonPath('checkout.url', 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5')
+            ->assertJsonStructure([
+                'checkout' => [
+                    'params' => [
+                        'MerchantID',
+                        'MerchantTradeNo',
+                        'MerchantTradeDate',
+                        'PaymentType',
+                        'TotalAmount',
+                        'TradeDesc',
+                        'ItemName',
+                        'ReturnURL',
+                        'ChoosePayment',
+                        'ClientBackURL',
+                        'EncryptType',
+                        'CheckMacValue',
+                    ],
+                ],
+            ])
+            ->json('checkout.params');
+
+        $tradeNo = $checkout['MerchantTradeNo'];
+        $donation = Donation::query()->where('merchant_trade_no', $tradeNo)->firstOrFail();
+
+        $this->assertSame('pending', $donation->status);
+        $this->assertSame($checkout['CheckMacValue'], data_get($donation->request_payload, 'CheckMacValue'));
+
+        $callback = [
+            'MerchantID' => $checkout['MerchantID'],
+            'MerchantTradeNo' => $tradeNo,
+            'RtnCode' => '1',
+            'RtnMsg' => 'Succeeded',
+            'TradeNo' => '1234567890',
+            'TradeAmt' => '300',
+            'PaymentDate' => now()->format('Y/m/d H:i:s'),
+            'PaymentType' => 'Credit_CreditCard',
+            'PaymentTypeChargeFee' => '10',
+            'TradeDate' => now()->format('Y/m/d H:i:s'),
+            'SimulatePaid' => '1',
+        ];
+        $callback['CheckMacValue'] = app(\App\Services\EcpayDonationService::class)->checkMacValue($callback);
+
+        $this->post('/api/donations/ecpay/notify', $callback)
+            ->assertOk()
+            ->assertSee('1|OK');
+
+        $this->assertDatabaseHas('donations', [
+            'merchant_trade_no' => $tradeNo,
+            'status' => 'paid',
+        ]);
+
+        $this->getJson('/api/donations/' . $tradeNo)
+            ->assertOk()
+            ->assertJsonPath('donation.status', 'paid');
     }
 }

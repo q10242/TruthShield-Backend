@@ -1,0 +1,85 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Donation;
+use App\Services\EcpayDonationService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class DonationController extends Controller
+{
+    public function store(Request $request, EcpayDonationService $ecpay): JsonResponse
+    {
+        $validated = $request->validate([
+            'amount' => ['required', 'integer', 'in:100,300,500,1000,2000,5000'],
+            'donor_name' => ['nullable', 'string', 'max:80'],
+            'donor_email' => ['nullable', 'email', 'max:160'],
+            'message' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $donation = Donation::query()->create([
+            'user_id' => $request->user()?->id,
+            'provider' => 'ecpay',
+            'merchant_trade_no' => $ecpay->nextTradeNo(),
+            'amount' => $validated['amount'],
+            'donor_name' => $validated['donor_name'] ?? null,
+            'donor_email' => $validated['donor_email'] ?? null,
+            'message' => $validated['message'] ?? null,
+        ]);
+
+        $payload = $ecpay->createPayload($donation);
+        $donation->forceFill(['request_payload' => $payload])->save();
+
+        return response()->json([
+            'donation' => [
+                'id' => $donation->id,
+                'merchant_trade_no' => $donation->merchant_trade_no,
+                'amount' => $donation->amount,
+                'status' => $donation->status,
+            ],
+            'checkout' => [
+                'method' => 'POST',
+                'url' => $ecpay->checkoutUrl(),
+                'params' => $payload,
+            ],
+        ], 201);
+    }
+
+    public function show(string $tradeNo): JsonResponse
+    {
+        $donation = Donation::query()
+            ->where('merchant_trade_no', $tradeNo)
+            ->firstOrFail();
+
+        return response()->json([
+            'donation' => [
+                'merchant_trade_no' => $donation->merchant_trade_no,
+                'amount' => $donation->amount,
+                'status' => $donation->status,
+                'paid_at' => $donation->paid_at?->toISOString(),
+            ],
+        ]);
+    }
+
+    public function notify(Request $request, EcpayDonationService $ecpay)
+    {
+        $payload = $request->all();
+        $tradeNo = (string) ($payload['MerchantTradeNo'] ?? '');
+        $donation = Donation::query()->where('merchant_trade_no', $tradeNo)->first();
+
+        if (! $donation || ! $ecpay->isValidCallback($payload)) {
+            return response('0|Error', 400);
+        }
+
+        $isPaid = (string) ($payload['RtnCode'] ?? '') === '1';
+        $donation->forceFill([
+            'status' => $isPaid ? 'paid' : 'failed',
+            'provider_payload' => $payload,
+            'paid_at' => $isPaid ? now() : $donation->paid_at,
+        ])->save();
+
+        return response('1|OK');
+    }
+}

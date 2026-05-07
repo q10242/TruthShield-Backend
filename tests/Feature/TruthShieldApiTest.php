@@ -1472,4 +1472,23 @@ class TruthShieldApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('donation.status', 'paid');
     }
+
+    public function test_ecpay_donation_rejects_invalid_callback_signature(): void
+    {
+        $checkout = $this->postJson('/api/donations/ecpay', ['amount' => 100])
+            ->assertCreated()
+            ->json('checkout.params');
+
+        $this->post('/api/donations/ecpay/notify', [
+            'MerchantID' => $checkout['MerchantID'],
+            'MerchantTradeNo' => $checkout['MerchantTradeNo'],
+            'RtnCode' => '1',
+            'CheckMacValue' => 'invalid',
+        ])->assertStatus(400);
+
+        $this->assertDatabaseHas('donations', [
+            'merchant_trade_no' => $checkout['MerchantTradeNo'],
+            'status' => 'pending',
+        ]);
+    }
 }

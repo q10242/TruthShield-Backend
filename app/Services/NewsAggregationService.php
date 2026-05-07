@@ -192,7 +192,7 @@ class NewsAggregationService
 
     private function previewUrl(?string $url, ?string $type): ?string
     {
-        if (! $url || $type !== 'image') {
+        if (! $url || ! in_array($type, ['image', 'cloud_drive'], true)) {
             return null;
         }
 
@@ -204,6 +204,10 @@ class NewsAggregationService
             if ($id && ! str_contains($id, '.')) {
                 return "https://i.imgur.com/{$id}.jpg";
             }
+        }
+
+        if ($type === 'cloud_drive') {
+            return null;
         }
 
         return $url;

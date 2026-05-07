@@ -32,6 +32,8 @@ class TrustedEvidenceSourceResource extends Resource
                 'government' => '政府資料',
                 'media' => '媒體資料',
                 'image_host' => '圖床',
+                'cloud_drive' => '雲端硬碟',
+                'configured' => '系統設定',
             ])->required(),
             Forms\Components\TextInput::make('trust_bonus')->label('信任加成')->numeric()->required(),
             Forms\Components\Toggle::make('is_active')->label('啟用'),

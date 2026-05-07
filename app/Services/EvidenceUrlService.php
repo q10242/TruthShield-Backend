@@ -46,6 +46,10 @@ class EvidenceUrlService
 
     public function evidenceType(?string $host, ?string $path): string
     {
+        if ($this->isCloudDriveHost($host)) {
+            return 'cloud_drive';
+        }
+
         if (
             in_array($host, ['imgur.com', 'www.imgur.com', 'i.imgur.com'], true)
             || preg_match('/\.(png|jpe?g|webp|gif)$/', (string) $path)
@@ -54,6 +58,23 @@ class EvidenceUrlService
         }
 
         return 'link';
+    }
+
+    public function isCloudDriveHost(?string $host): bool
+    {
+        if (! $host) {
+            return false;
+        }
+
+        foreach (config('truthshield.cloud_drive_evidence_hosts', []) as $allowedHost) {
+            $allowedHost = strtolower((string) $allowedHost);
+
+            if ($host === $allowedHost || str_ends_with($host, ".{$allowedHost}")) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function previewUrl(string $url, string $host, string $path, string $type): ?string

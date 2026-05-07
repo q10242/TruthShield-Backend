@@ -45,6 +45,7 @@ class VoteResource extends Resource
                     ->options([
                         'image' => '圖片',
                         'link' => '連結',
+                        'cloud_drive' => '雲端硬碟',
                     ]),
                 Forms\Components\TextInput::make('evidence_host')
                     ->maxLength(255),
@@ -111,8 +112,9 @@ class VoteResource extends Resource
                 Tables\Filters\SelectFilter::make('evidence_type')
                     ->options([
                         'image' => 'Image',
-                        'link' => 'Link',
-                    ]),
+                    'link' => 'Link',
+                    'cloud_drive' => 'Cloud Drive',
+                ]),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),

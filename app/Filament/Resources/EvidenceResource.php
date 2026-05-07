@@ -45,9 +45,9 @@ class EvidenceResource extends Resource
                 ->required(),
             Forms\Components\TextInput::make('url')->label('證據 URL')->url()->required()->maxLength(2048)->columnSpanFull(),
             Forms\Components\TextInput::make('host')->label('來源 Host')->maxLength(255),
-            Forms\Components\Select::make('type')->label('類型')->options(['image' => '圖片', 'link' => '連結', 'archive' => '存證']),
+            Forms\Components\Select::make('type')->label('類型')->options(['image' => '圖片', 'link' => '連結', 'archive' => '存證', 'cloud_drive' => '雲端硬碟']),
             Forms\Components\Select::make('safety')->label('安全性')->options(['trusted' => '可信', 'unverified' => '未驗證', 'unknown' => '未知'])->default('unknown'),
-            Forms\Components\Select::make('snapshot_status')->label('快照狀態')->options(['pending' => '等待中', 'snapshotted' => '已快照', 'failed' => '失敗'])->default('pending'),
+            Forms\Components\Select::make('snapshot_status')->label('快照狀態')->options(['pending' => '等待中', 'snapshotted' => '已快照', 'external' => '外部保存', 'failed' => '失敗'])->default('pending'),
             Forms\Components\TextInput::make('archive_url')->label('存證 URL')->url()->maxLength(2048)->columnSpanFull(),
             Forms\Components\TextInput::make('preview_url')->label('預覽 URL')->url()->maxLength(2048)->columnSpanFull(),
             Forms\Components\TextInput::make('quality_score')->label('品質分數')->numeric()->default(0),
@@ -69,7 +69,7 @@ class EvidenceResource extends Resource
             Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
         ])->filters([
             Tables\Filters\SelectFilter::make('safety')->options(['trusted' => '可信', 'unverified' => '未驗證', 'unknown' => '未知']),
-            Tables\Filters\SelectFilter::make('snapshot_status')->options(['pending' => '等待中', 'snapshotted' => '已快照', 'failed' => '失敗']),
+            Tables\Filters\SelectFilter::make('snapshot_status')->options(['pending' => '等待中', 'snapshotted' => '已快照', 'external' => '外部保存', 'failed' => '失敗']),
         ])->actions([
             Tables\Actions\ViewAction::make(),
             Tables\Actions\EditAction::make(),

@@ -29,6 +29,31 @@ class SnapshotEvidenceJob implements ShouldQueue
         $status = 'failed';
         $previewUrl = $evidence->preview_url;
 
+        if ($evidence->type === 'cloud_drive') {
+            $metadata += [
+                'external_storage' => true,
+                'message' => 'Cloud drive evidence is referenced externally and is not mirrored by TruthShield.',
+            ];
+
+            $snapshot = EvidenceSnapshot::query()->create([
+                'evidence_id' => $evidence->id,
+                'status' => 'external',
+                'archive_url' => null,
+                'preview_url' => null,
+                'attempts' => 1,
+                'last_attempted_at' => now(),
+                'metadata' => $metadata,
+            ]);
+
+            $evidence->forceFill([
+                'snapshot_status' => $snapshot->status,
+                'preview_url' => null,
+                'metadata' => array_merge($evidence->metadata ?? [], ['last_snapshot' => $metadata]),
+            ])->save();
+
+            return;
+        }
+
         try {
             $evidenceUrls->assertFetchableUrl($evidence->url);
 

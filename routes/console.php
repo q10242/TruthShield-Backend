@@ -182,6 +182,18 @@ Artisan::command('truthshield:seed-launch-policies', function () {
         );
     }
 
+    foreach (config('truthshield.cloud_drive_evidence_hosts', []) as $host) {
+        TrustedEvidenceSource::query()->updateOrCreate(
+            ['host' => $host],
+            [
+                'source_type' => 'cloud_drive',
+                'trust_bonus' => 6,
+                'is_active' => true,
+                'notes' => '外部雲端硬碟證據來源；TruthShield 只保存連結，不代管圖片。',
+            ],
+        );
+    }
+
     $this->info('Launch policies seeded.');
 })->purpose('Seed launch rate-limit policies and trusted evidence sources.');
 

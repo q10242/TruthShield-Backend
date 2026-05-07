@@ -373,6 +373,43 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonPath('vote.evidence_safety', 'trusted');
     }
 
+    public function test_cloud_drive_evidence_url_is_supported_without_mirroring_images(): void
+    {
+        config([
+            'truthshield.trusted_evidence_hosts' => [],
+            'truthshield.cloud_drive_evidence_hosts' => ['drive.google.com', 'www.dropbox.com'],
+        ]);
+
+        $this->seed(TagSeeder::class);
+        $user = User::factory()->create();
+        $tag = Tag::query()->where('slug', 'out-of-context')->firstOrFail();
+        $url = 'https://www.cna.com.tw/news/aipl/202605060001.aspx';
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/vote', [
+                'url' => $url,
+                'tag_id' => $tag->id,
+                'evidence_url' => 'https://drive.google.com/file/d/example/view?usp=sharing',
+                'evidence_note' => '雲端硬碟保存的截圖證據。',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('vote.evidence_host', 'drive.google.com')
+            ->assertJsonPath('vote.evidence_type', 'cloud_drive')
+            ->assertJsonPath('vote.evidence_safety', 'unverified');
+
+        $vote = Vote::query()->findOrFail($response->json('vote.id'));
+        $this->assertSame('cloud_drive', $vote->evidence->type);
+        $this->assertNull($vote->evidence->archive_url);
+
+        $this->artisan('truthshield:snapshot-evidence --limit=10')->assertExitCode(0);
+
+        $this->assertSame('external', $vote->evidence->refresh()->snapshot_status);
+        $this->assertDatabaseHas('evidence_snapshots', [
+            'evidence_id' => $vote->evidence->id,
+            'status' => 'external',
+        ]);
+    }
+
     public function test_low_trust_user_cannot_rate_evidence(): void
     {
         config(['truthshield.evidence_reaction_min_trust_score' => 0.5]);

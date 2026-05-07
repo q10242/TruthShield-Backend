@@ -49,6 +49,14 @@ class EvidenceSyncService
             return $url;
         }
 
+        foreach (config('truthshield.cloud_drive_evidence_hosts', []) as $allowedHost) {
+            $allowedHost = strtolower((string) $allowedHost);
+
+            if ($host === $allowedHost || str_ends_with($host, ".{$allowedHost}")) {
+                return null;
+            }
+        }
+
         return 'https://web.archive.org/save/' . $url;
     }
 }

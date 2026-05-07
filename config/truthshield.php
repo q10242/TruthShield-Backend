@@ -19,6 +19,25 @@ return [
         explode(',', env('TRUTHSHIELD_TRUSTED_EVIDENCE_HOSTS', 'imgur.com,www.imgur.com,i.imgur.com,archive.ph,web.archive.org')),
     ))),
 
+    'cloud_drive_evidence_hosts' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', env('TRUTHSHIELD_CLOUD_DRIVE_EVIDENCE_HOSTS', implode(',', [
+            'drive.google.com',
+            'docs.google.com',
+            'photos.google.com',
+            'lh3.googleusercontent.com',
+            'www.dropbox.com',
+            'dl.dropboxusercontent.com',
+            'onedrive.live.com',
+            '1drv.ms',
+            'sharepoint.com',
+            'icloud.com',
+            'www.icloud.com',
+            'box.com',
+            'app.box.com',
+        ]))),
+    ))),
+
     'algorithm_version' => env('TRUTHSHIELD_ALGORITHM_VERSION', 'truthshield-v1'),
 
     'identity_multipliers' => [

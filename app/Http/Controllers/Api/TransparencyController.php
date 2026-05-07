@@ -19,6 +19,7 @@ use App\Models\OperationalEvent;
 use App\Models\RateLimitPolicy;
 use App\Models\TrustedEvidenceSource;
 use App\Models\User;
+use App\Models\UserDataRequest;
 use App\Models\Vote;
 use App\Models\ReadSession;
 use App\Models\UserNotification;
@@ -40,6 +41,7 @@ class TransparencyController extends Controller
             'pending_evidence_reports' => EvidenceReport::query()->where('status', 'pending')->count(),
             'open_abuse_events' => AbuseEvent::query()->where('reviewed', false)->count(),
             'pending_appeals' => Appeal::query()->where('status', 'pending')->count(),
+            'pending_user_data_requests' => UserDataRequest::query()->where('status', 'pending')->count(),
             'moderation_events_24h' => ModerationEvent::query()->where('created_at', '>=', now()->subDay())->count(),
             'extension_failures_24h' => ExtensionEvent::query()->where('success', false)->where('created_at', '>=', now()->subDay())->count(),
             'audit_events_24h' => AuditLog::query()->where('created_at', '>=', now()->subDay())->count(),

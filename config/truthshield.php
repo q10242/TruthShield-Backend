@@ -80,4 +80,5 @@ return [
         'intval',
         explode(',', env('TRUTHSHIELD_DONATION_AMOUNTS', '100,300,500,1000,2000,5000')),
     ))),
+    'donation_monthly_goal' => (int) env('TRUTHSHIELD_DONATION_MONTHLY_GOAL', 15000),
 ];

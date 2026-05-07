@@ -45,6 +45,10 @@ class UserResource extends Resource
                     ->label('個人簡介')
                     ->maxLength(500)
                     ->columnSpanFull(),
+                Forms\Components\KeyValue::make('email_preferences')
+                    ->label('Email 通知偏好')
+                    ->helperText('可用鍵：account、moderation、official_response、donation、bug_report、product；值為 true/false。')
+                    ->columnSpanFull(),
                 Forms\Components\TextInput::make('email')
                     ->email()
                     ->required()

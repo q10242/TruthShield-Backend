@@ -33,6 +33,9 @@ class DonationResource extends Resource
             Forms\Components\TextInput::make('donor_name')->label('顯示名稱')->disabled(),
             Forms\Components\TextInput::make('donor_email')->label('Email')->disabled(),
             Forms\Components\Textarea::make('message')->label('留言')->disabled()->columnSpanFull(),
+            Forms\Components\TextInput::make('receipt_email_status')->label('收據 Email 狀態')->disabled(),
+            Forms\Components\DateTimePicker::make('receipt_email_sent_at')->label('收據 Email 寄送時間')->disabled(),
+            Forms\Components\Textarea::make('receipt_email_error')->label('收據 Email 錯誤')->disabled()->columnSpanFull(),
             Forms\Components\KeyValue::make('provider_payload')->label('綠界通知資料')->disabled()->columnSpanFull(),
         ]);
     }
@@ -45,6 +48,7 @@ class DonationResource extends Resource
             Tables\Columns\TextColumn::make('status')->label('狀態')->badge()->sortable(),
             Tables\Columns\TextColumn::make('donor_name')->label('顯示名稱')->searchable()->placeholder('匿名'),
             Tables\Columns\TextColumn::make('donor_email')->label('Email')->searchable()->toggleable(),
+            Tables\Columns\TextColumn::make('receipt_email_status')->label('收據')->badge()->toggleable(),
             Tables\Columns\TextColumn::make('paid_at')->label('付款時間')->dateTime()->sortable()->placeholder('未付款'),
             Tables\Columns\TextColumn::make('created_at')->label('建立時間')->dateTime()->sortable(),
         ])->filters([

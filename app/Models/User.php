@@ -33,6 +33,7 @@ class User extends Authenticatable implements FilamentUser
         'public_identity_label',
         'is_real_name_public',
         'profile_bio',
+        'email_preferences',
         'identity_multiplier',
         'abuse_multiplier',
         'password',
@@ -65,6 +66,7 @@ class User extends Authenticatable implements FilamentUser
             'abuse_multiplier' => 'float',
             'is_admin' => 'boolean',
             'is_real_name_public' => 'boolean',
+            'email_preferences' => 'array',
         ];
     }
 

@@ -14,6 +14,10 @@ class UserNotification extends Model
         'body',
         'action_url',
         'metadata',
+        'email_category',
+        'email_status',
+        'email_sent_at',
+        'email_error',
         'read_at',
     ];
 
@@ -21,6 +25,7 @@ class UserNotification extends Model
     {
         return [
             'metadata' => 'array',
+            'email_sent_at' => 'datetime',
             'read_at' => 'datetime',
         ];
     }

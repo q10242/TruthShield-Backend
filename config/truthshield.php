@@ -85,4 +85,14 @@ return [
         explode(',', env('TRUTHSHIELD_DONATION_AMOUNTS', '100,300,500,1000,2000,5000')),
     ))),
     'donation_monthly_goal' => (int) env('TRUTHSHIELD_DONATION_MONTHLY_GOAL', 15000),
+
+    'email_enabled' => (bool) env('TRUTHSHIELD_EMAIL_ENABLED', true),
+    'email_preferences' => [
+        'account' => true,
+        'moderation' => true,
+        'official_response' => true,
+        'donation' => true,
+        'bug_report' => true,
+        'product' => false,
+    ],
 ];

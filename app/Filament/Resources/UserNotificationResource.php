@@ -44,6 +44,10 @@ class UserNotificationResource extends Resource
                 ->url()
                 ->maxLength(2048)
                 ->columnSpanFull(),
+            Forms\Components\TextInput::make('email_category')->label('Email 類型')->disabled(),
+            Forms\Components\TextInput::make('email_status')->label('Email 狀態')->disabled(),
+            Forms\Components\DateTimePicker::make('email_sent_at')->label('Email 寄送時間')->disabled(),
+            Forms\Components\Textarea::make('email_error')->label('Email 錯誤')->disabled()->columnSpanFull(),
             Forms\Components\DateTimePicker::make('read_at'),
         ]);
     }
@@ -55,6 +59,7 @@ class UserNotificationResource extends Resource
                 Tables\Columns\TextColumn::make('user.email')->searchable(),
                 Tables\Columns\TextColumn::make('type')->badge()->searchable(),
                 Tables\Columns\TextColumn::make('title')->searchable()->limit(40),
+                Tables\Columns\TextColumn::make('email_status')->label('Email')->badge()->toggleable(),
                 Tables\Columns\IconColumn::make('read_at')->label('已讀')->boolean(),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
             ])

@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Donation;
 use App\Services\EcpayDonationService;
+use App\Services\NotificationService;
+use App\Services\TransactionalEmailService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -158,7 +160,7 @@ class DonationController extends Controller
         return response()->json(['data' => $rows]);
     }
 
-    public function notify(Request $request, EcpayDonationService $ecpay)
+    public function notify(Request $request, EcpayDonationService $ecpay, TransactionalEmailService $emails, NotificationService $notifications)
     {
         $payload = $request->all();
         $tradeNo = (string) ($payload['MerchantTradeNo'] ?? '');
@@ -174,6 +176,28 @@ class DonationController extends Controller
             'provider_payload' => $payload,
             'paid_at' => $isPaid ? now() : $donation->paid_at,
         ])->save();
+
+        if ($isPaid && ! $donation->receipt_email_sent_at) {
+            $emailResult = $emails->sendDonationReceipt($donation->refresh());
+            $donation->forceFill([
+                'receipt_email_status' => $emailResult['status'],
+                'receipt_email_sent_at' => $emailResult['status'] === 'sent' ? now() : null,
+                'receipt_email_error' => $emailResult['error'],
+            ])->save();
+
+            if ($donation->user) {
+                $notifications->send(
+                    $donation->user,
+                    'donation.paid',
+                    '捐款付款已完成',
+                    '感謝你支持 TruthShield。訂單編號：' . $donation->merchant_trade_no,
+                    config('services.ecpay.web_base_url') . '/donate?trade_no=' . urlencode($donation->merchant_trade_no),
+                    ['donation_id' => $donation->id],
+                    'donation',
+                );
+            }
+        }
+
         $this->forgetDonationCaches();
 
         return response('1|OK');

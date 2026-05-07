@@ -18,6 +18,10 @@ class ProfileController extends Controller
 
         return response()->json([
             'user' => $user,
+            'email_preferences' => array_replace(
+                config('truthshield.email_preferences', []),
+                $user->email_preferences ?? [],
+            ),
             'title' => $achievements->titleFor($user, $achievementStats),
             'stats' => [
                 'votes' => $achievementStats['votes'],
@@ -74,12 +78,28 @@ class ProfileController extends Controller
             'display_name' => ['required', 'string', 'max:80'],
             'is_real_name_public' => ['required', 'boolean'],
             'profile_bio' => ['nullable', 'string', 'max:500'],
+            'email_preferences' => ['nullable', 'array'],
+            'email_preferences.account' => ['boolean'],
+            'email_preferences.moderation' => ['boolean'],
+            'email_preferences.official_response' => ['boolean'],
+            'email_preferences.donation' => ['boolean'],
+            'email_preferences.bug_report' => ['boolean'],
+            'email_preferences.product' => ['boolean'],
         ]);
+
+        $emailPreferences = array_intersect_key(
+            $validated['email_preferences'] ?? [],
+            config('truthshield.email_preferences', []),
+        );
 
         $request->user()->forceFill([
             'display_name' => $validated['display_name'],
             'is_real_name_public' => $validated['is_real_name_public'],
             'profile_bio' => $validated['profile_bio'] ?? null,
+            'email_preferences' => array_replace(
+                config('truthshield.email_preferences', []),
+                $emailPreferences,
+            ),
         ])->save();
 
         return response()->json([

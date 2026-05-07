@@ -27,6 +27,9 @@ class Donation extends Model
         'request_payload',
         'provider_payload',
         'paid_at',
+        'receipt_email_status',
+        'receipt_email_sent_at',
+        'receipt_email_error',
     ];
 
     protected $casts = [
@@ -34,6 +37,7 @@ class Donation extends Model
         'request_payload' => 'array',
         'provider_payload' => 'array',
         'paid_at' => 'datetime',
+        'receipt_email_sent_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

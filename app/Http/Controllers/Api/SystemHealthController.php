@@ -109,6 +109,11 @@ class SystemHealthController extends Controller
                 'connection' => config('queue.default'),
                 ...$metrics['queue'],
             ],
+            'mail' => [
+                'enabled' => (bool) config('truthshield.email_enabled', true),
+                'mailer' => config('mail.default'),
+                'from_address_configured' => filled(config('mail.from.address')),
+            ],
             'counts' => $metrics['counts'],
             'governance_pressure_score' => min(100, $governancePressure * 10),
             'thresholds' => [

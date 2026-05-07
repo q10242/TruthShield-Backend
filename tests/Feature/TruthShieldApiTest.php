@@ -48,6 +48,7 @@ use Database\Seeders\TagSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class TruthShieldApiTest extends TestCase
@@ -1234,6 +1235,29 @@ class TruthShieldApiTest extends TestCase
         $this->assertSame(0, UserNotification::query()->whereNull('read_at')->count());
     }
 
+    public function test_notification_service_respects_email_preferences(): void
+    {
+        Mail::fake();
+        $user = User::factory()->create([
+            'email' => 'notify@example.com',
+            'email_preferences' => ['moderation' => true],
+        ]);
+
+        app(\App\Services\NotificationService::class)->send(
+            $user,
+            'evidence.hidden',
+            '你的證據已被隱藏',
+            '違反證據規範。',
+        );
+
+        $this->assertDatabaseHas('user_notifications', [
+            'user_id' => $user->id,
+            'type' => 'evidence.hidden',
+            'email_category' => 'moderation',
+            'email_status' => 'sent',
+        ]);
+    }
+
     public function test_domain_report_rolls_up_pending_reports_for_same_domain(): void
     {
         $payload = [
@@ -1904,6 +1928,7 @@ class TruthShieldApiTest extends TestCase
 
     public function test_ecpay_donation_checkout_payload_and_callback(): void
     {
+        Mail::fake();
         config([
             'services.ecpay.checkout_url' => 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5',
             'services.ecpay.api_base_url' => 'http://127.0.0.1:18080',
@@ -1968,6 +1993,7 @@ class TruthShieldApiTest extends TestCase
         $this->assertDatabaseHas('donations', [
             'merchant_trade_no' => $tradeNo,
             'status' => 'paid',
+            'receipt_email_status' => 'sent',
         ]);
 
         $this->getJson('/api/donations/' . $tradeNo)
@@ -2032,6 +2058,7 @@ class TruthShieldApiTest extends TestCase
 
     public function test_bug_and_security_report_can_be_submitted(): void
     {
+        Mail::fake();
         $this->postJson('/api/bug-reports', [
             'report_type' => 'security',
             'title' => 'postMessage origin validation issue',
@@ -2053,6 +2080,21 @@ class TruthShieldApiTest extends TestCase
             'title' => 'postMessage origin validation issue',
             'status' => 'new',
             'source' => 'extension_popup',
+        ]);
+
+        $report = BugReport::query()->firstOrFail();
+        $result = app(\App\Services\TransactionalEmailService::class)
+            ->sendBugReportResponse($report, '我們已經收到並開始分類這個安全回報。');
+
+        $report->forceFill([
+            'admin_response' => '我們已經收到並開始分類這個安全回報。',
+            'reporter_email_status' => $result['status'],
+            'reporter_notified_at' => $result['status'] === 'sent' ? now() : null,
+        ])->save();
+
+        $this->assertDatabaseHas('bug_reports', [
+            'id' => $report->id,
+            'reporter_email_status' => 'sent',
         ]);
     }
 

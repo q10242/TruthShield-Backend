@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\BugReportResource\Pages;
 use App\Models\BugReport;
+use App\Services\TransactionalEmailService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -36,6 +37,10 @@ class BugReportResource extends Resource
             Forms\Components\TextInput::make('source')->label('來源')->maxLength(80),
             Forms\Components\KeyValue::make('diagnostics')->label('診斷資料')->columnSpanFull(),
             Forms\Components\Textarea::make('triage_note')->label('Triage 筆記')->rows(4)->columnSpanFull(),
+            Forms\Components\Textarea::make('admin_response')->label('回覆內容')->rows(4)->columnSpanFull(),
+            Forms\Components\TextInput::make('reporter_email_status')->label('回覆寄送狀態')->disabled(),
+            Forms\Components\DateTimePicker::make('reporter_notified_at')->label('回覆寄送時間')->disabled(),
+            Forms\Components\Textarea::make('reporter_email_error')->label('回覆寄送錯誤')->disabled()->columnSpanFull(),
         ]);
     }
 
@@ -72,6 +77,33 @@ class BugReportResource extends Resource
                     'reviewed_by' => auth()->id(),
                     'reviewed_at' => now(),
                 ])->save()),
+            Tables\Actions\Action::make('reply')
+                ->label('回覆回報者')
+                ->color('warning')
+                ->form([
+                    Forms\Components\Textarea::make('admin_response')
+                        ->label('回覆內容')
+                        ->required()
+                        ->maxLength(2000),
+                    Forms\Components\Select::make('status')
+                        ->label('狀態')
+                        ->options(self::statusOptions())
+                        ->default('in_progress')
+                        ->required(),
+                ])
+                ->visible(fn (BugReport $record): bool => filled($record->contact_email))
+                ->action(function (BugReport $record, array $data, TransactionalEmailService $emails): void {
+                    $result = $emails->sendBugReportResponse($record, $data['admin_response']);
+                    $record->forceFill([
+                        'status' => $data['status'],
+                        'admin_response' => $data['admin_response'],
+                        'reporter_email_status' => $result['status'],
+                        'reporter_notified_at' => $result['status'] === 'sent' ? now() : null,
+                        'reporter_email_error' => $result['error'],
+                        'reviewed_by' => auth()->id(),
+                        'reviewed_at' => now(),
+                    ])->save();
+                }),
         ])->defaultSort('created_at', 'desc');
     }
 

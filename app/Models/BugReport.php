@@ -23,6 +23,10 @@ class BugReport extends Model
         'source',
         'diagnostics',
         'triage_note',
+        'admin_response',
+        'reporter_notified_at',
+        'reporter_email_status',
+        'reporter_email_error',
         'reviewed_by',
         'reviewed_at',
     ];
@@ -32,6 +36,7 @@ class BugReport extends Model
         return [
             'diagnostics' => 'array',
             'reviewed_at' => 'datetime',
+            'reporter_notified_at' => 'datetime',
         ];
     }
 

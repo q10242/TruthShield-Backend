@@ -12,7 +12,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        //
+        if (env('APP_ENV') === 'local') {
+            $middleware->validateCsrfTokens(except: [
+                'livewire/update',
+            ]);
+        }
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

@@ -971,6 +971,8 @@ class TruthShieldApiTest extends TestCase
 
     public function test_community_url_classification_and_trusted_source_suggestions_roll_up(): void
     {
+        $trustedUser = User::factory()->create(['trust_score' => 2.4]);
+        $token = $trustedUser->createToken('community-maintenance')->plainTextToken;
         $articlePayload = [
             'url' => 'https://community-news.test/news/politics/202605070001',
             'classification' => 'article',
@@ -984,9 +986,12 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonPath('report.classification', 'article')
             ->assertJsonPath('report.report_count', 1);
 
-        $this->postJson('/api/url-classification-reports', $articlePayload)->assertCreated();
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/url-classification-reports', $articlePayload)
+            ->assertCreated();
         $this->assertSame(1, UrlClassificationReport::query()->where('domain', 'community-news.test')->count());
         $this->assertSame(2, UrlClassificationReport::query()->where('domain', 'community-news.test')->value('report_count'));
+        $this->assertSame(2.65, round((float) UrlClassificationReport::query()->where('domain', 'community-news.test')->value('weighted_score'), 2));
         $this->assertNotNull(UrlClassificationReport::query()->where('domain', 'community-news.test')->value('suggested_pattern'));
 
         $this->postJson('/api/trusted-source-suggestions', [
@@ -998,13 +1003,15 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonPath('suggestion.host', 'drive.google.com')
             ->assertJsonPath('suggestion.source_type', 'cloud_drive');
 
-        $this->postJson('/api/trusted-source-suggestions', [
-            'host' => 'drive.google.com',
-            'source_type' => 'cloud_drive',
-        ])->assertCreated();
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/trusted-source-suggestions', [
+                'host' => 'drive.google.com',
+                'source_type' => 'cloud_drive',
+            ])->assertCreated();
 
         $this->assertSame(1, TrustedSourceSuggestion::query()->where('host', 'drive.google.com')->count());
         $this->assertSame(2, TrustedSourceSuggestion::query()->where('host', 'drive.google.com')->value('report_count'));
+        $this->assertSame(4.8, round((float) TrustedSourceSuggestion::query()->where('host', 'drive.google.com')->value('weighted_score'), 2));
     }
 
     public function test_api_clients_can_be_created_listed_and_revoked(): void

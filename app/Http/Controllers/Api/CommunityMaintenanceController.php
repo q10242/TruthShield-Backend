@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\TrustedSourceSuggestion;
+use App\Models\User;
 use App\Models\UrlClassificationReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class CommunityMaintenanceController extends Controller
 {
@@ -29,7 +31,7 @@ class CommunityMaintenanceController extends Controller
             ], 422);
         }
 
-        $user = $request->user();
+        $user = $this->optionalUser($request);
         $weight = max(0.1, (float) ($user?->trust_score ?? 0.25));
         $pathSignature = $this->pathSignature($validated['url']);
         $classification = $validated['classification'];
@@ -97,7 +99,7 @@ class CommunityMaintenanceController extends Controller
 
         $host = preg_replace('/^www\./', '', $host) ?: $host;
         $sourceType = $validated['source_type'] ?? 'cloud_drive';
-        $user = $request->user();
+        $user = $this->optionalUser($request);
         $weight = max(0.1, (float) ($user?->trust_score ?? 0.25));
 
         $suggestion = TrustedSourceSuggestion::query()
@@ -174,5 +176,23 @@ class CommunityMaintenanceController extends Controller
         return in_array($classification, ['article', 'list', 'home', 'search'], true)
             ? "^{$pattern}$"
             : null;
+    }
+
+    private function optionalUser(Request $request): ?User
+    {
+        $user = $request->user();
+        if ($user instanceof User) {
+            return $user;
+        }
+
+        $token = $request->bearerToken();
+        if (! $token) {
+            return null;
+        }
+
+        $accessToken = PersonalAccessToken::findToken($token);
+        $tokenable = $accessToken?->tokenable;
+
+        return $tokenable instanceof User ? $tokenable : null;
     }
 }

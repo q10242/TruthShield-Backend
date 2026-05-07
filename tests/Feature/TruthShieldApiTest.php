@@ -9,6 +9,8 @@ use App\Models\ApiClient;
 use App\Models\Appeal;
 use App\Models\NewsDomain;
 use App\Models\NewsDomainReport;
+use App\Models\NewsChangeReport;
+use App\Models\NewsUrlSnapshot;
 use App\Models\MediaOutlet;
 use App\Models\Tag;
 use App\Models\User;
@@ -204,6 +206,70 @@ class TruthShieldApiTest extends TestCase
                 'voting_closes_at',
                 'finalized_at',
             ]);
+    }
+
+    public function test_news_snapshot_records_metadata_and_detects_changes(): void
+    {
+        $url = 'https://www.cna.com.tw/news/aipl/202605060001.aspx';
+
+        $this->postJson('/api/news/snapshot', [
+            'url' => $url,
+            'title_snapshot' => '原始標題',
+            'canonical_url' => $url,
+            'description' => '原始摘要',
+            'image_url' => 'https://www.cna.com.tw/og.jpg',
+            'content_hash' => 'abc123',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('snapshot.snapshot_type', 'initial')
+            ->assertJsonPath('status.snapshot.availability_status', 'available');
+
+        $this->postJson('/api/news/snapshot', [
+            'url' => $url,
+            'title_snapshot' => '修改後標題',
+            'canonical_url' => $url,
+            'description' => '原始摘要',
+            'image_url' => 'https://www.cna.com.tw/og.jpg',
+            'content_hash' => 'def456',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('snapshot.snapshot_type', 'changed')
+            ->assertJsonPath('status.snapshot.changed_snapshots_count', 1);
+
+        $newsUrl = NewsUrl::query()->firstOrFail();
+
+        $this->assertDatabaseHas((new NewsUrlSnapshot())->getTable(), [
+            'news_url_id' => $newsUrl->id,
+            'snapshot_type' => 'changed',
+        ]);
+
+        $this->getJson('/api/news/status?url=' . urlencode($url))
+            ->assertOk()
+            ->assertJsonPath('snapshot.latest_snapshot.snapshot_type', 'changed');
+    }
+
+    public function test_news_change_report_can_mark_deleted_article_for_review(): void
+    {
+        $url = 'https://www.cna.com.tw/news/aipl/202605060001.aspx';
+
+        $this->postJson('/api/news/change-reports', [
+            'url' => $url,
+            'report_type' => 'deleted',
+            'page_title' => '找不到頁面',
+            'note' => '原新聞連結已經無法開啟。',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('report.report_type', 'deleted')
+            ->assertJsonPath('report.status', 'pending');
+
+        $this->assertDatabaseHas((new NewsChangeReport())->getTable(), [
+            'report_type' => 'deleted',
+            'status' => 'pending',
+        ]);
+
+        $this->getJson('/api/news/status?url=' . urlencode($url))
+            ->assertOk()
+            ->assertJsonPath('snapshot.pending_change_reports_count', 1);
     }
 
     public function test_user_has_one_editable_vote_per_news_url(): void

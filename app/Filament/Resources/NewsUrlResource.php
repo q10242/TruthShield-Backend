@@ -43,9 +43,32 @@ class NewsUrlResource extends Resource
                 Forms\Components\Textarea::make('normalized_url')
                     ->required()
                     ->columnSpanFull(),
+                Forms\Components\Textarea::make('canonical_url')
+                    ->columnSpanFull(),
                 Forms\Components\TextInput::make('title_snapshot')
                     ->maxLength(255),
+                Forms\Components\TextInput::make('description_snapshot')
+                    ->maxLength(500)
+                    ->columnSpanFull(),
+                Forms\Components\TextInput::make('image_snapshot_url')
+                    ->url()
+                    ->maxLength(2048)
+                    ->columnSpanFull(),
+                Forms\Components\Select::make('availability_status')
+                    ->options([
+                        'available' => '可存取',
+                        'deleted_or_unavailable' => '已刪除或無法存取',
+                        'redirected' => '已轉址',
+                        'paywalled' => '付費牆',
+                        'unknown' => '未知',
+                    ])
+                    ->default('available'),
+                Forms\Components\TextInput::make('archive_url')
+                    ->url()
+                    ->maxLength(2048)
+                    ->columnSpanFull(),
                 Forms\Components\DateTimePicker::make('published_at'),
+                Forms\Components\DateTimePicker::make('last_snapshot_at'),
                 Forms\Components\DateTimePicker::make('voting_closes_at'),
                 Forms\Components\DateTimePicker::make('finalized_at'),
                 Forms\Components\Textarea::make('final_status_payload')
@@ -74,6 +97,14 @@ class NewsUrlResource extends Resource
                 Tables\Columns\TextColumn::make('mediaOutlet.name')
                     ->label('媒體')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('availability_status')
+                    ->label('可用性')
+                    ->badge()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('snapshots_count')
+                    ->counts('snapshots')
+                    ->label('快照')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('normalized_url')
                     ->searchable()
                     ->limit(70),
@@ -101,6 +132,15 @@ class NewsUrlResource extends Resource
                     ->query(fn ($query) => $query->where('voting_closes_at', '>', now())),
                 Tables\Filters\Filter::make('finalized')
                     ->query(fn ($query) => $query->whereNotNull('finalized_at')),
+                Tables\Filters\SelectFilter::make('availability_status')
+                    ->label('可用性')
+                    ->options([
+                        'available' => '可存取',
+                        'deleted_or_unavailable' => '已刪除或無法存取',
+                        'redirected' => '已轉址',
+                        'paywalled' => '付費牆',
+                        'unknown' => '未知',
+                    ]),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),

@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\DB;
 
 class NewsAggregationService
 {
+    public function __construct(private readonly NewsSnapshotService $snapshots)
+    {
+    }
+
     public function statusForFingerprint(array $fingerprint): array
     {
         $missingCacheKey = $this->missingStatusCacheKey($fingerprint['hash']);
@@ -31,7 +35,7 @@ class NewsAggregationService
         $this->ensureVotingWindow($newsUrl);
 
         if (! $this->isOpen($newsUrl)) {
-            return $this->finalize($newsUrl)['status'];
+            return $this->withCurrentSnapshot($newsUrl, $this->finalize($newsUrl)['status']);
         }
 
         $cacheKey = $this->statusCacheKey($newsUrl);
@@ -97,7 +101,7 @@ class NewsAggregationService
     {
         if ($newsUrl->finalized_at && $newsUrl->final_status_payload && is_array($newsUrl->final_evidence_payload)) {
             return [
-                'status' => $newsUrl->final_status_payload,
+                'status' => $this->withCurrentSnapshot($newsUrl, $newsUrl->final_status_payload),
                 'evidence' => $newsUrl->final_evidence_payload,
             ];
         }
@@ -109,7 +113,7 @@ class NewsAggregationService
 
             if ($fresh?->finalized_at && $fresh->final_status_payload && is_array($fresh->final_evidence_payload)) {
                 return [
-                    'status' => $fresh->final_status_payload,
+                    'status' => $this->withCurrentSnapshot($fresh, $fresh->final_status_payload),
                     'evidence' => $fresh->final_evidence_payload,
                 ];
             }
@@ -137,6 +141,13 @@ class NewsAggregationService
             'status' => $status,
             'evidence' => $evidence,
         ];
+    }
+
+    private function withCurrentSnapshot(NewsUrl $newsUrl, array $status): array
+    {
+        $status['snapshot'] = $this->snapshots->statusPayload($newsUrl);
+
+        return $status;
     }
 
     private function buildStatusPayload(NewsUrl $newsUrl, ?Carbon $finalizedAt = null): array
@@ -170,6 +181,7 @@ class NewsAggregationService
             'voting_closes_at' => $newsUrl->voting_closes_at?->toJSON(),
             'finalized_at' => $finalizedAt?->toJSON(),
             'algorithm_version' => $newsUrl->algorithm_version ?: config('truthshield.algorithm_version', 'truthshield-v1'),
+            'snapshot' => $this->snapshots->statusPayload($newsUrl),
         ];
     }
 
@@ -267,6 +279,15 @@ class NewsAggregationService
             'voting_closes_at' => null,
             'finalized_at' => null,
             'algorithm_version' => config('truthshield.algorithm_version', 'truthshield-v1'),
+            'snapshot' => [
+                'availability_status' => 'unknown',
+                'last_snapshot_at' => null,
+                'archive_url' => null,
+                'snapshots_count' => 0,
+                'changed_snapshots_count' => 0,
+                'pending_change_reports_count' => 0,
+                'latest_snapshot' => null,
+            ],
         ];
     }
 

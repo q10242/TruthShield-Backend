@@ -17,7 +17,7 @@ class NewsDetailController extends Controller
         ];
 
         return response()->json([
-            'news' => $newsUrl->load('mediaOutlet:id,name,slug'),
+            'news' => $newsUrl->load(['mediaOutlet:id,name,slug', 'snapshots' => fn ($query) => $query->latest('captured_at')->limit(8)]),
             'status' => $aggregation->statusForFingerprint($fingerprint),
             'evidence' => $aggregation->evidenceForFingerprint($fingerprint),
         ]);

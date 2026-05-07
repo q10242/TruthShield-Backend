@@ -27,6 +27,8 @@ class OpenApiController extends Controller
                 ],
                 '/api/auth/{provider}/callback' => ['post' => ['summary' => 'OAuth callback token exchange']],
                 '/api/news/evidence' => ['get' => ['summary' => 'List evidence for a URL']],
+                '/api/news/snapshot' => ['post' => ['summary' => 'Record article metadata snapshot and detect changes']],
+                '/api/news/change-reports' => ['post' => ['summary' => 'Report deleted or modified article state']],
                 '/api/news/read-session' => ['post' => ['summary' => 'Record authenticated reading time']],
                 '/api/vote' => ['post' => ['summary' => 'Create or update one authenticated vote']],
                 '/api/evidence/{vote}/reaction' => ['post' => ['summary' => 'Rate evidence helpfulness']],

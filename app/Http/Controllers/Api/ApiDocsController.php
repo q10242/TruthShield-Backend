@@ -16,6 +16,8 @@ class ApiDocsController extends Controller
                 ['method' => 'POST', 'path' => '/api/auth/{provider}/callback', 'description' => 'OAuth callback token exchange for Facebook, Google, or GitHub.'],
                 ['method' => 'GET', 'path' => '/api/openapi.json', 'description' => 'Machine-readable OpenAPI specification.'],
                 ['method' => 'GET', 'path' => '/api/news/status', 'description' => 'Weighted credibility status for a URL.'],
+                ['method' => 'POST', 'path' => '/api/news/snapshot', 'description' => 'Record article metadata snapshot and detect title/content/availability changes without storing full copyrighted text.'],
+                ['method' => 'POST', 'path' => '/api/news/change-reports', 'description' => 'Report deleted, edited, redirected, paywalled, or archive-needed article states.'],
                 ['method' => 'POST', 'path' => '/api/news/read-session', 'description' => 'Record authenticated article reading seconds before voting.'],
                 ['method' => 'POST', 'path' => '/api/vote', 'description' => 'Create or update one user vote for one URL.'],
                 ['method' => 'GET', 'path' => '/api/news/evidence', 'description' => 'Evidence list with weighted helpfulness and preview metadata.'],

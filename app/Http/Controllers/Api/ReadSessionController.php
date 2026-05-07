@@ -7,6 +7,7 @@ use App\Models\NewsUrl;
 use App\Models\ReadSession;
 use App\Services\MediaOutletService;
 use App\Services\NewsAggregationService;
+use App\Services\NewsSnapshotService;
 use App\Services\UrlFingerprintService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,12 +19,17 @@ class ReadSessionController extends Controller
         Request $request,
         UrlFingerprintService $fingerprints,
         NewsAggregationService $newsAggregation,
+        NewsSnapshotService $snapshots,
         MediaOutletService $mediaOutlets,
     ): JsonResponse {
         $validated = $request->validate([
             'url' => ['required', 'url', 'max:4096'],
             'seconds_read' => ['required', 'integer', 'min:0', 'max:86400'],
             'title_snapshot' => ['nullable', 'string', 'max:255'],
+            'canonical_url' => ['nullable', 'url', 'max:4096'],
+            'description' => ['nullable', 'string', 'max:500'],
+            'image_url' => ['nullable', 'url', 'max:2048'],
+            'content_hash' => ['nullable', 'string', 'max:64'],
             'visible' => ['nullable', 'boolean'],
         ]);
 
@@ -39,6 +45,7 @@ class ReadSessionController extends Controller
                 'original_url' => $fingerprint['original_url'],
                 'normalized_url' => $fingerprint['normalized_url'],
                 'title_snapshot' => $validated['title_snapshot'] ?? null,
+                'canonical_url' => $validated['canonical_url'] ?? null,
                 'voting_closes_at' => now()->addHours(72),
             ],
         );
@@ -48,6 +55,14 @@ class ReadSessionController extends Controller
 
         if (! $newsUrl->title_snapshot && ! empty($validated['title_snapshot'])) {
             $newsUrl->forceFill(['title_snapshot' => $validated['title_snapshot']])->save();
+        }
+
+        if (! $newsUrl->last_snapshot_at && ! empty($validated['title_snapshot'])) {
+            $snapshots->capture($newsUrl, [
+                ...$validated,
+                'source' => 'read_session',
+                'user_agent' => substr((string) $request->userAgent(), 0, 240),
+            ]);
         }
 
         $existing = ReadSession::query()

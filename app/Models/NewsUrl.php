@@ -13,7 +13,14 @@ class NewsUrl extends Model
         'media_outlet_id',
         'original_url',
         'normalized_url',
+        'canonical_url',
         'title_snapshot',
+        'description_snapshot',
+        'image_snapshot_url',
+        'content_hash',
+        'availability_status',
+        'last_snapshot_at',
+        'archive_url',
         'published_at',
         'voting_closes_at',
         'finalized_at',
@@ -28,6 +35,7 @@ class NewsUrl extends Model
             'voting_closes_at' => 'datetime',
             'published_at' => 'datetime',
             'finalized_at' => 'datetime',
+            'last_snapshot_at' => 'datetime',
             'final_status_payload' => 'array',
             'final_evidence_payload' => 'array',
         ];
@@ -46,6 +54,16 @@ class NewsUrl extends Model
     public function evidences(): HasMany
     {
         return $this->hasMany(Evidence::class);
+    }
+
+    public function snapshots(): HasMany
+    {
+        return $this->hasMany(NewsUrlSnapshot::class);
+    }
+
+    public function changeReports(): HasMany
+    {
+        return $this->hasMany(NewsChangeReport::class);
     }
 
     public function mediaOutlet(): BelongsTo

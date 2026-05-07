@@ -1491,4 +1491,22 @@ class TruthShieldApiTest extends TestCase
             'status' => 'pending',
         ]);
     }
+
+    public function test_donation_config_and_amount_validation(): void
+    {
+        config(['truthshield.donation_amounts' => [120, 360]]);
+
+        $this->getJson('/api/donations/config')
+            ->assertOk()
+            ->assertJsonPath('amounts.0', 120)
+            ->assertJsonPath('amounts.1', 360)
+            ->assertJsonPath('provider', 'ecpay');
+
+        $this->postJson('/api/donations/ecpay', ['amount' => 300])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('amount');
+
+        $this->postJson('/api/donations/ecpay', ['amount' => 360])
+            ->assertCreated();
+    }
 }

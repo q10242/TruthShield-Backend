@@ -52,6 +52,7 @@ class DonationResource extends Resource
                 'pending' => '待付款',
                 'paid' => '已付款',
                 'failed' => '付款失敗',
+                'expired' => '已過期',
             ]),
         ])->actions([
             Tables\Actions\ViewAction::make(),

@@ -167,12 +167,14 @@ class NewsAggregationService
             'weight' => round((float) $row->total_weight, 4),
             'percentage' => $totalWeight > 0 ? round(((float) $row->total_weight / $totalWeight) * 100, 2) : 0.0,
         ])->values()->all();
+        $secondaryDistribution = $this->secondaryTagDistribution($newsUrl);
 
         return [
             'url_hash' => $newsUrl->hash,
             'normalized_url' => $newsUrl->normalized_url,
             'top_tag' => $top?->tag,
             'distribution' => $distribution,
+            'secondary_distribution' => $secondaryDistribution,
             'display_text' => $this->displayText($top?->tag?->severity, $percentage, $top?->tag?->name),
             'tone' => $this->toneFor($top?->tag?->severity),
             'percentage' => $percentage,
@@ -271,6 +273,7 @@ class NewsAggregationService
             'normalized_url' => $normalizedUrl,
             'top_tag' => null,
             'distribution' => [],
+            'secondary_distribution' => [],
             'display_text' => '尚無足夠投票資料',
             'tone' => 'neutral',
             'percentage' => 0.0,
@@ -302,6 +305,41 @@ class NewsAggregationService
         }
 
         return '⚠️ ' . (int) round($percentage) . '% 使用者標註：' . $tagName;
+    }
+
+    private function secondaryTagDistribution(NewsUrl $newsUrl): array
+    {
+        $votes = $newsUrl->votes()
+            ->whereNotNull('secondary_tag_ids')
+            ->get(['secondary_tag_ids', 'weight_score']);
+        $weights = [];
+
+        foreach ($votes as $vote) {
+            foreach ($vote->secondary_tag_ids ?: [] as $tagId) {
+                $weights[(int) $tagId] = ($weights[(int) $tagId] ?? 0) + (float) $vote->weight_score;
+            }
+        }
+
+        if ($weights === []) {
+            return [];
+        }
+
+        arsort($weights);
+        $tags = \App\Models\Tag::query()
+            ->whereIn('id', array_keys($weights))
+            ->get(['id', 'name', 'slug', 'color', 'severity'])
+            ->keyBy('id');
+        $total = array_sum($weights);
+
+        return collect($weights)
+            ->map(fn ($weight, $tagId) => [
+                'tag' => $tags->get((int) $tagId),
+                'weight' => round((float) $weight, 4),
+                'percentage' => $total > 0 ? round(((float) $weight / $total) * 100, 2) : 0.0,
+            ])
+            ->filter(fn ($row) => $row['tag'])
+            ->values()
+            ->all();
     }
 
     private function toneFor(?string $severity): string

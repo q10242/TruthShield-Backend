@@ -28,7 +28,7 @@ class ApiDocsController extends Controller
                 ['method' => 'POST', 'path' => '/api/me/claimants', 'description' => 'Request verified author, media, subject, or organization claimant status.'],
                 ['method' => 'POST', 'path' => '/api/official-responses', 'description' => 'Submit an official or right-of-reply response for admin review.'],
                 ['method' => 'POST', 'path' => '/api/official-responses/{officialResponse}/reaction', 'description' => 'Rate a published official response as helpful or not helpful with trust weighting.'],
-                ['method' => 'GET', 'path' => '/api/evidence-library', 'description' => 'Public evidence library with tag/domain/source filters and helpful, quality, controversy, or latest sorting.'],
+                ['method' => 'GET', 'path' => '/api/evidence-library', 'description' => 'Public evidence and official response library with tag/domain/source/focus filters and helpful, quality, controversy, or latest sorting.'],
                 ['method' => 'GET', 'path' => '/api/news-domain-reports/status', 'description' => 'Check whether an untracked news domain has already been reported.'],
                 ['method' => 'GET', 'path' => '/api/me/notifications', 'description' => 'Authenticated user notifications.'],
                 ['method' => 'POST', 'path' => '/api/me/notifications/read-all', 'description' => 'Mark authenticated user notifications as read.'],

@@ -42,6 +42,8 @@ class VoteController extends Controller
         $validated = $request->validate([
             'url' => ['required', 'url', 'max:4096'],
             'tag_id' => ['required', 'integer', 'exists:tags,id'],
+            'secondary_tag_ids' => ['nullable', 'array', 'max:4'],
+            'secondary_tag_ids.*' => ['integer', 'distinct', 'exists:tags,id'],
             'evidence_url' => ['nullable', 'url', 'max:2048'],
             'evidence_note' => ['nullable', 'string', 'max:320'],
             'title_snapshot' => ['nullable', 'string', 'max:255'],
@@ -49,6 +51,12 @@ class VoteController extends Controller
         ]);
 
         $tag = Tag::query()->findOrFail($validated['tag_id']);
+        $secondaryTagIds = collect($validated['secondary_tag_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->reject(fn ($id) => $id === (int) $validated['tag_id'])
+            ->unique()
+            ->values()
+            ->all();
         $evidenceUrl = $validated['evidence_url'] ?? null;
         $evidence = null;
 
@@ -133,6 +141,7 @@ class VoteController extends Controller
             ],
             [
                 'tag_id' => $validated['tag_id'],
+                'secondary_tag_ids' => $secondaryTagIds,
                 'evidence_url' => $evidenceUrl,
                 'evidence_type' => $evidence['type'],
                 'evidence_host' => $evidence['host'],

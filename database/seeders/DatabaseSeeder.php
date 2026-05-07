@@ -151,6 +151,11 @@ class DatabaseSeeder extends Seeder
             $tester->votes()->create([
                 'news_url_id' => $newsUrl->id,
                 'tag_id' => $tag->id,
+                'secondary_tag_ids' => Tag::query()
+                    ->whereIn('slug', ['single-source', 'missing-facts'])
+                    ->pluck('id')
+                    ->values()
+                    ->all(),
                 'evidence_url' => 'https://imgur.com/truthshield-seed-evidence',
                 'evidence_note' => '樣本投票：新聞只呈現單一說法，缺少另一方回應。',
                 'evidence_type' => 'image',

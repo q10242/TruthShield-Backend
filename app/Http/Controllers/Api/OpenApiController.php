@@ -75,6 +75,7 @@ class OpenApiController extends Controller
                             ['name' => 'tag', 'in' => 'query', 'schema' => ['type' => 'string']],
                             ['name' => 'domain', 'in' => 'query', 'schema' => ['type' => 'string']],
                             ['name' => 'trusted', 'in' => 'query', 'schema' => ['type' => 'boolean']],
+                            ['name' => 'focus', 'in' => 'query', 'schema' => ['type' => 'string', 'enum' => ['community', 'official']]],
                             ['name' => 'sort', 'in' => 'query', 'schema' => ['type' => 'string', 'enum' => ['helpful', 'quality', 'controversial', 'latest']]],
                         ],
                     ],

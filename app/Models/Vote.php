@@ -13,6 +13,7 @@ class Vote extends Model
         'user_id',
         'news_url_id',
         'tag_id',
+        'secondary_tag_ids',
         'evidence_url',
         'evidence_type',
         'evidence_host',
@@ -28,6 +29,7 @@ class Vote extends Model
         return [
             'weight_score' => 'float',
             'hidden' => 'boolean',
+            'secondary_tag_ids' => 'array',
         ];
     }
 

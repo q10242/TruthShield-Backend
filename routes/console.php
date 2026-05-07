@@ -473,6 +473,51 @@ SQL,
     return 0;
 })->purpose('Run PostgreSQL EXPLAIN plans for launch hot queries.');
 
+Artisan::command('truthshield:check-performance-budget {--base-url=} {--url=https://www.cna.com.tw/news/aipl/202605060001.aspx}', function () {
+    $baseUrl = rtrim($this->option('base-url') ?: config('app.url'), '/');
+    $url = $this->option('url');
+    $thresholds = [
+        'status_p95_ms' => 120,
+        'evidence_p95_ms' => 250,
+        'health_p95_ms' => 150,
+    ];
+    $summary = [];
+
+    foreach ([
+        'status' => ['/api/news/status', ['url' => $url], 'status_p95_ms'],
+        'evidence' => ['/api/news/evidence', ['url' => $url], 'evidence_p95_ms'],
+        'health' => ['/api/system/health', [], 'health_p95_ms'],
+    ] as $name => [$path, $query, $budgetKey]) {
+        $latencies = [];
+        $failures = 0;
+        for ($i = 0; $i < 20; $i++) {
+            $started = microtime(true);
+            try {
+                $response = Http::timeout(5)->acceptJson()->get($baseUrl . $path, $query);
+                if (! $response->successful()) {
+                    $failures++;
+                }
+            } catch (\Throwable) {
+                $failures++;
+            }
+            $latencies[] = (microtime(true) - $started) * 1000;
+        }
+
+        sort($latencies);
+        $p95 = round($latencies[(int) floor((count($latencies) - 1) * 0.95)], 2);
+        $summary[$name] = [
+            'p95_ms' => $p95,
+            'budget_ms' => $thresholds[$budgetKey],
+            'failures' => $failures,
+            'pass' => $failures === 0 && $p95 <= $thresholds[$budgetKey],
+        ];
+    }
+
+    $this->info(json_encode(['base_url' => $baseUrl, 'summary' => $summary], JSON_PRETTY_PRINT));
+
+    return collect($summary)->every(fn ($row) => $row['pass']) ? 0 : 1;
+})->purpose('Check local hot endpoint latency budgets for pre-launch QA.');
+
 Artisan::command('truthshield:backup-postgres {path?}', function () {
     $path = $this->argument('path') ?: storage_path('app/backups/truthshield-' . now()->format('Ymd-His') . '.sql');
     if (! is_dir(dirname($path))) {

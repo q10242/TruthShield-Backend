@@ -7,6 +7,8 @@ use App\Models\Donation;
 use App\Services\EcpayDonationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\PersonalAccessToken;
 
 class DonationController extends Controller
@@ -35,6 +37,7 @@ class DonationController extends Controller
 
         $payload = $ecpay->createPayload($donation);
         $donation->forceFill(['request_payload' => $payload])->save();
+        $this->forgetDonationCaches();
 
         return response()->json([
             'donation' => [
@@ -53,12 +56,12 @@ class DonationController extends Controller
 
     public function config(): JsonResponse
     {
-        return response()->json([
+        return response()->json(Cache::store(config('truthshield.status_cache_store'))->remember('donations:config:v1', now()->addMinutes(10), fn () => [
             'amounts' => config('truthshield.donation_amounts', [100, 300, 500, 1000, 2000, 5000]),
             'currency' => 'TWD',
             'provider' => 'ecpay',
             'monthly_goal' => (int) config('truthshield.donation_monthly_goal', 15000),
-        ]);
+        ]));
     }
 
     public function show(string $tradeNo): JsonResponse
@@ -79,20 +82,39 @@ class DonationController extends Controller
 
     public function summary(): JsonResponse
     {
-        $paid = Donation::query()->where('status', Donation::STATUS_PAID);
+        return response()->json(Cache::store(config('truthshield.status_cache_store'))->remember('donations:summary:v1', now()->addSeconds(30), function (): array {
+            $monthStart = now()->startOfMonth();
+            $row = Donation::query()
+                ->selectRaw('
+                    COALESCE(SUM(CASE WHEN status = ? THEN amount ELSE 0 END), 0) as total_amount,
+                    SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as paid_count,
+                    COALESCE(SUM(CASE WHEN status = ? AND paid_at >= ? THEN amount ELSE 0 END), 0) as month_amount,
+                    SUM(CASE WHEN status = ? AND paid_at >= ? THEN 1 ELSE 0 END) as month_count,
+                    SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as pending_count
+                ', [
+                    Donation::STATUS_PAID,
+                    Donation::STATUS_PAID,
+                    Donation::STATUS_PAID,
+                    $monthStart,
+                    Donation::STATUS_PAID,
+                    $monthStart,
+                    Donation::STATUS_PENDING,
+                ])
+                ->first();
 
-        return response()->json([
-            'total_amount' => (int) (clone $paid)->sum('amount'),
-            'paid_count' => (clone $paid)->count(),
-            'month_amount' => (int) (clone $paid)->where('paid_at', '>=', now()->startOfMonth())->sum('amount'),
-            'month_count' => (clone $paid)->where('paid_at', '>=', now()->startOfMonth())->count(),
-            'pending_count' => Donation::query()->where('status', Donation::STATUS_PENDING)->count(),
-        ]);
+            return [
+                'total_amount' => (int) $row->total_amount,
+                'paid_count' => (int) $row->paid_count,
+                'month_amount' => (int) $row->month_amount,
+                'month_count' => (int) $row->month_count,
+                'pending_count' => (int) $row->pending_count,
+            ];
+        }));
     }
 
     public function supporters(): JsonResponse
     {
-        $supporters = Donation::query()
+        $supporters = Cache::store(config('truthshield.status_cache_store'))->remember('donations:supporters:v1', now()->addSeconds(30), fn () => Donation::query()
             ->where('status', Donation::STATUS_PAID)
             ->latest('paid_at')
             ->limit(24)
@@ -102,25 +124,34 @@ class DonationController extends Controller
                 'amount' => $donation->amount,
                 'message' => $donation->message,
                 'paid_at' => $donation->paid_at?->toISOString(),
-            ]);
+            ]));
 
         return response()->json(['data' => $supporters]);
     }
 
     public function monthly(): JsonResponse
     {
-        $rows = collect(range(5, 0))
-            ->map(function (int $monthsAgo) {
-                $month = now()->startOfMonth()->subMonths($monthsAgo);
-                $query = Donation::query()
-                    ->where('status', Donation::STATUS_PAID)
-                    ->whereBetween('paid_at', [$month, $month->copy()->endOfMonth()]);
+        $rows = Cache::store(config('truthshield.status_cache_store'))->remember('donations:monthly:v1', now()->addMinutes(5), function () {
+            $start = now()->startOfMonth()->subMonths(5);
+            $raw = Donation::query()
+                ->where('status', Donation::STATUS_PAID)
+                ->where('paid_at', '>=', $start)
+                ->selectRaw("to_char(paid_at, 'YYYY-MM') as month, COALESCE(SUM(amount), 0) as amount, COUNT(*) as count")
+                ->groupBy(DB::raw("to_char(paid_at, 'YYYY-MM')"))
+                ->get()
+                ->keyBy('month');
 
-                return [
-                    'month' => $month->format('Y-m'),
-                    'amount' => (int) (clone $query)->sum('amount'),
-                    'count' => (clone $query)->count(),
-                ];
+            return collect(range(5, 0))
+                ->map(function (int $monthsAgo) use ($raw) {
+                    $month = now()->startOfMonth()->subMonths($monthsAgo)->format('Y-m');
+
+                    return [
+                        'month' => $month,
+                        'amount' => (int) ($raw[$month]->amount ?? 0),
+                        'count' => (int) ($raw[$month]->count ?? 0),
+                    ];
+                })
+                ->values();
             })
             ->values();
 
@@ -143,6 +174,7 @@ class DonationController extends Controller
             'provider_payload' => $payload,
             'paid_at' => $isPaid ? now() : $donation->paid_at,
         ])->save();
+        $this->forgetDonationCaches();
 
         return response('1|OK');
     }
@@ -155,5 +187,13 @@ class DonationController extends Controller
         }
 
         return PersonalAccessToken::findToken($token)?->tokenable;
+    }
+
+    private function forgetDonationCaches(): void
+    {
+        $cache = Cache::store(config('truthshield.status_cache_store'));
+        foreach (['donations:summary:v1', 'donations:supporters:v1', 'donations:monthly:v1', 'transparency:summary:v1', 'system:health:metrics:v1'] as $key) {
+            $cache->forget($key);
+        }
     }
 }

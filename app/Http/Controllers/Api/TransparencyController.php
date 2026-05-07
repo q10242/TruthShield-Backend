@@ -24,12 +24,13 @@ use App\Models\Vote;
 use App\Models\ReadSession;
 use App\Models\UserNotification;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 
 class TransparencyController extends Controller
 {
     public function show(): JsonResponse
     {
-        return response()->json([
+        return response()->json(Cache::store(config('truthshield.status_cache_store'))->remember('transparency:summary:v1', now()->addSeconds(30), fn () => [
             'users' => User::query()->count(),
             'news_urls' => NewsUrl::query()->count(),
             'votes' => Vote::query()->count(),
@@ -63,6 +64,6 @@ class TransparencyController extends Controller
                 'limited' => User::query()->where('risk_status', 'limited')->count(),
                 'suspended_weight' => User::query()->where('risk_status', 'suspended_weight')->count(),
             ],
-        ]);
+        ]));
     }
 }

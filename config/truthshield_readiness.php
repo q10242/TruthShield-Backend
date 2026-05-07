@@ -1,7 +1,8 @@
 <?php
 
 return [
-    'local_next_points' => [
+    'local_next_points' => [],
+    'local_completed_polish_points' => [
         ['id' => 1, 'category' => 'operations', 'title' => '願景準備頁加入缺口模式', 'impact' => '使用者能分辨已完成、本地待推、外部依賴。'],
         ['id' => 2, 'category' => 'operations', 'title' => '願景資料抽成 config', 'impact' => '減少 controller 寫死清單，後續可由營運維護。'],
         ['id' => 3, 'category' => 'governance', 'title' => '後台願景 dashboard widget', 'impact' => '管理員一進後台就看到 readiness 狀態。'],
@@ -37,5 +38,17 @@ return [
         ['severity' => 'critical', 'target' => 'token、後台權限、付款 callback、SSRF', 'sla' => '72 小時內確認，7 天內初步修補。'],
         ['severity' => 'high', 'target' => '投票權重繞過、iframe/postMessage、濫用降權繞過', 'sla' => '7 天內回覆處理計畫。'],
         ['severity' => 'medium', 'target' => '資料匯出、透明頁、插件相容性資訊洩漏', 'sla' => '14 天內排程。'],
+    ],
+    'external_launch_dependencies' => [
+        '正式 OAuth provider secrets 與 redirect URL',
+        '正式 HTTPS API / Web origin',
+        'Chrome Web Store 發佈資料與審核',
+        'ECPay 正式 MerchantID / HashKey / HashIV',
+        'production Redis / PostgreSQL 備份還原演練',
+        '私密資安通報信箱',
+        '真實新聞站 selector 相容性抽測',
+        '高頻 hover 壓測與 CDN / edge cache 策略',
+        '正式隱私權與服務條款審閱',
+        '社群治理準則公開審稿',
     ],
 ];

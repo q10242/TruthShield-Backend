@@ -25,7 +25,32 @@ class OpenApiController extends Controller
                         ],
                     ],
                 ],
-                '/api/vision-readiness' => ['get' => ['summary' => 'Vision-level launch readiness checklist and operating playbooks']],
+                '/api/vision-readiness' => [
+                    'get' => [
+                        'summary' => 'Vision-level launch readiness checklist and operating playbooks',
+                        'responses' => [
+                            '200' => [
+                                'description' => 'Readiness payload',
+                                'content' => [
+                                    'application/json' => [
+                                        'schema' => [
+                                            'type' => 'object',
+                                            'properties' => [
+                                                'summary' => ['type' => 'object'],
+                                                'feature_points' => ['type' => 'array', 'items' => ['type' => 'object']],
+                                                'local_next_points' => ['type' => 'array', 'items' => ['type' => 'object']],
+                                                'local_completed_polish_points' => ['type' => 'array', 'items' => ['type' => 'object']],
+                                                'production_checklist' => ['type' => 'array', 'items' => ['type' => 'object']],
+                                                'security_report_flow' => ['type' => 'array', 'items' => ['type' => 'object']],
+                                                'launch_dependencies' => ['type' => 'array', 'items' => ['type' => 'string']],
+                                            ],
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
                 '/api/auth/{provider}/callback' => ['post' => ['summary' => 'OAuth callback token exchange']],
                 '/api/news/evidence' => ['get' => ['summary' => 'List evidence for a URL']],
                 '/api/news/snapshot' => ['post' => ['summary' => 'Record article metadata snapshot and detect changes']],

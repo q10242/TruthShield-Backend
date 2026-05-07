@@ -173,7 +173,7 @@ class AuthController extends Controller
                 'email' => $validated['email'],
                 'display_name' => $validated['name'] ?? $user->name,
                 'verified_at' => now(),
-                'metadata' => ['source' => 'api_callback_stub'],
+                'metadata' => ['source' => 'api_callback'],
             ],
         );
 

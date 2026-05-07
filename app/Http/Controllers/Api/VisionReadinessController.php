@@ -29,6 +29,7 @@ class VisionReadinessController extends Controller
                     'name' => 'TruthShield 願景上線準備中心',
                     'local_feature_points' => count($this->featurePoints()),
                     'local_next_points' => count(config('truthshield_readiness.local_next_points', [])),
+                    'local_completed_polish_points' => count(config('truthshield_readiness.local_completed_polish_points', [])),
                     'external_launch_dependencies' => count($this->launchDependencies()),
                     'completed_local_points' => collect($this->featurePoints())->where('status', 'implemented')->count(),
                     'generated_at' => now()->toJSON(),
@@ -36,6 +37,7 @@ class VisionReadinessController extends Controller
                 'categories' => $this->categories(),
                 'feature_points' => $this->featurePoints(),
                 'local_next_points' => config('truthshield_readiness.local_next_points', []),
+                'local_completed_polish_points' => config('truthshield_readiness.local_completed_polish_points', []),
                 'journalism_taxonomy' => $this->journalismTaxonomy(),
                 'evidence_rubric' => $this->evidenceRubric(),
                 'participation_loops' => $this->participationLoops(),
@@ -215,17 +217,6 @@ class VisionReadinessController extends Controller
 
     private function launchDependencies(): array
     {
-        return [
-            '正式 OAuth provider secrets 與 redirect URL',
-            '正式 HTTPS API / Web origin',
-            'Chrome Web Store 發佈資料與審核',
-            'ECPay 正式 MerchantID / HashKey / HashIV',
-            'production Redis / PostgreSQL 備份還原演練',
-            '私密資安通報信箱',
-            '真實新聞站 selector 相容性抽測',
-            '高頻 hover 壓測與 CDN / edge cache 策略',
-            '正式隱私權與服務條款審閱',
-            '社群治理準則公開審稿',
-        ];
+        return config('truthshield_readiness.external_launch_dependencies', []);
     }
 }

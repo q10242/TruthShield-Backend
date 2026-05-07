@@ -16,6 +16,7 @@ class AdminChineseLabels
         'AppealResource' => '管理使用者申訴。審核結果會影響證據可見性、帳號限制、信用調整與通知。',
         'AuditLogResource' => '查看後台與重要 API 操作紀錄。這是追蹤管理行為與事後稽核的主要資料。',
         'BadgeResource' => '管理徽章與成就。這會影響使用者 Profile 展示與參與誘因，不應頻繁改動條件。',
+        'BugReportResource' => '管理使用者回報的一般 Bug、插件問題、資料錯誤與安全漏洞。安全類型不應公開細節，需優先分類嚴重度並追蹤修復狀態。',
         'CommunityTaskResource' => '管理社群自治任務。任務狀態會影響使用者協助維護新聞站、證據品質與可信來源的入口。',
         'DonationResource' => '管理捐款訂單與付款狀態。資料會用於公開資金透明頁與營運匯出。',
         'EvidenceReactionResource' => '管理使用者對證據的有用／沒幫助評分。這會影響證據排序、品質分與未來信用結算。',

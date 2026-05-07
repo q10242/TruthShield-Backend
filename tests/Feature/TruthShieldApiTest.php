@@ -1912,6 +1912,32 @@ class TruthShieldApiTest extends TestCase
         ]);
     }
 
+    public function test_bug_and_security_report_can_be_submitted(): void
+    {
+        $this->postJson('/api/bug-reports', [
+            'report_type' => 'security',
+            'title' => 'postMessage origin validation issue',
+            'description' => 'The iframe accepts messages from an unexpected origin.',
+            'steps_to_reproduce' => 'Open a crafted page and send a resize message.',
+            'page_url' => 'https://example.com/news/1',
+            'contact_email' => 'security@example.com',
+            'extension_version' => '0.1.0',
+            'source' => 'extension_popup',
+            'diagnostics' => ['browser' => 'Chrome'],
+        ])
+            ->assertCreated()
+            ->assertJsonPath('report.report_type', 'security')
+            ->assertJsonPath('report.severity', 'high')
+            ->assertJsonPath('report.status', 'new');
+
+        $this->assertDatabaseHas('bug_reports', [
+            'report_type' => 'security',
+            'title' => 'postMessage origin validation issue',
+            'status' => 'new',
+            'source' => 'extension_popup',
+        ]);
+    }
+
     public function test_vision_readiness_endpoint_returns_55_local_feature_points(): void
     {
         $this->seed();

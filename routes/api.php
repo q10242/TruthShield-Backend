@@ -76,6 +76,7 @@ Route::get('/leaderboard/trust', [TrustLeaderboardController::class, 'index']);
 Route::get('/exports/media.csv', [ExportController::class, 'mediaCsv']);
 Route::get('/exports/news.csv', [ExportController::class, 'newsCsv']);
 Route::get('/exports/evidence.csv', [ExportController::class, 'evidenceCsv']);
+Route::get('/exports/donations.csv', [ExportController::class, 'donationsCsv']);
 Route::get('/media/{mediaOutlet:slug}', [MediaOutletController::class, 'show']);
 Route::get('/transparency', [TransparencyController::class, 'show']);
 Route::get('/system/health', [SystemHealthController::class, 'show']);

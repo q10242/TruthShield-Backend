@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Donation;
 use App\Models\MediaOutlet;
 use App\Models\NewsUrl;
 use App\Models\Vote;
@@ -112,5 +113,30 @@ class ExportController extends Controller
                 }
             });
         }, 'truthshield-evidence.csv', ['Content-Type' => 'text/csv']);
+    }
+
+    public function donationsCsv(): StreamedResponse
+    {
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['id', 'trade_no', 'amount', 'status', 'donor_name', 'donor_email', 'paid_at', 'created_at']);
+
+            Donation::query()
+                ->latest()
+                ->chunk(200, function ($rows) use ($handle): void {
+                    foreach ($rows as $row) {
+                        fputcsv($handle, [
+                            $row->id,
+                            $row->merchant_trade_no,
+                            $row->amount,
+                            $row->status,
+                            $row->donor_name,
+                            $row->donor_email,
+                            $row->paid_at?->toJSON(),
+                            $row->created_at?->toJSON(),
+                        ]);
+                    }
+                });
+        }, 'truthshield-donations.csv', ['Content-Type' => 'text/csv']);
     }
 }

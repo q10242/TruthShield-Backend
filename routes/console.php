@@ -164,6 +164,37 @@ Artisan::command('truthshield:record-operational-heartbeat {type=queue_worker}',
     $this->info('Heartbeat recorded.');
 })->purpose('Record operational heartbeat for health checks.');
 
+Artisan::command('truthshield:check-production-env', function () {
+    $required = [
+        'APP_KEY',
+        'APP_URL',
+        'FRONTEND_URL',
+        'DB_HOST',
+        'DB_DATABASE',
+        'DB_USERNAME',
+        'DB_PASSWORD',
+        'REDIS_HOST',
+        'ECPAY_MERCHANT_ID',
+        'ECPAY_HASH_KEY',
+        'ECPAY_HASH_IV',
+        'ECPAY_API_BASE_URL',
+        'ECPAY_WEB_BASE_URL',
+    ];
+    $missing = array_values(array_filter($required, fn (string $key) => blank(env($key))));
+
+    if ($missing !== []) {
+        $this->error('Missing production env: ' . implode(', ', $missing));
+        return 1;
+    }
+
+    if ((bool) config('truthshield.dev_login_enabled')) {
+        $this->warn('TRUTHSHIELD_DEV_LOGIN_ENABLED is enabled. Disable it before production launch.');
+    }
+
+    $this->info('Production environment checklist passed.');
+    return 0;
+})->purpose('Validate required TruthShield production environment variables.');
+
 Artisan::command('truthshield:seed-launch-policies', function () {
     $policies = [
         ['name' => 'hover', 'scope' => 'public_status', 'max_attempts' => 600, 'decay_seconds' => 60, 'low_trust_multiplier' => 1],

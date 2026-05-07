@@ -31,6 +31,7 @@ class DatabaseSeeder extends Seeder
             ['name' => '證據審閱員', 'slug' => 'evidence-rater', 'description' => '完成 5 次證據有用/沒幫助評分。', 'color' => '#c4b5fd'],
             ['name' => '閱讀紀律', 'slug' => 'reading-discipline', 'description' => '累積 5 篇新聞閱讀紀錄。', 'color' => '#facc15'],
             ['name' => '信用成長', 'slug' => 'trust-growth', 'description' => '累積 3 筆信用分歷史。', 'color' => '#fb7185'],
+            ['name' => '護盾支持者', 'slug' => 'shield-supporter', 'description' => '完成第一筆專案捐款支持。', 'color' => '#f0abfc'],
         ] as $badge) {
             Badge::query()->updateOrCreate(['slug' => $badge['slug']], $badge);
         }

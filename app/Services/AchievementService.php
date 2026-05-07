@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Badge;
+use App\Models\Donation;
 use App\Models\EvidenceReaction;
 use App\Models\User;
 
@@ -123,6 +124,7 @@ class AchievementService
                 ->count(),
             'read_sessions' => $user->readSessions()->count(),
             'trust_history_entries' => $user->trustScoreHistories()->count(),
+            'paid_donations' => Donation::query()->where('user_id', $user->id)->where('status', 'paid')->count(),
             'badges' => $user->badges()->count(),
         ];
     }
@@ -192,6 +194,15 @@ class AchievementService
                 'metric' => 'read_sessions',
                 'target' => 5,
                 'reason' => '累積 5 篇新聞閱讀紀錄。',
+            ],
+            [
+                'name' => '護盾支持者',
+                'slug' => 'shield-supporter',
+                'description' => '完成第一筆專案捐款支持。',
+                'color' => '#f0abfc',
+                'metric' => 'paid_donations',
+                'target' => 1,
+                'reason' => '完成第一筆專案捐款支持。',
             ],
             [
                 'name' => '信用成長',

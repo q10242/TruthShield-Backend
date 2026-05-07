@@ -50,9 +50,9 @@ class TransparencyController extends Controller
             'selector_failures_24h' => ExtensionSelectorCheck::query()->where('success', false)->where('checked_at', '>=', now()->subDay())->count(),
             'active_trusted_evidence_sources' => TrustedEvidenceSource::query()->where('is_active', true)->count(),
             'active_rate_limit_policies' => RateLimitPolicy::query()->where('is_active', true)->count(),
-            'donation_total_amount' => (int) Donation::query()->where('status', 'paid')->sum('amount'),
-            'donation_paid_count' => Donation::query()->where('status', 'paid')->count(),
-            'donation_month_amount' => (int) Donation::query()->where('status', 'paid')->where('paid_at', '>=', now()->startOfMonth())->sum('amount'),
+            'donation_total_amount' => (int) Donation::query()->where('status', Donation::STATUS_PAID)->sum('amount'),
+            'donation_paid_count' => Donation::query()->where('status', Donation::STATUS_PAID)->count(),
+            'donation_month_amount' => (int) Donation::query()->where('status', Donation::STATUS_PAID)->where('paid_at', '>=', now()->startOfMonth())->sum('amount'),
             'algorithm_version' => config('truthshield.algorithm_version', 'truthshield-v1'),
             'status_cache_version' => config('truthshield.status_cache_version', 'v1'),
             'weight_distribution' => [

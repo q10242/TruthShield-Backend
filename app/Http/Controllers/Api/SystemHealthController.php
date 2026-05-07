@@ -73,8 +73,8 @@ class SystemHealthController extends Controller
                         'active_trusted_evidence_sources' => TrustedEvidenceSource::query()->where('is_active', true)->count(),
                         'active_rate_limit_policies' => RateLimitPolicy::query()->where('is_active', true)->count(),
                         'pending_evidence_snapshots' => \App\Models\Evidence::query()->where('snapshot_status', 'pending')->count(),
-                        'pending_donations' => Donation::query()->where('status', 'pending')->count(),
-                        'paid_donations_24h' => Donation::query()->where('status', 'paid')->where('paid_at', '>=', now()->subDay())->count(),
+                        'pending_donations' => Donation::query()->where('status', Donation::STATUS_PENDING)->count(),
+                        'paid_donations_24h' => Donation::query()->where('status', Donation::STATUS_PAID)->where('paid_at', '>=', now()->subDay())->count(),
                     ],
                 ];
             },

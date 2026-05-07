@@ -1593,4 +1593,25 @@ class TruthShieldApiTest extends TestCase
             'status' => 'pending',
         ]);
     }
+
+    public function test_vision_readiness_endpoint_returns_55_local_feature_points(): void
+    {
+        $this->seed();
+
+        $this->getJson('/api/vision-readiness')
+            ->assertOk()
+            ->assertJsonPath('summary.local_feature_points', 55)
+            ->assertJsonPath('summary.completed_local_points', 55)
+            ->assertJsonCount(55, 'feature_points')
+            ->assertJsonStructure([
+                'categories',
+                'feature_points' => [['id', 'category', 'title', 'status']],
+                'journalism_taxonomy' => ['negative', 'positive'],
+                'evidence_rubric',
+                'participation_loops',
+                'operational_playbooks',
+                'live_pressure',
+                'launch_dependencies',
+            ]);
+    }
 }

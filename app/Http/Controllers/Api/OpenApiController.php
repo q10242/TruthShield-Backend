@@ -25,6 +25,7 @@ class OpenApiController extends Controller
                         ],
                     ],
                 ],
+                '/api/vision-readiness' => ['get' => ['summary' => 'Vision-level launch readiness checklist and operating playbooks']],
                 '/api/auth/{provider}/callback' => ['post' => ['summary' => 'OAuth callback token exchange']],
                 '/api/news/evidence' => ['get' => ['summary' => 'List evidence for a URL']],
                 '/api/news/snapshot' => ['post' => ['summary' => 'Record article metadata snapshot and detect changes']],

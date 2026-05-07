@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\TrustLeaderboardController;
 use App\Http\Controllers\Api\UserVoteController;
 use App\Http\Controllers\Api\UserDataExportController;
 use App\Http\Controllers\Api\UserDataRequestController;
+use App\Http\Controllers\Api\VisionReadinessController;
 use App\Services\TrustScoreService;
 
 Route::post('/auth/dev-login', [AuthController::class, 'devLogin'])->middleware('throttle:auth');
@@ -52,6 +53,7 @@ Route::get('/tags', [LookupController::class, 'tags']);
 Route::get('/docs', [ApiDocsController::class, 'show']);
 Route::get('/openapi.json', [OpenApiController::class, 'show']);
 Route::get('/algorithm', [AlgorithmController::class, 'show']);
+Route::get('/vision-readiness', [VisionReadinessController::class, 'show']);
 Route::get('/account-graph/summary', [AccountGraphController::class, 'summary'])->middleware('auth:sanctum');
 Route::get('/evidence-report-reasons', [LookupController::class, 'evidenceReportReasons']);
 Route::get('/trusted-evidence-sources', [LaunchOpsController::class, 'trustedEvidenceSources']);

@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\OfficialResponseResource\Pages;
 use App\Models\OfficialResponse;
 use App\Services\ModerationEventService;
+use App\Services\NotificationService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -75,6 +76,7 @@ class OfficialResponseResource extends Resource
                 ->form([
                     Forms\Components\Textarea::make('review_note')->label('審核理由')->required()->maxLength(500),
                 ])
+                ->requiresConfirmation()
                 ->action(function (OfficialResponse $record, array $data): void {
                     $record->forceFill([
                         'status' => 'published',
@@ -86,6 +88,17 @@ class OfficialResponseResource extends Resource
                     app(ModerationEventService::class)->record(request(), 'official_response.published', $record, '官方澄清已發布', [
                         'news_url_id' => $record->news_url_id,
                     ]);
+                    $record->loadMissing(['user', 'newsUrl']);
+                    if ($record->user) {
+                        app(NotificationService::class)->send(
+                            $record->user,
+                            'official_response.published',
+                            '你的官方澄清已發布',
+                            '澄清內容已通過審核，會在新聞頁獨立顯示。',
+                            $record->newsUrl?->normalized_url,
+                            ['official_response_id' => $record->id],
+                        );
+                    }
                 }),
             Tables\Actions\Action::make('hide')
                 ->label('隱藏')
@@ -93,6 +106,7 @@ class OfficialResponseResource extends Resource
                 ->form([
                     Forms\Components\Textarea::make('review_note')->label('隱藏理由')->required()->maxLength(500),
                 ])
+                ->requiresConfirmation()
                 ->action(function (OfficialResponse $record, array $data): void {
                     $record->forceFill([
                         'status' => 'hidden',
@@ -103,6 +117,17 @@ class OfficialResponseResource extends Resource
                     app(ModerationEventService::class)->record(request(), 'official_response.hidden', $record, '官方澄清已隱藏', [
                         'news_url_id' => $record->news_url_id,
                     ]);
+                    $record->loadMissing(['user', 'newsUrl']);
+                    if ($record->user) {
+                        app(NotificationService::class)->send(
+                            $record->user,
+                            'official_response.hidden',
+                            '你的官方澄清已被隱藏',
+                            $data['review_note'],
+                            $record->newsUrl?->normalized_url,
+                            ['official_response_id' => $record->id],
+                        );
+                    }
                 }),
         ])->defaultSort('created_at', 'desc');
     }

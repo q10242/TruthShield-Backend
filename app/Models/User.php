@@ -123,6 +123,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(OfficialResponse::class);
     }
 
+    public function officialResponseReactions(): HasMany
+    {
+        return $this->hasMany(OfficialResponseReaction::class);
+    }
+
     public function publicName(): string
     {
         if ($this->is_real_name_public && $this->name) {

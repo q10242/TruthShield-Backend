@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\VerifiedClaimantResource\Pages;
 use App\Models\VerifiedClaimant;
 use App\Services\ModerationEventService;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -74,6 +75,7 @@ class VerifiedClaimantResource extends Resource
                     Forms\Components\TextInput::make('public_identity_label')->label('公開身份標籤')->default('已驗證澄清者')->maxLength(120),
                     Forms\Components\Textarea::make('review_note')->label('審核理由')->required()->maxLength(500),
                 ])
+                ->requiresConfirmation()
                 ->action(function (VerifiedClaimant $record, array $data): void {
                     $record->forceFill([
                         'status' => 'approved',
@@ -86,6 +88,16 @@ class VerifiedClaimantResource extends Resource
                     app(ModerationEventService::class)->record(request(), 'claimant.approved', $record, '身份澄清申請已通過', [
                         'claim_type' => $record->claim_type,
                     ]);
+                    if ($record->user) {
+                        app(NotificationService::class)->send(
+                            $record->user,
+                            'claimant.approved',
+                            '你的身份澄清申請已通過',
+                            '你現在可以在相關新聞提交官方或本人澄清。',
+                            '/profile',
+                            ['verified_claimant_id' => $record->id],
+                        );
+                    }
                 }),
             Tables\Actions\Action::make('reject')
                 ->label('拒絕')
@@ -93,6 +105,7 @@ class VerifiedClaimantResource extends Resource
                 ->form([
                     Forms\Components\Textarea::make('review_note')->label('拒絕理由')->required()->maxLength(500),
                 ])
+                ->requiresConfirmation()
                 ->action(function (VerifiedClaimant $record, array $data): void {
                     $record->forceFill([
                         'status' => 'rejected',
@@ -103,6 +116,16 @@ class VerifiedClaimantResource extends Resource
                     app(ModerationEventService::class)->record(request(), 'claimant.rejected', $record, '身份澄清申請已拒絕', [
                         'claim_type' => $record->claim_type,
                     ]);
+                    if ($record->user) {
+                        app(NotificationService::class)->send(
+                            $record->user,
+                            'claimant.rejected',
+                            '你的身份澄清申請未通過',
+                            $data['review_note'],
+                            '/profile',
+                            ['verified_claimant_id' => $record->id],
+                        );
+                    }
                 }),
         ])->defaultSort('created_at', 'desc');
     }

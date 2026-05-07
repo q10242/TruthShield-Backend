@@ -66,6 +66,11 @@ class NewsUrl extends Model
         return $this->hasMany(NewsChangeReport::class);
     }
 
+    public function officialResponses(): HasMany
+    {
+        return $this->hasMany(OfficialResponse::class);
+    }
+
     public function mediaOutlet(): BelongsTo
     {
         return $this->belongsTo(MediaOutlet::class);

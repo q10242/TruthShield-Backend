@@ -27,7 +27,10 @@ class NewsSearchController extends Controller
             $term = '%' . $validated['q'] . '%';
             $query->where(fn ($builder) => $builder
                 ->where('normalized_url', 'like', $term)
-                ->orWhere('title_snapshot', 'like', $term));
+                ->orWhere('title_snapshot', 'like', $term)
+                ->orWhereHas('officialResponses', fn ($responses) => $responses
+                    ->where('status', 'published')
+                    ->where('response_text', 'like', $term)));
         }
 
         if (! empty($validated['domain'])) {

@@ -137,6 +137,23 @@ class UserResource extends Resource
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_admin')
                     ->label('管理員帳號'),
+                Tables\Filters\SelectFilter::make('risk_status')
+                    ->label('風險狀態')
+                    ->options([
+                        'normal' => 'Normal',
+                        'watched' => 'Watched',
+                        'limited' => 'Limited',
+                        'suspended_weight' => 'Suspended Weight',
+                    ]),
+                Tables\Filters\SelectFilter::make('identity_level')
+                    ->label('身份等級')
+                    ->options([
+                        'dev' => 'Dev',
+                        'oauth' => 'OAuth',
+                        'verified_social' => 'Verified Social',
+                        'trusted_reviewer' => 'Trusted Reviewer',
+                        'restricted' => 'Restricted',
+                    ]),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
@@ -152,6 +169,7 @@ class UserResource extends Resource
                         Forms\Components\Textarea::make('details')
                             ->maxLength(500),
                     ])
+                    ->requiresConfirmation()
                     ->action(function (User $record, array $data): void {
                         app(TrustScoreService::class)->adjust(
                             $record,
@@ -164,10 +182,12 @@ class UserResource extends Resource
                 Tables\Actions\Action::make('limitWeight')
                     ->label('限制權重')
                     ->color('warning')
+                    ->requiresConfirmation()
                     ->action(fn (User $record): bool => $record->forceFill(['risk_status' => 'limited', 'abuse_multiplier' => 0.1])->save()),
                 Tables\Actions\Action::make('restoreWeight')
                     ->label('恢復權重')
                     ->color('success')
+                    ->requiresConfirmation()
                     ->action(fn (User $record): bool => $record->forceFill(['risk_status' => 'normal', 'abuse_multiplier' => 1.0])->save()),
             ])
             ->bulkActions([

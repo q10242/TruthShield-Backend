@@ -23,6 +23,11 @@ class MediaOutletController extends Controller
 
         return response()->json([
             'media' => $mediaOutlet->load('domains:id,media_outlet_id,domain,is_active'),
+            'official_response_count' => $mediaOutlet->newsUrls()
+                ->whereHas('officialResponses', fn ($query) => $query->where('status', 'published'))
+                ->withCount(['officialResponses as published_official_responses_count' => fn ($query) => $query->where('status', 'published')])
+                ->get()
+                ->sum('published_official_responses_count'),
             'tag_weights' => $weights,
             'recent_news' => $mediaOutlet->newsUrls()
                 ->withCount('votes')

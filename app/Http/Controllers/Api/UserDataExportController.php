@@ -32,6 +32,18 @@ class UserDataExportController extends Controller
                 ->with('newsUrl:id,normalized_url,title_snapshot')
                 ->latest()
                 ->get(),
+            'verified_claimants' => $user->verifiedClaimants()
+                ->with('newsUrl:id,normalized_url,title_snapshot')
+                ->latest()
+                ->get(),
+            'official_responses' => $user->officialResponses()
+                ->with(['newsUrl:id,normalized_url,title_snapshot', 'verifiedClaimant:id,organization_name,claim_type,status'])
+                ->latest()
+                ->get(),
+            'official_response_reactions' => $user->officialResponseReactions()
+                ->with('officialResponse:id,news_url_id,response_type,status')
+                ->latest()
+                ->get(),
         ]);
     }
 }

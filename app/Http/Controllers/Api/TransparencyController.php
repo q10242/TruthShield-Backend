@@ -21,10 +21,13 @@ use App\Models\NewsUrl;
 use App\Models\NewsUrlSnapshot;
 use App\Models\ModerationEvent;
 use App\Models\OperationalEvent;
+use App\Models\OfficialResponse;
+use App\Models\OfficialResponseReaction;
 use App\Models\RateLimitPolicy;
 use App\Models\TrustedEvidenceSource;
 use App\Models\User;
 use App\Models\UserDataRequest;
+use App\Models\VerifiedClaimant;
 use App\Models\Vote;
 use App\Models\ReadSession;
 use App\Models\UserNotification;
@@ -35,7 +38,7 @@ class TransparencyController extends Controller
 {
     public function show(): JsonResponse
     {
-        return response()->json(Cache::store(config('truthshield.status_cache_store'))->remember('transparency:summary:v2', now()->addSeconds(30), fn () => [
+        return response()->json(Cache::store(config('truthshield.status_cache_store'))->remember('transparency:summary:v3', now()->addSeconds(30), fn () => [
             'users' => User::query()->count(),
             'news_urls' => NewsUrl::query()->count(),
             'votes' => Vote::query()->count(),
@@ -53,6 +56,13 @@ class TransparencyController extends Controller
             'open_abuse_events' => AbuseEvent::query()->where('reviewed', false)->count(),
             'pending_appeals' => Appeal::query()->where('status', 'pending')->count(),
             'pending_user_data_requests' => UserDataRequest::query()->where('status', 'pending')->count(),
+            'pending_verified_claimants' => VerifiedClaimant::query()->where('status', 'pending')->count(),
+            'approved_verified_claimants' => VerifiedClaimant::query()->where('status', 'approved')->count(),
+            'pending_official_responses' => OfficialResponse::query()->where('status', 'pending')->count(),
+            'published_official_responses' => OfficialResponse::query()->where('status', 'published')->count(),
+            'official_response_reactions' => OfficialResponseReaction::query()->count(),
+            'bot_challenges_24h' => AbuseEvent::query()->where('type', 'challenge_required')->where('created_at', '>=', now()->subDay())->count(),
+            'bot_blocks_24h' => AbuseEvent::query()->where('type', 'bot_blocked')->where('created_at', '>=', now()->subDay())->count(),
             'moderation_events_24h' => ModerationEvent::query()->where('created_at', '>=', now()->subDay())->count(),
             'extension_failures_24h' => ExtensionEvent::query()->where('success', false)->where('created_at', '>=', now()->subDay())->count(),
             'audit_events_24h' => AuditLog::query()->where('created_at', '>=', now()->subDay())->count(),
@@ -88,6 +98,22 @@ class TransparencyController extends Controller
                 'abuse_events_open' => AbuseEvent::query()->where('reviewed', false)->count(),
                 'community_tasks_open' => CommunityTask::query()->where('status', 'open')->count(),
                 'community_tasks_escalated' => CommunityTask::query()->where('status', 'escalated')->count(),
+            ],
+            'official_response_distribution' => [
+                'pending' => OfficialResponse::query()->where('status', 'pending')->count(),
+                'published' => OfficialResponse::query()->where('status', 'published')->count(),
+                'hidden' => OfficialResponse::query()->where('status', 'hidden')->count(),
+                'rejected' => OfficialResponse::query()->where('status', 'rejected')->count(),
+            ],
+            'claimant_distribution' => [
+                'pending' => VerifiedClaimant::query()->where('status', 'pending')->count(),
+                'approved' => VerifiedClaimant::query()->where('status', 'approved')->count(),
+                'rejected' => VerifiedClaimant::query()->where('status', 'rejected')->count(),
+            ],
+            'bot_protection_distribution' => [
+                'challenge_required_24h' => AbuseEvent::query()->where('type', 'challenge_required')->where('created_at', '>=', now()->subDay())->count(),
+                'blocked_24h' => AbuseEvent::query()->where('type', 'bot_blocked')->where('created_at', '>=', now()->subDay())->count(),
+                'community_signal_spikes' => AbuseEvent::query()->where('type', 'community_signal_spike')->where('created_at', '>=', now()->subDay())->count(),
             ],
             'governance_pressure_score' => min(100, (
                 EvidenceReport::query()->where('status', 'pending')->count()

@@ -53,6 +53,7 @@ class EvidenceReportResource extends Resource
             Tables\Actions\Action::make('hideEvidence')
                 ->label('隱藏證據')
                 ->color('danger')
+                ->requiresConfirmation()
                 ->action(function (EvidenceReport $record, NotificationService $notifications): void {
                     $record->vote?->forceFill(['hidden' => true, 'moderation_status' => 'hidden'])->save();
                     $record->forceFill(['status' => 'reviewed'])->save();
@@ -71,6 +72,7 @@ class EvidenceReportResource extends Resource
             Tables\Actions\Action::make('restoreEvidence')
                 ->label('恢復證據')
                 ->color('success')
+                ->requiresConfirmation()
                 ->action(function (EvidenceReport $record, NotificationService $notifications): void {
                     $record->vote?->forceFill(['hidden' => false, 'moderation_status' => 'visible'])->save();
                     $record->forceFill(['status' => 'rejected'])->save();

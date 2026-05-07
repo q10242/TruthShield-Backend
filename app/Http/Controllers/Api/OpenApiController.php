@@ -53,6 +53,14 @@ class OpenApiController extends Controller
                 ],
                 '/api/auth/{provider}/callback' => ['post' => ['summary' => 'OAuth callback token exchange']],
                 '/api/news/evidence' => ['get' => ['summary' => 'List evidence for a URL']],
+                '/api/news/official-responses' => [
+                    'get' => [
+                        'summary' => 'List published official or right-of-reply responses for a URL',
+                        'parameters' => [
+                            ['name' => 'url', 'in' => 'query', 'required' => true, 'schema' => ['type' => 'string', 'format' => 'uri']],
+                        ],
+                    ],
+                ],
                 '/api/news/snapshot' => ['post' => ['summary' => 'Record article metadata snapshot and detect changes']],
                 '/api/news/change-reports' => ['post' => ['summary' => 'Report deleted or modified article state']],
                 '/api/news/read-session' => ['post' => ['summary' => 'Record authenticated reading time']],
@@ -88,9 +96,18 @@ class OpenApiController extends Controller
                 '/api/donations/supporters' => ['get' => ['summary' => 'Recent public donation supporters']],
                 '/api/donations/monthly' => ['get' => ['summary' => 'Monthly donation trend']],
                 '/api/user-data-requests' => ['post' => ['summary' => 'Submit a privacy data request']],
+                '/api/me/profile' => [
+                    'get' => ['summary' => 'Authenticated profile with badges, claimant status, and contribution summary'],
+                    'put' => ['summary' => 'Update public display identity and profile preferences'],
+                ],
+                '/api/me/claimants' => ['post' => ['summary' => 'Request verified claimant status for official responses']],
+                '/api/official-responses' => ['post' => ['summary' => 'Submit official response for admin review']],
+                '/api/official-responses/{officialResponse}/reaction' => ['post' => ['summary' => 'Rate a published official response helpfulness']],
                 '/api/me/appeals' => ['get' => ['summary' => 'List current user appeals'], 'post' => ['summary' => 'Create current user appeal']],
                 '/api/moderation-events' => ['get' => ['summary' => 'Public moderation event summaries']],
                 '/api/extension/events' => ['post' => ['summary' => 'Record extension telemetry']],
+                '/api/bot/config' => ['get' => ['summary' => 'Public bot protection challenge configuration']],
+                '/api/extension/nonce' => ['get' => ['summary' => 'Issue a short-lived extension nonce']],
                 '/api/extension/coverage' => ['get' => ['summary' => 'Domain-level extension coverage']],
                 '/api/account-graph/summary' => ['get' => ['summary' => 'Authenticated account signal graph summary']],
                 '/api/auth/{provider}/begin' => ['post' => ['summary' => 'Create OAuth state']],

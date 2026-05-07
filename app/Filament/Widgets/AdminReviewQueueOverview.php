@@ -8,8 +8,10 @@ use App\Models\CommunityTask;
 use App\Models\EvidenceReport;
 use App\Models\NewsChangeReport;
 use App\Models\NewsDomainReport;
+use App\Models\OfficialResponse;
 use App\Models\TrustedSourceSuggestion;
 use App\Models\UrlClassificationReport;
+use App\Models\VerifiedClaimant;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
@@ -54,6 +56,8 @@ class AdminReviewQueueOverview extends BaseWidget
             ['queue_label' => 'URL 分類', 'title' => '待審文章/分類頁回報', 'count' => UrlClassificationReport::query()->where('status', 'pending')->count(), 'priority' => 'medium', 'admin_url' => '/admin/url-classification-reports'],
             ['queue_label' => '可信來源', 'title' => '待審可信證據來源建議', 'count' => TrustedSourceSuggestion::query()->where('status', 'pending')->count(), 'priority' => 'medium', 'admin_url' => '/admin/trusted-source-suggestions'],
             ['queue_label' => '社群自治', 'title' => '升級人工處理的社群任務', 'count' => CommunityTask::query()->where('status', 'escalated')->count(), 'priority' => 'high', 'admin_url' => '/admin/community-tasks'],
+            ['queue_label' => '身份澄清', 'title' => '待審作者/媒體/當事人身份申請', 'count' => VerifiedClaimant::query()->where('status', 'pending')->count(), 'priority' => 'high', 'admin_url' => '/admin/verified-claimants'],
+            ['queue_label' => '官方澄清', 'title' => '待審官方/本人澄清內容', 'count' => OfficialResponse::query()->where('status', 'pending')->count(), 'priority' => 'high', 'admin_url' => '/admin/official-responses'],
         ])->filter(fn ($row) => $row['count'] > 0)->values();
 
         if ($rows->isEmpty()) {

@@ -43,18 +43,17 @@ class VoteResource extends Resource
                     ->maxLength(2048),
                 Forms\Components\Select::make('evidence_type')
                     ->options([
-                        'image' => 'Image',
-                        'link' => 'Link',
-                    ])
-                    ->maxLength(24),
+                        'image' => '圖片',
+                        'link' => '連結',
+                    ]),
                 Forms\Components\TextInput::make('evidence_host')
                     ->maxLength(255),
                 Forms\Components\Select::make('evidence_safety')
                     ->options([
                         'none' => 'None',
-                        'unknown' => 'Unknown',
-                        'trusted' => 'Trusted',
-                        'unverified' => 'Unverified',
+                        'unknown' => '未知',
+                        'trusted' => '可信',
+                        'unverified' => '未驗證',
                     ]),
                 Forms\Components\Textarea::make('evidence_note')
                     ->maxLength(320)

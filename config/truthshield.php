@@ -42,6 +42,8 @@ return [
     ))),
 
     'news_domains' => [
+        '127.0.0.1',
+        'localhost',
         'cna.com.tw',
         'www.cna.com.tw',
         'news.pts.org.tw',

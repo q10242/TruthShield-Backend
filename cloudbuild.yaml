@@ -6,7 +6,7 @@ substitutions:
   _QUEUE_DEPLOY_ENABLED: "true"
   _QUEUE_INSTANCE: "<QUEUE_VM_NAME>"
   _QUEUE_ZONE: asia-east1-a
-  _QUEUE_ENV_FILE: /home/kyjita/codebase/truthshield-worker/.env
+  _QUEUE_ENV_FILE: /path/to/worker.env
   _QUEUE_CONTAINER_NAME: truthshield-worker
   _QUEUE_DOCKER_NETWORK: "__SET_ME_IN_TRIGGER__"
   _QUEUE_SSH_USER: <QUEUE_SSH_USER>

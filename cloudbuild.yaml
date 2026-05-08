@@ -3,9 +3,9 @@ substitutions:
   _AR_HOSTNAME: asia-east1-docker.pkg.dev
   _AR_REPOSITORY: truthshield
   _SERVICE_NAME: truthshield-api
-  _QUEUE_DEPLOY_ENABLED: "false"
-  _QUEUE_INSTANCE: "10.140.0.10"
-  _QUEUE_ZONE: asia-east1-b
+  _QUEUE_DEPLOY_ENABLED: "true"
+  _QUEUE_INSTANCE: "<QUEUE_VM_NAME>"
+  _QUEUE_ZONE: asia-east1-a
   _QUEUE_ENV_FILE: /path/to/worker.env
   _QUEUE_CONTAINER_NAME: truthshield-worker
 

@@ -154,9 +154,10 @@ _QUEUE_ENV_FILE=/path/to/worker.env
 _QUEUE_CONTAINER_NAME=truthshield-worker
 _QUEUE_DOCKER_NETWORK=infra
 _QUEUE_SSH_USER=<QUEUE_SSH_USER>
+_QUEUE_IMAGE_CLEANUP_KEEP=3
 ```
 
-The queue host must have Docker, permission to pull from Artifact Registry, a populated env file, and a deploy user that can run Docker. If PostgreSQL and Redis run in Docker, put the worker on the same Docker network and set `DB_HOST` / `REDIS_HOST` to their container names in `worker.env`. The remote deploy script pulls the same image, runs migration/seed/bootstrap commands once, starts `queue:work redis`, and installs a crontab entry that runs `schedule:run` through the worker container.
+The queue host must have Docker, permission to pull from Artifact Registry, a populated env file, and a deploy user that can run Docker. If PostgreSQL and Redis run in Docker, put the worker on the same Docker network and set `DB_HOST` / `REDIS_HOST` to their container names in `worker.env`. The remote deploy script pulls the same image, runs migration/seed/bootstrap commands once, starts `queue:work redis`, installs a crontab entry that runs `schedule:run` through the worker container, and removes older TruthShield images after a successful worker start.
 
 ## Cloud Run Container
 

@@ -10,6 +10,7 @@ substitutions:
   _QUEUE_CONTAINER_NAME: truthshield-worker
   _QUEUE_DOCKER_NETWORK: "__SET_ME_IN_TRIGGER__"
   _QUEUE_SSH_USER: <QUEUE_SSH_USER>
+  _QUEUE_IMAGE_CLEANUP_KEEP: "3"
 
 steps:
   - name: gcr.io/cloud-builders/docker
@@ -62,7 +63,7 @@ steps:
         gcloud compute ssh "$$SSH_TARGET" \
           --zone="${_QUEUE_ZONE}" \
           --quiet \
-          --command="chmod +x /tmp/truthshield-queue-image-deploy.sh && IMAGE='$${IMAGE}' ENV_FILE='${_QUEUE_ENV_FILE}' CONTAINER_NAME='${_QUEUE_CONTAINER_NAME}' DOCKER_NETWORK='${_QUEUE_DOCKER_NETWORK}' /tmp/truthshield-queue-image-deploy.sh"
+          --command="chmod +x /tmp/truthshield-queue-image-deploy.sh && IMAGE='$${IMAGE}' ENV_FILE='${_QUEUE_ENV_FILE}' CONTAINER_NAME='${_QUEUE_CONTAINER_NAME}' DOCKER_NETWORK='${_QUEUE_DOCKER_NETWORK}' IMAGE_CLEANUP_KEEP='${_QUEUE_IMAGE_CLEANUP_KEEP}' /tmp/truthshield-queue-image-deploy.sh"
 
 images:
   - ${_AR_HOSTNAME}/${PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}:${COMMIT_SHA}

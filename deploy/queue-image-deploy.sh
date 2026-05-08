@@ -12,6 +12,7 @@ QUEUE_TRIES="${QUEUE_TRIES:-3}"
 QUEUE_TIMEOUT="${QUEUE_TIMEOUT:-90}"
 QUEUE_MEMORY="${QUEUE_MEMORY:-256}"
 SCHEDULE_CRON_FILE="${SCHEDULE_CRON_FILE:-/etc/cron.d/truthshield-scheduler}"
+IMAGE_CLEANUP_KEEP="${IMAGE_CLEANUP_KEEP:-3}"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   echo "Missing ${ENV_FILE} on queue host." >&2
@@ -83,5 +84,27 @@ else
 fi
 
 docker exec "${CONTAINER_NAME}" php artisan truthshield:record-operational-heartbeat queue_worker || true
+
+if [[ "${IMAGE_CLEANUP_KEEP}" =~ ^[0-9]+$ && "${IMAGE_CLEANUP_KEEP}" -gt 0 ]]; then
+  IMAGE_REPOSITORY="${IMAGE%:*}"
+  current_image_id="$(docker image inspect "${IMAGE}" --format '{{.Id}}' 2>/dev/null || true)"
+  mapfile -t old_image_ids < <(
+    docker images "${IMAGE_REPOSITORY}" \
+      --format '{{.ID}} {{.CreatedAt}}' \
+      | sort -k2,3r \
+      | awk -v keep="${IMAGE_CLEANUP_KEEP}" 'NR > keep { print $1 }' \
+      | sort -u
+  )
+
+  for image_id in "${old_image_ids[@]}"; do
+    if [[ -n "${current_image_id}" && "${image_id}" == "${current_image_id#sha256:}" ]]; then
+      continue
+    fi
+
+    docker image rm "${image_id}" >/dev/null 2>&1 || true
+  done
+
+  docker image prune -f >/dev/null 2>&1 || true
+fi
 
 echo "Queue worker deployed: ${CONTAINER_NAME}"

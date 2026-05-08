@@ -133,7 +133,7 @@ BASE_URL=https://api.truthshield.example ./deploy/smoke-test.sh
 Queue worker:
 
 ```bash
-php artisan queue:work database --sleep=1 --tries=3 --timeout=90
+php artisan queue:work redis --sleep=1 --tries=3 --timeout=90
 ```
 
 Scheduler:
@@ -143,6 +143,18 @@ php artisan schedule:run
 ```
 
 In production, the API can run on Cloud Run while a shared worker machine runs queue workers and scheduler cron.
+
+The Cloud Build config can also update a queue VM after pushing the API image. Set trigger substitutions:
+
+```text
+_QUEUE_DEPLOY_ENABLED=true
+_QUEUE_INSTANCE=truthshield-worker
+_QUEUE_ZONE=asia-east1-b
+_QUEUE_ENV_FILE=/path/to/worker.env
+_QUEUE_CONTAINER_NAME=truthshield-worker
+```
+
+The queue host must have Docker, permission to pull from Artifact Registry, and a populated env file. The remote deploy script pulls the same image, runs migration/seed/bootstrap commands once, starts `queue:work redis`, and installs a crontab entry that runs `schedule:run` through the worker container.
 
 ## Cloud Run Container
 

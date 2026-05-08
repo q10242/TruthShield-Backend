@@ -9,7 +9,7 @@ User=www-data
 Group=www-data
 WorkingDirectory=/var/www/truthshield/current/truth-shield-api
 EnvironmentFile=/path/to/worker.env
-ExecStart=/usr/bin/php artisan queue:work database --sleep=1 --tries=3 --timeout=90 --memory=256
+ExecStart=/usr/bin/php artisan queue:work redis --sleep=1 --tries=3 --timeout=90 --memory=256
 Restart=always
 RestartSec=5
 TimeoutStopSec=90

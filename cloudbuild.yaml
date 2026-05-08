@@ -3,6 +3,11 @@ substitutions:
   _AR_HOSTNAME: asia-east1-docker.pkg.dev
   _AR_REPOSITORY: truthshield
   _SERVICE_NAME: truthshield-api
+  _QUEUE_DEPLOY_ENABLED: "false"
+  _QUEUE_INSTANCE: "__SET_ME__"
+  _QUEUE_ZONE: asia-east1-b
+  _QUEUE_ENV_FILE: /path/to/worker.env
+  _QUEUE_CONTAINER_NAME: truthshield-worker
 
 steps:
   - name: gcr.io/cloud-builders/docker
@@ -28,6 +33,29 @@ steps:
       - --platform=managed
       - --allow-unauthenticated
       - --quiet
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -lc
+      - |
+        if [[ "${_QUEUE_DEPLOY_ENABLED}" != "true" ]]; then
+          echo "Queue host deploy disabled."
+          exit 0
+        fi
+        if [[ -z "${_QUEUE_INSTANCE}" || "${_QUEUE_INSTANCE}" == "__SET_ME__" ]]; then
+          echo "_QUEUE_INSTANCE is required when _QUEUE_DEPLOY_ENABLED=true" >&2
+          exit 1
+        fi
+
+        IMAGE="${_AR_HOSTNAME}/${PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}:${COMMIT_SHA}"
+        gcloud compute scp deploy/queue-image-deploy.sh "${_QUEUE_INSTANCE}:/tmp/truthshield-queue-image-deploy.sh" \
+          --zone="${_QUEUE_ZONE}" \
+          --quiet
+        gcloud compute ssh "${_QUEUE_INSTANCE}" \
+          --zone="${_QUEUE_ZONE}" \
+          --quiet \
+          --command="chmod +x /tmp/truthshield-queue-image-deploy.sh && IMAGE='${IMAGE}' ENV_FILE='${_QUEUE_ENV_FILE}' CONTAINER_NAME='${_QUEUE_CONTAINER_NAME}' /tmp/truthshield-queue-image-deploy.sh"
 
 images:
   - ${_AR_HOSTNAME}/${PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}:${COMMIT_SHA}

@@ -27,6 +27,8 @@ RUN composer install \
 COPY . .
 
 RUN composer dump-autoload --optimize \
+  && php artisan filament:assets \
+  && php artisan filament:optimize \
   && mkdir -p storage/logs bootstrap/cache \
   && chmod -R ug+rw storage bootstrap/cache
 

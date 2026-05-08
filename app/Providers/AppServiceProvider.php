@@ -15,6 +15,7 @@ use Filament\Tables\Table;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -33,6 +34,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         app()->setLocale('zh_TW');
+
+        if ((bool) config('app.force_https', false)) {
+            URL::forceScheme('https');
+        }
 
         TextInput::configureUsing(fn (TextInput $component) => $component->label(AdminChineseLabels::field($component->getName())));
         Textarea::configureUsing(fn (Textarea $component) => $component->label(AdminChineseLabels::field($component->getName())));

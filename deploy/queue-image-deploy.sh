@@ -4,6 +4,7 @@ set -euo pipefail
 IMAGE="${IMAGE:?Set IMAGE to the Artifact Registry image}"
 CONTAINER_NAME="${CONTAINER_NAME:-truthshield-worker}"
 ENV_FILE="${ENV_FILE:-/path/to/worker.env}"
+DOCKER_NETWORK="${DOCKER_NETWORK:-}"
 QUEUE_CONNECTION="${QUEUE_CONNECTION:-redis}"
 QUEUE_NAME="${QUEUE_NAME:-default}"
 QUEUE_SLEEP="${QUEUE_SLEEP:-1}"
@@ -24,6 +25,11 @@ fi
 
 echo "Deploying ${IMAGE} to ${CONTAINER_NAME}"
 
+NETWORK_ARGS=()
+if [[ -n "${DOCKER_NETWORK}" ]]; then
+  NETWORK_ARGS=(--network "${DOCKER_NETWORK}")
+fi
+
 REGISTRY_HOST="${IMAGE%%/*}"
 if command -v gcloud >/dev/null 2>&1; then
   gcloud auth configure-docker "${REGISTRY_HOST}" --quiet >/dev/null 2>&1 || true
@@ -36,6 +42,7 @@ docker pull "${IMAGE}"
 docker run -d \
   --name "${CONTAINER_NAME}" \
   --restart unless-stopped \
+  "${NETWORK_ARGS[@]}" \
   --env-file "${ENV_FILE}" \
   "${IMAGE}" \
   sh -lc "sleep infinity"
@@ -54,6 +61,7 @@ docker rm -f "${CONTAINER_NAME}" >/dev/null
 docker run -d \
   --name "${CONTAINER_NAME}" \
   --restart unless-stopped \
+  "${NETWORK_ARGS[@]}" \
   --env-file "${ENV_FILE}" \
   "${IMAGE}" \
   sh -lc "php artisan queue:work ${QUEUE_CONNECTION} --queue=${QUEUE_NAME} --sleep=${QUEUE_SLEEP} --tries=${QUEUE_TRIES} --timeout=${QUEUE_TIMEOUT} --memory=${QUEUE_MEMORY}"

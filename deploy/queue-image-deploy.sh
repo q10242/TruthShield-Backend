@@ -13,6 +13,7 @@ QUEUE_TIMEOUT="${QUEUE_TIMEOUT:-90}"
 QUEUE_MEMORY="${QUEUE_MEMORY:-256}"
 SCHEDULE_CRON_FILE="${SCHEDULE_CRON_FILE:-/etc/cron.d/truthshield-scheduler}"
 IMAGE_CLEANUP_KEEP="${IMAGE_CLEANUP_KEEP:-3}"
+SCHEDULE_CRON_IDENTIFIER="${SCHEDULE_CRON_IDENTIFIER:-truthshield-scheduler}"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   echo "Missing ${ENV_FILE} on queue host." >&2
@@ -67,17 +68,30 @@ docker run -d \
   "${IMAGE}" \
   sh -lc "php artisan queue:work ${QUEUE_CONNECTION} --queue=${QUEUE_NAME} --sleep=${QUEUE_SLEEP} --tries=${QUEUE_TRIES} --timeout=${QUEUE_TIMEOUT} --memory=${QUEUE_MEMORY}"
 
+schedule_command="docker exec ${CONTAINER_NAME} php artisan schedule:run >> /var/log/truthshield-schedule.log 2>&1"
 if [[ -w "$(dirname "${SCHEDULE_CRON_FILE}")" ]]; then
   cat > "${SCHEDULE_CRON_FILE}" <<CRON
-* * * * * root docker exec ${CONTAINER_NAME} php artisan schedule:run >> /var/log/truthshield-schedule.log 2>&1
+* * * * * root ${schedule_command}
 CRON
   chmod 0644 "${SCHEDULE_CRON_FILE}"
-elif command -v sudo >/dev/null 2>&1; then
+elif command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
   tmp="$(mktemp)"
   cat > "${tmp}" <<CRON
-* * * * * root docker exec ${CONTAINER_NAME} php artisan schedule:run >> /var/log/truthshield-schedule.log 2>&1
+* * * * * root ${schedule_command}
 CRON
   sudo install -m 0644 "${tmp}" "${SCHEDULE_CRON_FILE}"
+  rm -f "${tmp}"
+elif command -v crontab >/dev/null 2>&1; then
+  tmp="$(mktemp)"
+  current_cron="$(crontab -l 2>/dev/null || true)"
+  printf '%s\n' "${current_cron}" \
+    | sed "/# ${SCHEDULE_CRON_IDENTIFIER} start/,/# ${SCHEDULE_CRON_IDENTIFIER} end/d" > "${tmp}"
+  {
+    echo "# ${SCHEDULE_CRON_IDENTIFIER} start"
+    echo "* * * * * ${schedule_command}"
+    echo "# ${SCHEDULE_CRON_IDENTIFIER} end"
+  } >> "${tmp}"
+  crontab "${tmp}"
   rm -f "${tmp}"
 else
   echo "Cannot write ${SCHEDULE_CRON_FILE}; install scheduler cron manually." >&2

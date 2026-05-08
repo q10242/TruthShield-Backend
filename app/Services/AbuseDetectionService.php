@@ -38,7 +38,6 @@ class AbuseDetectionService
                     'evidence_url' => $vote->evidence_url,
                     'duplicates' => $duplicateEvidence,
                 ]);
-                $this->restrict($user, 'watched', 0.5);
             }
         }
 
@@ -53,8 +52,8 @@ class AbuseDetectionService
             $this->record($user, $newsUrl, 'coordinated_tag_burst', 'high', [
                 'tag_id' => $vote->tag_id,
                 'recent_users' => $sameTagBurst,
+                'review_required' => true,
             ]);
-            $this->restrict($user, 'limited', 0.1);
         }
 
         $secondsRead = (int) $user->readSessions()

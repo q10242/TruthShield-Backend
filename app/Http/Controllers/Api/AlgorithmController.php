@@ -43,12 +43,59 @@ class AlgorithmController extends Controller
                 [
                     'key' => 'anti_abuse',
                     'title' => 'Anti-manipulation safeguards',
-                    'description' => 'Coordinated voting, repeated evidence URLs, low reading time, and fresh-account bursts can lower future abuse multipliers.',
+                    'description' => 'Reading gates, weighted votes, evidence requirements, rate limits, bot challenges, and reviewable abuse events reduce manipulation without using deletion as the first response.',
                 ],
                 [
                     'key' => 'article_snapshots',
                     'title' => 'Article snapshots without full-text storage',
                     'description' => 'TruthShield stores metadata, availability, and change history so deleted or edited articles remain auditable without mirroring copyrighted full text.',
+                ],
+            ],
+            'anti_abuse_transparency' => [
+                'public_rules' => [
+                    [
+                        'key' => 'weighted_votes',
+                        'title' => 'Weighted votes',
+                        'description' => 'Results use trust_score * identity_multiplier * abuse_multiplier instead of raw vote counts.',
+                    ],
+                    [
+                        'key' => 'reading_gate',
+                        'title' => 'Reading gate',
+                        'description' => 'Votes require a minimum reading signal before they can be accepted.',
+                    ],
+                    [
+                        'key' => 'evidence_required',
+                        'title' => 'Evidence required for negative labels',
+                        'description' => 'Negative labels require a public evidence URL and a short explanation.',
+                    ],
+                    [
+                        'key' => 'one_entry',
+                        'title' => 'One entry per article per user',
+                        'description' => 'A user can update one vote and evidence note for the same article before the voting window closes.',
+                    ],
+                    [
+                        'key' => 'low_trust_limits',
+                        'title' => 'Low-trust accounts can still participate',
+                        'description' => 'Low-trust or new accounts can submit votes and evidence, but their weight and reaction privileges may be limited until trust is earned.',
+                    ],
+                    [
+                        'key' => 'review_first_for_bursts',
+                        'title' => 'Burst behavior is reviewed before heavy restriction',
+                        'description' => 'Repeated evidence URLs and short-window same-label vote bursts create abuse events for review instead of automatically applying severe penalties.',
+                    ],
+                ],
+                'protected_details' => [
+                    'Exact bot risk scoring weights.',
+                    'Exact challenge thresholds.',
+                    'Blocked user-agent patterns.',
+                    'Extension nonce validation details.',
+                    'Some short-window burst thresholds that would allow adversaries to tune around the system.',
+                ],
+                'user_protections' => [
+                    'Suspicious behavior is generally down-weighted or sent to review before high-impact penalties.',
+                    'Users can still read results and submit evidence even when their weight is low.',
+                    'Risk restrictions, evidence hiding, trust adjustments, and appeals leave governance records.',
+                    'Users can appeal high-impact moderation or weight decisions.',
                 ],
             ],
             'config' => [

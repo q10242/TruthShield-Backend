@@ -1212,6 +1212,59 @@ class TruthShieldApiTest extends TestCase
         $this->assertSame(1, AbuseCluster::query()->count());
     }
 
+    public function test_coordinated_vote_burst_creates_review_event_without_immediate_heavy_restriction(): void
+    {
+        $this->seed(TagSeeder::class);
+        $tag = Tag::query()->where('slug', 'clickbait-title')->firstOrFail();
+        $newsUrl = NewsUrl::query()->create([
+            'hash' => 'burst-review-hash',
+            'original_url' => 'https://burst.test/news/1',
+            'normalized_url' => 'https://burst.test/news/1',
+            'voting_closes_at' => now()->addHours(72),
+        ]);
+
+        for ($i = 0; $i < 9; $i++) {
+            Vote::query()->create([
+                'user_id' => User::factory()->create()->id,
+                'news_url_id' => $newsUrl->id,
+                'tag_id' => $tag->id,
+                'evidence_url' => "https://evidence.example.com/burst-{$i}",
+                'evidence_note' => '同向爆量測試證據。',
+                'weight_score' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $target = User::factory()->create([
+            'risk_status' => 'normal',
+            'abuse_multiplier' => 1,
+        ]);
+        $vote = Vote::query()->create([
+            'user_id' => $target->id,
+            'news_url_id' => $newsUrl->id,
+            'tag_id' => $tag->id,
+            'evidence_url' => 'https://evidence.example.com/target',
+            'evidence_note' => '第十筆同向爆量測試證據。',
+            'weight_score' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        app(\App\Services\AbuseDetectionService::class)->inspectVoteSignals($target, $newsUrl, $vote);
+
+        $this->assertDatabaseHas('abuse_events', [
+            'user_id' => $target->id,
+            'news_url_id' => $newsUrl->id,
+            'type' => 'coordinated_tag_burst',
+            'severity' => 'high',
+        ]);
+
+        $target->refresh();
+        $this->assertSame('normal', $target->risk_status);
+        $this->assertSame(1.0, (float) $target->abuse_multiplier);
+    }
+
     public function test_notifications_can_be_listed_and_marked_read(): void
     {
         $user = User::factory()->create();

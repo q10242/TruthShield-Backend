@@ -55,7 +55,7 @@ steps:
         gcloud compute ssh "${_QUEUE_INSTANCE}" \
           --zone="${_QUEUE_ZONE}" \
           --quiet \
-          --command="chmod +x /tmp/truthshield-queue-image-deploy.sh && IMAGE='${IMAGE}' ENV_FILE='${_QUEUE_ENV_FILE}' CONTAINER_NAME='${_QUEUE_CONTAINER_NAME}' /tmp/truthshield-queue-image-deploy.sh"
+          --command="chmod +x /tmp/truthshield-queue-image-deploy.sh && IMAGE='$${IMAGE}' ENV_FILE='${_QUEUE_ENV_FILE}' CONTAINER_NAME='${_QUEUE_CONTAINER_NAME}' /tmp/truthshield-queue-image-deploy.sh"
 
 images:
   - ${_AR_HOSTNAME}/${PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}:${COMMIT_SHA}

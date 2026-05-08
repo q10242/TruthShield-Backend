@@ -8,7 +8,7 @@ substitutions:
   _QUEUE_ZONE: asia-east1-a
   _QUEUE_ENV_FILE: /path/to/worker.env
   _QUEUE_CONTAINER_NAME: truthshield-worker
-  _QUEUE_DOCKER_NETWORK: ""
+  _QUEUE_DOCKER_NETWORK: "__SET_ME_IN_TRIGGER__"
 
 steps:
   - name: gcr.io/cloud-builders/docker

@@ -60,7 +60,7 @@ class VoteController extends Controller
         $evidenceUrl = $validated['evidence_url'] ?? null;
         $evidence = null;
 
-        if ($tag->requires_evidence && ! $evidenceUrl) {
+        if ($tag->requiresEvidenceUrl() && ! $evidenceUrl) {
             return response()->json([
                 'message' => 'Evidence URL is required for this tag.',
                 'errors' => [
@@ -69,7 +69,7 @@ class VoteController extends Controller
             ], 422);
         }
 
-        if ($tag->requires_evidence && ! trim((string) ($validated['evidence_note'] ?? ''))) {
+        if ($tag->requiresEvidenceNote() && ! trim((string) ($validated['evidence_note'] ?? ''))) {
             return response()->json([
                 'message' => 'Evidence note is required for this tag.',
                 'errors' => [

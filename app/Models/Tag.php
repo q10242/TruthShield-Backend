@@ -8,6 +8,22 @@ use Illuminate\Support\Facades\Cache;
 
 class Tag extends Model
 {
+    public const EVIDENCE_REQUIREMENT_STRONG = 'strong_evidence';
+    public const EVIDENCE_REQUIREMENT_CONTEXT = 'context_note';
+    public const EVIDENCE_REQUIREMENT_DISCLOSURE = 'disclosure_note';
+    public const EVIDENCE_REQUIREMENT_OPTIONAL = 'optional';
+
+    private const CONTEXT_NOTE_SLUGS = [
+        'lack-of-balance',
+        'single-source',
+        'fact-opinion-blurring',
+    ];
+
+    private const DISCLOSURE_NOTE_SLUGS = [
+        'content-farm',
+        'undisclosed-sponsored-content',
+    ];
+
     protected $fillable = [
         'name',
         'slug',
@@ -38,6 +54,7 @@ class Tag extends Model
 
         foreach (['zh-TW', 'en'] as $locale) {
             $cache->forget("lookup:tags:v2:{$locale}");
+            $cache->forget("lookup:tags:v3:{$locale}");
         }
     }
 
@@ -52,8 +69,38 @@ class Tag extends Model
             'color' => $this->color,
             'severity' => $this->severity,
             'requires_evidence' => (bool) $this->requires_evidence,
+            'evidence_requirement' => $this->evidenceRequirement(),
+            'evidence_url_required' => $this->requiresEvidenceUrl(),
+            'evidence_note_required' => $this->requiresEvidenceNote(),
             'description' => $translation['description'] ?? $this->description,
         ];
+    }
+
+    public function evidenceRequirement(): string
+    {
+        if (! $this->requires_evidence) {
+            return self::EVIDENCE_REQUIREMENT_OPTIONAL;
+        }
+
+        if (in_array($this->slug, self::CONTEXT_NOTE_SLUGS, true)) {
+            return self::EVIDENCE_REQUIREMENT_CONTEXT;
+        }
+
+        if (in_array($this->slug, self::DISCLOSURE_NOTE_SLUGS, true)) {
+            return self::EVIDENCE_REQUIREMENT_DISCLOSURE;
+        }
+
+        return self::EVIDENCE_REQUIREMENT_STRONG;
+    }
+
+    public function requiresEvidenceUrl(): bool
+    {
+        return $this->evidenceRequirement() === self::EVIDENCE_REQUIREMENT_STRONG;
+    }
+
+    public function requiresEvidenceNote(): bool
+    {
+        return (bool) $this->requires_evidence;
     }
 
     public function votes(): HasMany

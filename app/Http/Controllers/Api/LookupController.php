@@ -18,7 +18,7 @@ class LookupController extends Controller
         return response()
             ->json([
                 'data' => Cache::store(config('truthshield.status_cache_store'))->remember(
-                    "lookup:tags:v2:{$locale}",
+                    "lookup:tags:v3:{$locale}",
                     now()->addMinutes(10),
                     fn () => Tag::query()
                         ->select('id', 'name', 'slug', 'color', 'severity', 'requires_evidence', 'description', 'translations')

@@ -129,7 +129,7 @@ class TruthShieldApiTest extends TestCase
             ->assertOk()
             ->assertJsonStructure([
                 'data' => [
-                    ['id', 'name', 'slug', 'color', 'severity', 'requires_evidence', 'description'],
+                    ['id', 'name', 'slug', 'color', 'severity', 'requires_evidence', 'evidence_requirement', 'evidence_url_required', 'evidence_note_required', 'description'],
                 ],
             ]);
 
@@ -196,6 +196,23 @@ class TruthShieldApiTest extends TestCase
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors('evidence_note');
+    }
+
+    public function test_context_negative_vote_accepts_note_without_evidence_url(): void
+    {
+        $this->seed(TagSeeder::class);
+        $user = User::factory()->create();
+        $tag = Tag::query()->where('slug', 'single-source')->firstOrFail();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/vote', [
+                'url' => 'https://www.cna.com.tw/news/aipl/202605060010.aspx',
+                'tag_id' => $tag->id,
+                'evidence_note' => '全文只引用單一官方說法，未見受影響方、第二來源或文件補強。',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('vote.evidence_url', null)
+            ->assertJsonPath('vote.evidence_note', '全文只引用單一官方說法，未見受影響方、第二來源或文件補強。');
     }
 
     public function test_valid_token_vote_records_weight_and_clears_status_cache(): void

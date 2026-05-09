@@ -1,26 +1,16 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Schedule;
 use App\Jobs\DetectAbuseClustersJob;
 use App\Jobs\FinalizeNewsUrlJob;
 use App\Jobs\SnapshotEvidenceJob;
-use App\Models\AbuseCluster;
-use App\Models\AbuseEvent;
 use App\Models\AccountEdge;
 use App\Models\AccountSignal;
-use App\Models\Evidence;
-use App\Models\EvidenceSnapshot;
 use App\Models\Donation;
+use App\Models\Evidence;
 use App\Models\ExtensionSelectorCheck;
-use App\Models\OperationalEvent;
-use App\Models\NewsUrl;
 use App\Models\NewsDomain;
+use App\Models\NewsUrl;
+use App\Models\OperationalEvent;
 use App\Models\RateLimitPolicy;
 use App\Models\TrustedEvidenceSource;
 use App\Models\User;
@@ -29,9 +19,18 @@ use App\Services\AlgorithmVersionService;
 use App\Services\CommunityAutomationService;
 use App\Services\EvidenceSyncService;
 use App\Services\NewsAggregationService;
-use App\Services\TrustScoreService;
 use App\Services\TrafficAnalyticsService;
+use App\Services\TransactionalEmailService;
+use App\Services\TrustScoreService;
+use App\Services\UrlFingerprintService;
 use Database\Seeders\ProductionBaselineSeeder;
+use Illuminate\Foundation\Inspiring;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -45,7 +44,7 @@ Artisan::command('truthshield:finalize-news {--settle}', function (NewsAggregati
         ->whereNotNull('voting_closes_at')
         ->where('voting_closes_at', '<=', now())
         ->whereNull('finalized_at')
-        ->chunkById(100, function ($newsUrls) use ($aggregation, $trustScores, &$count, &$settled): void {
+        ->chunkById(100, function ($newsUrls) use (&$count, &$settled): void {
             foreach ($newsUrls as $newsUrl) {
                 FinalizeNewsUrlJob::dispatchSync($newsUrl->id, (bool) $this->option('settle'));
                 $count++;
@@ -146,7 +145,7 @@ Artisan::command('truthshield:build-account-graph', function () {
                     $edgeType = match ($signal->signal_type) {
                         'ip_hash' => 'shared_ip',
                         'user_agent_hash' => 'shared_user_agent',
-                        default => 'shared_' . $signal->signal_type,
+                        default => 'shared_'.$signal->signal_type,
                     };
 
                     AccountEdge::query()->updateOrCreate(
@@ -184,11 +183,13 @@ Artisan::command('truthshield:bootstrap-admin {--email=} {--name=TruthShield Adm
 
     if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $this->error('Provide a valid --email for the first admin.');
+
         return 1;
     }
 
     if (strlen($password) < 12) {
         $this->error('Provide --password with at least 12 characters. Do not reuse local seed passwords.');
+
         return 1;
     }
 
@@ -216,6 +217,7 @@ Artisan::command('truthshield:bootstrap-admin {--email=} {--name=TruthShield Adm
     ]);
 
     $this->info("Admin ready: {$email}");
+
     return 0;
 })->purpose('Create or update the first production admin account.');
 
@@ -238,7 +240,8 @@ Artisan::command('truthshield:check-production-env', function () {
     $missing = array_values(array_filter($required, fn (string $key) => blank(env($key))));
 
     if ($missing !== []) {
-        $this->error('Missing production env: ' . implode(', ', $missing));
+        $this->error('Missing production env: '.implode(', ', $missing));
+
         return 1;
     }
 
@@ -247,6 +250,7 @@ Artisan::command('truthshield:check-production-env', function () {
     }
 
     $this->info('Production environment checklist passed.');
+
     return 0;
 })->purpose('Validate required TruthShield production environment variables.');
 
@@ -275,14 +279,14 @@ Artisan::command('truthshield:preflight-production {--require-external}', functi
     try {
         DB::select('select 1');
     } catch (Throwable $exception) {
-        $failures[] = 'Database connection failed: ' . $exception->getMessage();
+        $failures[] = 'Database connection failed: '.$exception->getMessage();
     }
 
     try {
         cache()->store(config('truthshield.status_cache_store'))->put('preflight:cache', 'ok', 10);
         $check(cache()->store(config('truthshield.status_cache_store'))->get('preflight:cache') === 'ok', 'Redis/cache read-write check failed.');
     } catch (Throwable $exception) {
-        $failures[] = 'Redis/cache connection failed: ' . $exception->getMessage();
+        $failures[] = 'Redis/cache connection failed: '.$exception->getMessage();
     }
 
     $check(User::query()->where('is_admin', true)->exists(), 'No admin user exists. Run truthshield:bootstrap-admin.');
@@ -319,10 +323,12 @@ Artisan::command('truthshield:preflight-production {--require-external}', functi
 
     if ($failures !== []) {
         $this->error('Production preflight failed.');
+
         return 1;
     }
 
-    $this->info('Production preflight passed with ' . count($warnings) . ' warning(s).');
+    $this->info('Production preflight passed with '.count($warnings).' warning(s).');
+
     return 0;
 })->purpose('Run production readiness checks that do not require external credentials unless requested.');
 
@@ -344,6 +350,37 @@ Artisan::command('truthshield:seed-production-baseline', function () {
 
     $this->info('Production baseline data seeded.');
 })->purpose('Seed production-safe baseline data without demo users or local test content.');
+
+Artisan::command('truthshield:test-email {email} {--subject=} {--body=}', function (TransactionalEmailService $emails) {
+    $email = (string) $this->argument('email');
+    $subject = (string) ($this->option('subject') ?: '[TruthShield] Mail delivery test '.now()->format('Y-m-d H:i:s'));
+    $body = (string) ($this->option('body') ?: implode("\n\n", [
+        '這是一封 TruthShield 測試信。',
+        'If you received this message, outbound transactional email is configured correctly.',
+        'Mailer: '.config('mail.default'),
+        'From: '.config('mail.from.address'),
+        'Sent at: '.now()->toJSON(),
+    ]));
+
+    $this->line('Mailer: '.config('mail.default'));
+    $this->line('From: '.config('mail.from.address'));
+    $this->line('To: '.$email);
+
+    $result = $emails->sendToAddress($email, $subject, $body);
+
+    if ($result['status'] === 'sent') {
+        $this->info('Email sent.');
+
+        return self::SUCCESS;
+    }
+
+    $this->error('Email result: '.$result['status']);
+    if ($result['error']) {
+        $this->error($result['error']);
+    }
+
+    return self::FAILURE;
+})->purpose('Send a TruthShield transactional email test message.');
 
 Artisan::command('truthshield:aggregate-traffic {--hours=48}', function (TrafficAnalyticsService $traffic) {
     $hours = max(1, (int) $this->option('hours'));
@@ -421,6 +458,7 @@ Artisan::command('truthshield:import-selector-fixtures {path=database/fixtures/e
     $path = base_path($this->argument('path'));
     if (! File::exists($path)) {
         $this->error("Fixture file not found: {$path}");
+
         return 1;
     }
 
@@ -442,6 +480,7 @@ Artisan::command('truthshield:import-selector-fixtures {path=database/fixtures/e
     }
 
     $this->info("Imported {$count} extension selector fixtures.");
+
     return 0;
 })->purpose('Import extension selector fixtures for mainstream news domains.');
 
@@ -461,7 +500,7 @@ Artisan::command('truthshield:refresh-evidence-quality {--limit=500}', function 
     $this->info("Refreshed {$count} evidence quality scores.");
 })->purpose('Refresh evidence quality scores from weighted reactions.');
 
-Artisan::command('truthshield:stress-status {url?} {--requests=200}', function (NewsAggregationService $aggregation, \App\Services\UrlFingerprintService $fingerprints) {
+Artisan::command('truthshield:stress-status {url?} {--requests=200}', function (NewsAggregationService $aggregation, UrlFingerprintService $fingerprints) {
     $url = $this->argument('url') ?: 'https://www.cna.com.tw/news/aipl/202605060001.aspx';
     $requests = max(1, (int) $this->option('requests'));
     $fingerprint = $fingerprints->fingerprint($url);
@@ -492,11 +531,11 @@ Artisan::command('truthshield:stress-http-status {url?} {--requests=50} {--base-
     for ($i = 0; $i < $requests; $i++) {
         $started = microtime(true);
         try {
-            $response = Http::timeout(5)->acceptJson()->get($baseUrl . '/api/news/status', ['url' => $url]);
+            $response = Http::timeout(5)->acceptJson()->get($baseUrl.'/api/news/status', ['url' => $url]);
             if (! $response->ok()) {
                 $failures++;
             }
-        } catch (\Throwable) {
+        } catch (Throwable) {
             $failures++;
         }
         $latencies[] = (microtime(true) - $started) * 1000;
@@ -536,7 +575,7 @@ Artisan::command('truthshield:stress-http-launch {url?} {--requests=20} {--base-
             $started = microtime(true);
             try {
                 $response = $query === null
-                    ? Http::timeout(5)->acceptJson()->post($baseUrl . $path, [
+                    ? Http::timeout(5)->acceptJson()->post($baseUrl.$path, [
                         'events' => [[
                             'domain' => 'load-test.local',
                             'event_type' => 'load_test',
@@ -544,12 +583,12 @@ Artisan::command('truthshield:stress-http-launch {url?} {--requests=20} {--base-
                             'metadata' => ['iteration' => $i],
                         ]],
                     ])
-                    : Http::timeout(5)->acceptJson()->get($baseUrl . $path, $query);
+                    : Http::timeout(5)->acceptJson()->get($baseUrl.$path, $query);
 
                 if (! $response->successful()) {
                     $failures++;
                 }
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 $failures++;
             }
 
@@ -577,6 +616,7 @@ Artisan::command('truthshield:stress-http-launch {url?} {--requests=20} {--base-
 Artisan::command('truthshield:explain-hot-queries', function () {
     if (DB::getDriverName() !== 'pgsql') {
         $this->warn('EXPLAIN checks are only available on PostgreSQL.');
+
         return 0;
     }
 
@@ -638,11 +678,11 @@ Artisan::command('truthshield:check-performance-budget {--base-url=} {--url=http
         for ($i = 0; $i < 20; $i++) {
             $started = microtime(true);
             try {
-                $response = Http::timeout(5)->acceptJson()->get($baseUrl . $path, $query);
+                $response = Http::timeout(5)->acceptJson()->get($baseUrl.$path, $query);
                 if (! $response->successful()) {
                     $failures++;
                 }
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 $failures++;
             }
             $latencies[] = (microtime(true) - $started) * 1000;
@@ -664,7 +704,7 @@ Artisan::command('truthshield:check-performance-budget {--base-url=} {--url=http
 })->purpose('Check local hot endpoint latency budgets for pre-launch QA.');
 
 Artisan::command('truthshield:backup-postgres {path?}', function () {
-    $path = $this->argument('path') ?: storage_path('app/backups/truthshield-' . now()->format('Ymd-His') . '.sql');
+    $path = $this->argument('path') ?: storage_path('app/backups/truthshield-'.now()->format('Ymd-His').'.sql');
     if (! is_dir(dirname($path))) {
         mkdir(dirname($path), 0775, true);
     }

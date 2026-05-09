@@ -2,51 +2,55 @@
 
 namespace Tests\Feature;
 
-use App\Models\NewsUrl;
+use App\Jobs\FinalizeNewsUrlJob;
+use App\Jobs\SnapshotEvidenceJob;
+use App\Models\AbuseCluster;
+use App\Models\AbuseEvent;
 use App\Models\AccountEdge;
 use App\Models\AccountSignal;
+use App\Models\AlgorithmVersion;
 use App\Models\ApiClient;
 use App\Models\Appeal;
-use App\Models\NewsDomain;
-use App\Models\NewsDomainReport;
-use App\Models\NewsChangeReport;
-use App\Models\NewsUrlSnapshot;
-use App\Models\MediaOutlet;
-use App\Models\Tag;
-use App\Models\User;
-use App\Models\Vote;
 use App\Models\Badge;
 use App\Models\BugReport;
-use App\Models\Donation;
-use App\Models\AbuseEvent;
-use App\Models\AbuseCluster;
-use App\Models\AlgorithmVersion;
 use App\Models\CommunitySignal;
 use App\Models\CommunityTask;
-use App\Models\EvidenceReport;
+use App\Models\Donation;
 use App\Models\Evidence;
+use App\Models\EvidenceReport;
 use App\Models\EvidenceSnapshot;
-use App\Models\ExtensionSelectorCheck;
 use App\Models\ExtensionEvent;
-use App\Models\OperationalEvent;
+use App\Models\ExtensionSelectorCheck;
+use App\Models\MediaOutlet;
+use App\Models\NewsChangeReport;
+use App\Models\NewsDomain;
+use App\Models\NewsDomainReport;
+use App\Models\NewsUrl;
+use App\Models\NewsUrlSnapshot;
 use App\Models\OfficialResponse;
 use App\Models\OfficialResponseReaction;
+use App\Models\OperationalEvent;
 use App\Models\RateLimitPolicy;
 use App\Models\SystemSetting;
-use App\Models\TrustedEvidenceSource;
-use App\Models\TrustedSourceSuggestion;
-use App\Models\UrlClassificationReport;
-use App\Models\UserIdentity;
-use App\Models\VerifiedClaimant;
-use App\Models\YoutubeChannel;
-use App\Models\YoutubeChannelReport;
-use App\Models\TrustSettlement;
+use App\Models\Tag;
 use App\Models\TrafficDailySummary;
 use App\Models\TrafficEvent;
 use App\Models\TrafficHourlySummary;
+use App\Models\TrustedEvidenceSource;
+use App\Models\TrustedSourceSuggestion;
+use App\Models\TrustSettlement;
+use App\Models\UrlClassificationReport;
+use App\Models\User;
+use App\Models\UserIdentity;
 use App\Models\UserNotification;
-use App\Jobs\FinalizeNewsUrlJob;
-use App\Jobs\SnapshotEvidenceJob;
+use App\Models\VerifiedClaimant;
+use App\Models\Vote;
+use App\Models\YoutubeChannel;
+use App\Models\YoutubeChannelReport;
+use App\Services\AbuseDetectionService;
+use App\Services\EcpayDonationService;
+use App\Services\NotificationService;
+use App\Services\TransactionalEmailService;
 use Database\Seeders\TagSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -140,7 +144,7 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonPath('report.domain', 'example-news.test')
             ->assertJsonPath('report.status', 'pending');
 
-        $this->assertDatabaseHas((new NewsDomainReport())->getTable(), [
+        $this->assertDatabaseHas((new NewsDomainReport)->getTable(), [
             'domain' => 'example-news.test',
             'status' => 'pending',
         ]);
@@ -214,7 +218,7 @@ class TruthShieldApiTest extends TestCase
         $this->assertNotNull($newsUrl->voting_closes_at);
         $this->assertTrue($newsUrl->created_at->copy()->addHours(72)->equalTo($newsUrl->voting_closes_at));
 
-        $cacheKey = 'news:status:' . config('truthshield.status_cache_version', 'v1') . ':' . $newsUrl->hash;
+        $cacheKey = 'news:status:'.config('truthshield.status_cache_version', 'v1').':'.$newsUrl->hash;
         Cache::store(config('truthshield.status_cache_store'))->put($cacheKey, ['stale' => true], now()->addMinutes(5));
 
         $this->withToken($token)
@@ -233,7 +237,7 @@ class TruthShieldApiTest extends TestCase
     {
         $this->seed(TagSeeder::class);
 
-        $this->getJson('/api/news/status?url=' . urlencode('https://www.cna.com.tw/news/aipl/202605060001.aspx') . '&locale=zh-TW')
+        $this->getJson('/api/news/status?url='.urlencode('https://www.cna.com.tw/news/aipl/202605060001.aspx').'&locale=zh-TW')
             ->assertOk()
             ->assertJsonPath('top_tag', null)
             ->assertJsonPath('display_text', '尚無足夠投票資料')
@@ -247,7 +251,7 @@ class TruthShieldApiTest extends TestCase
                 'finalized_at',
             ]);
 
-        $this->getJson('/api/news/status?url=' . urlencode('https://www.cna.com.tw/news/aipl/202605060001.aspx') . '&locale=en')
+        $this->getJson('/api/news/status?url='.urlencode('https://www.cna.com.tw/news/aipl/202605060001.aspx').'&locale=en')
             ->assertOk()
             ->assertJsonPath('display_text', 'Not enough voting data yet')
             ->assertJsonPath('is_open', true);
@@ -283,12 +287,12 @@ class TruthShieldApiTest extends TestCase
 
         $newsUrl = NewsUrl::query()->firstOrFail();
 
-        $this->assertDatabaseHas((new NewsUrlSnapshot())->getTable(), [
+        $this->assertDatabaseHas((new NewsUrlSnapshot)->getTable(), [
             'news_url_id' => $newsUrl->id,
             'snapshot_type' => 'changed',
         ]);
 
-        $this->getJson('/api/news/status?url=' . urlencode($url))
+        $this->getJson('/api/news/status?url='.urlencode($url))
             ->assertOk()
             ->assertJsonPath('snapshot.latest_snapshot.snapshot_type', 'changed');
     }
@@ -307,12 +311,12 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonPath('report.report_type', 'deleted')
             ->assertJsonPath('report.status', 'pending');
 
-        $this->assertDatabaseHas((new NewsChangeReport())->getTable(), [
+        $this->assertDatabaseHas((new NewsChangeReport)->getTable(), [
             'report_type' => 'deleted',
             'status' => 'pending',
         ]);
 
-        $this->getJson('/api/news/status?url=' . urlencode($url))
+        $this->getJson('/api/news/status?url='.urlencode($url))
             ->assertOk()
             ->assertJsonPath('snapshot.pending_change_reports_count', 1);
     }
@@ -394,7 +398,7 @@ class TruthShieldApiTest extends TestCase
         $newsUrl = NewsUrl::query()->firstOrFail();
         $newsUrl->forceFill(['voting_closes_at' => now()->subMinute()])->save();
 
-        $this->getJson('/api/news/status?url=' . urlencode($url))
+        $this->getJson('/api/news/status?url='.urlencode($url))
             ->assertOk()
             ->assertJsonPath('is_open', false)
             ->assertJsonPath('top_tag.id', $accurate->id)
@@ -413,7 +417,7 @@ class TruthShieldApiTest extends TestCase
             'weight_score' => 99,
         ]);
 
-        $this->getJson('/api/news/status?url=' . urlencode($url))
+        $this->getJson('/api/news/status?url='.urlencode($url))
             ->assertOk()
             ->assertJsonPath('top_tag.id', $accurate->id)
             ->assertJsonPath('total_weight', 2);
@@ -443,7 +447,7 @@ class TruthShieldApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('reaction.weight_score', 2.2);
 
-        $this->getJson('/api/news/evidence?url=' . urlencode($url))
+        $this->getJson('/api/news/evidence?url='.urlencode($url))
             ->assertOk()
             ->assertJsonPath('data.0.evidence_note', '相關報導提供完整時間線。')
             ->assertJsonPath('data.0.helpful_weight', 2.2)
@@ -679,7 +683,7 @@ class TruthShieldApiTest extends TestCase
             ->assertCreated();
 
         $this->actingAs($user, 'sanctum')
-            ->getJson('/api/me/vote?url=' . urlencode($url))
+            ->getJson('/api/me/vote?url='.urlencode($url))
             ->assertOk()
             ->assertJsonPath('vote.tag_id', $tag->id);
     }
@@ -804,7 +808,7 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonPath('stats.votes', 1)
             ->assertJsonStructure(['recent_votes', 'notifications', 'badges']);
 
-        $this->getJson('/api/news/search?q=' . urlencode('中央社'))
+        $this->getJson('/api/news/search?q='.urlencode('中央社'))
             ->assertOk()
             ->assertJsonPath('data.0.title_snapshot', '中央社測試新聞')
             ->assertJsonPath('meta.total', 1);
@@ -1055,7 +1059,7 @@ class TruthShieldApiTest extends TestCase
         $response = OfficialResponse::query()->firstOrFail();
         $response->forceFill(['status' => 'published', 'published_at' => now()])->save();
 
-        $this->getJson('/api/news/official-responses?url=' . urlencode($newsUrl->normalized_url))
+        $this->getJson('/api/news/official-responses?url='.urlencode($newsUrl->normalized_url))
             ->assertOk()
             ->assertJsonPath('data.0.author.display_name', '新聞當事人')
             ->assertJsonPath('data.0.author.identity_label', '當事人已驗證')
@@ -1117,11 +1121,11 @@ class TruthShieldApiTest extends TestCase
             'safety' => 'trusted',
         ]);
 
-        $this->getJson('/api/news/status?url=' . urlencode($url))
+        $this->getJson('/api/news/status?url='.urlencode($url))
             ->assertOk()
             ->assertJsonPath('algorithm_version', 'truthshield-v1');
 
-        $this->getJson('/api/news/evidence?url=' . urlencode($url))
+        $this->getJson('/api/news/evidence?url='.urlencode($url))
             ->assertOk()
             ->assertJsonStructure(['data' => [['quality_score', 'archive_url', 'snapshot_status']]]);
     }
@@ -1254,7 +1258,7 @@ class TruthShieldApiTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        app(\App\Services\AbuseDetectionService::class)->inspectVoteSignals($target, $newsUrl, $vote);
+        app(AbuseDetectionService::class)->inspectVoteSignals($target, $newsUrl, $vote);
 
         $this->assertDatabaseHas('abuse_events', [
             'user_id' => $target->id,
@@ -1300,7 +1304,7 @@ class TruthShieldApiTest extends TestCase
             'email_preferences' => ['moderation' => true],
         ]);
 
-        app(\App\Services\NotificationService::class)->send(
+        app(NotificationService::class)->send(
             $user,
             'evidence.hidden',
             '你的證據已被隱藏',
@@ -1324,7 +1328,7 @@ class TruthShieldApiTest extends TestCase
             'truthshield.email_limits.duplicate_ttl_seconds' => 600,
         ]);
 
-        $emails = app(\App\Services\TransactionalEmailService::class);
+        $emails = app(TransactionalEmailService::class);
 
         $first = $emails->sendToAddress('limited@example.com', '重複主旨', '第一次');
         $duplicate = $emails->sendToAddress('limited@example.com', '重複主旨', '第二次');
@@ -1425,7 +1429,7 @@ class TruthShieldApiTest extends TestCase
         $this->assertSame(2, YoutubeChannelReport::query()->where('handle', 'cna')->value('report_count'));
         $this->assertSame(2.45, round((float) YoutubeChannelReport::query()->where('handle', 'cna')->value('weighted_score'), 2));
 
-        $this->getJson('/api/youtube-channel-reports/status?channel_url=' . urlencode('https://www.youtube.com/@CNA'))
+        $this->getJson('/api/youtube-channel-reports/status?channel_url='.urlencode('https://www.youtube.com/@CNA'))
             ->assertOk()
             ->assertJsonPath('is_reported', true)
             ->assertJsonPath('report.report_count', 2)
@@ -1961,7 +1965,7 @@ class TruthShieldApiTest extends TestCase
             'metadata' => ['button' => 'hero', 'full_url' => 'https://example.test/private?token=secret'],
         ])->assertAccepted();
 
-        $this->getJson('/api/news/status?url=' . urlencode('https://www.cna.com.tw/news/aipl/202605090001.aspx'))
+        $this->getJson('/api/news/status?url='.urlencode('https://www.cna.com.tw/news/aipl/202605090001.aspx'))
             ->assertOk()
             ->assertHeader('X-TruthShield-Cache');
 
@@ -2133,7 +2137,7 @@ class TruthShieldApiTest extends TestCase
             'TradeDate' => now()->format('Y/m/d H:i:s'),
             'SimulatePaid' => '1',
         ];
-        $callback['CheckMacValue'] = app(\App\Services\EcpayDonationService::class)->checkMacValue($callback);
+        $callback['CheckMacValue'] = app(EcpayDonationService::class)->checkMacValue($callback);
 
         $this->post('/api/donations/ecpay/notify', $callback)
             ->assertOk()
@@ -2145,9 +2149,33 @@ class TruthShieldApiTest extends TestCase
             'receipt_email_status' => 'sent',
         ]);
 
-        $this->getJson('/api/donations/' . $tradeNo)
+        $this->getJson('/api/donations/'.$tradeNo)
             ->assertOk()
             ->assertJsonPath('donation.status', 'paid');
+    }
+
+    public function test_ecpay_donation_checkout_uses_english_language_for_english_locale(): void
+    {
+        config([
+            'services.ecpay.checkout_url' => 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5',
+            'services.ecpay.api_base_url' => 'http://127.0.0.1:18080',
+            'services.ecpay.web_base_url' => 'http://127.0.0.1:15173',
+        ]);
+
+        $checkout = $this->postJson('/api/donations/ecpay', [
+            'amount' => 300,
+            'locale' => 'en',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('checkout.params.Language', 'ENG')
+            ->json('checkout.params');
+
+        $this->assertStringContainsString('locale=en', $checkout['ClientBackURL']);
+
+        $donation = Donation::query()->where('merchant_trade_no', $checkout['MerchantTradeNo'])->firstOrFail();
+
+        $this->assertSame('ENG', data_get($donation->request_payload, 'Language'));
+        $this->assertSame($checkout['CheckMacValue'], data_get($donation->request_payload, 'CheckMacValue'));
     }
 
     public function test_ecpay_donation_rejects_invalid_callback_signature(): void
@@ -2232,7 +2260,7 @@ class TruthShieldApiTest extends TestCase
         ]);
 
         $report = BugReport::query()->firstOrFail();
-        $result = app(\App\Services\TransactionalEmailService::class)
+        $result = app(TransactionalEmailService::class)
             ->sendBugReportResponse($report, '我們已經收到並開始分類這個安全回報。');
 
         $report->forceFill([

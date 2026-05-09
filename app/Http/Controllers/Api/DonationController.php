@@ -19,10 +19,11 @@ class DonationController extends Controller
     {
         $allowedAmounts = implode(',', config('truthshield.donation_amounts', [100, 300, 500, 1000, 2000, 5000]));
         $validated = $request->validate([
-            'amount' => ['required', 'integer', 'in:' . $allowedAmounts],
+            'amount' => ['required', 'integer', 'in:'.$allowedAmounts],
             'donor_name' => ['nullable', 'string', 'max:80'],
             'donor_email' => ['nullable', 'email', 'max:160'],
             'message' => ['nullable', 'string', 'max:120'],
+            'locale' => ['nullable', 'string', 'in:zh-TW,en,ja,ko,zh-CN'],
         ]);
 
         $user = $request->user() ?? $this->userFromBearerToken($request);
@@ -37,7 +38,7 @@ class DonationController extends Controller
             'message' => $validated['message'] ?? null,
         ]);
 
-        $payload = $ecpay->createPayload($donation);
+        $payload = $ecpay->createPayload($donation, $validated['locale'] ?? null);
         $donation->forceFill(['request_payload' => $payload])->save();
         $this->forgetDonationCaches();
 
@@ -154,7 +155,7 @@ class DonationController extends Controller
                     ];
                 })
                 ->values();
-            })
+        })
             ->values();
 
         return response()->json(['data' => $rows]);
@@ -190,8 +191,8 @@ class DonationController extends Controller
                     $donation->user,
                     'donation.paid',
                     '捐款付款已完成',
-                    '感謝你支持 TruthShield。訂單編號：' . $donation->merchant_trade_no,
-                    config('services.ecpay.web_base_url') . '/donate?trade_no=' . urlencode($donation->merchant_trade_no),
+                    '感謝你支持 TruthShield。訂單編號：'.$donation->merchant_trade_no,
+                    config('services.ecpay.web_base_url').'/donate?trade_no='.urlencode($donation->merchant_trade_no),
                     ['donation_id' => $donation->id],
                     'donation',
                 );

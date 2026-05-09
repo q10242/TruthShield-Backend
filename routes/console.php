@@ -30,6 +30,7 @@ use App\Services\CommunityAutomationService;
 use App\Services\EvidenceSyncService;
 use App\Services\NewsAggregationService;
 use App\Services\TrustScoreService;
+use Database\Seeders\ProductionBaselineSeeder;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -332,6 +333,15 @@ Artisan::command('truthshield:expire-pending-donations {--hours=24}', function (
 
     $this->info("Expired {$count} pending donation orders older than {$hours} hours.");
 })->purpose('Expire stale pending donation orders.');
+
+Artisan::command('truthshield:seed-production-baseline', function () {
+    $this->call('db:seed', [
+        '--class' => ProductionBaselineSeeder::class,
+        '--force' => true,
+    ]);
+
+    $this->info('Production baseline data seeded.');
+})->purpose('Seed production-safe baseline data without demo users or local test content.');
 
 Artisan::command('truthshield:seed-launch-policies', function () {
     $policies = [

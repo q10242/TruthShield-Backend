@@ -50,6 +50,10 @@ class AppServiceProvider extends ServiceProvider
         Table::configureUsing(fn (Table $table) => $table->actionsColumnLabel('操作'));
 
         RateLimiter::for('auth', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
+        RateLimiter::for('oauth', fn (Request $request) => [
+            Limit::perMinute(60)->by($request->ip() . '|' . $request->path()),
+            Limit::perHour(300)->by($request->ip() . '|oauth'),
+        ]);
         RateLimiter::for('hover', fn (Request $request) => Limit::perMinute(180)->by($request->ip()));
         RateLimiter::for('vote', function (Request $request) {
             $max = $request->user()?->risk_status === 'normal' ? 20 : 6;

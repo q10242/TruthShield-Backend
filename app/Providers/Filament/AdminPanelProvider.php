@@ -2,8 +2,8 @@
 
 namespace App\Providers\Filament;
 
-use App\Http\Middleware\LocalFilamentAdmin;
 use App\Filament\Pages\Dashboard;
+use App\Http\Middleware\LocalFilamentAdmin;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -77,8 +77,28 @@ class AdminPanelProvider extends PanelProvider
                             border-radius: .5rem !important;
                         }
                         .fi-input-wrp,
-                        .fi-fo-field-wrp input {
+                        .fi-fo-field-wrp input:not([type="checkbox"]):not([type="radio"]) {
                             background: rgba(9, 9, 11, .74) !important;
+                        }
+                        .fi-checkbox-input {
+                            width: 1rem !important;
+                            height: 1rem !important;
+                            cursor: pointer !important;
+                            background-color: rgba(9, 9, 11, .74) !important;
+                            box-shadow: 0 0 0 1px rgba(103, 232, 249, .28) !important;
+                        }
+                        .fi-checkbox-input:checked {
+                            background-color: #06b6d4 !important;
+                            color: #09090b !important;
+                            box-shadow: 0 0 0 1px rgba(103, 232, 249, .9), 0 0 0 4px rgba(6, 182, 212, .14) !important;
+                        }
+                        .fi-checkbox-input:focus {
+                            outline: 2px solid rgba(103, 232, 249, .48) !important;
+                            outline-offset: 2px !important;
+                        }
+                        .fi-fo-checkbox label,
+                        .fi-checkbox-input + label {
+                            cursor: pointer !important;
                         }
                         .fi-simple-header-heading::after {
                             content: '信譽、證據與反操縱營運中心';

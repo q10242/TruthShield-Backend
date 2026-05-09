@@ -4,6 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\LocalAdminWebAuth;
+use App\Http\Middleware\RecordTrafficEvent;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -32,6 +33,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 LocalAdminWebAuth::class,
             ]);
         }
+
+        $middleware->appendToGroup('api', [
+            RecordTrafficEvent::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

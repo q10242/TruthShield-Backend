@@ -27,8 +27,12 @@ class NewsController extends Controller
             return response()->json(['message' => $exception->getMessage()], 422);
         }
 
+        $status = $newsAggregation->statusForFingerprint($fingerprint, $this->locale($request));
+        $cacheStatus = $status['cache_status'] ?? null;
+
         return response()
-            ->json($newsAggregation->statusForFingerprint($fingerprint, $this->locale($request)))
+            ->json($status)
+            ->header('X-TruthShield-Cache', $cacheStatus ?: 'unknown')
             ->header('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
     }
 

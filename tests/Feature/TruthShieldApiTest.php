@@ -41,6 +41,9 @@ use App\Models\VerifiedClaimant;
 use App\Models\YoutubeChannel;
 use App\Models\YoutubeChannelReport;
 use App\Models\TrustSettlement;
+use App\Models\TrafficDailySummary;
+use App\Models\TrafficEvent;
+use App\Models\TrafficHourlySummary;
 use App\Models\UserNotification;
 use App\Jobs\FinalizeNewsUrlJob;
 use App\Jobs\SnapshotEvidenceJob;
@@ -1942,6 +1945,51 @@ class TruthShieldApiTest extends TestCase
         $this->assertGreaterThanOrEqual(30, NewsDomain::query()->count());
 
         $this->artisan('truthshield:stress-status --requests=5')->assertExitCode(0);
+    }
+
+    public function test_privacy_first_traffic_events_and_summary_flow(): void
+    {
+        config(['truthshield_traffic.enabled' => true]);
+        config(['truthshield_traffic.record_api_requests' => true]);
+        config(['truthshield_traffic.status_sample_rate' => 1.0]);
+
+        $this->postJson('/api/traffic/events', [
+            'event_type' => 'extension_zip_download',
+            'source' => 'web',
+            'feature' => 'extension_download',
+            'domain' => 'truth-shield.otus.tw',
+            'metadata' => ['button' => 'hero', 'full_url' => 'https://example.test/private?token=secret'],
+        ])->assertAccepted();
+
+        $this->getJson('/api/news/status?url=' . urlencode('https://www.cna.com.tw/news/aipl/202605090001.aspx'))
+            ->assertOk()
+            ->assertHeader('X-TruthShield-Cache');
+
+        $this->assertGreaterThanOrEqual(2, TrafficEvent::query()->count());
+        $this->assertDatabaseHas('traffic_events', [
+            'event_type' => 'extension_zip_download',
+            'source' => 'web',
+            'domain' => 'truth-shield.otus.tw',
+        ]);
+
+        $event = TrafficEvent::query()->where('event_type', 'api_request')->where('feature', 'news_status')->firstOrFail();
+        $this->assertNotNull($event->session_hash);
+        $this->assertNotNull($event->url_hash);
+        $this->assertNull($event->metadata['full_url'] ?? null);
+
+        $this->artisan('truthshield:aggregate-traffic', ['--hours' => 24])->assertExitCode(0);
+
+        $this->assertGreaterThan(0, TrafficHourlySummary::query()->count());
+        $this->assertGreaterThan(0, TrafficDailySummary::query()->count());
+
+        $this->getJson('/api/traffic/summary')
+            ->assertOk()
+            ->assertJsonStructure([
+                'today_api_requests',
+                'today_status_queries',
+                'extension_zip_downloads_today',
+                'cache_hit_rate',
+            ]);
     }
 
     public function test_snapshot_job_fetches_metadata_and_finalize_job_settles_news(): void

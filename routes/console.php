@@ -30,6 +30,7 @@ use App\Services\CommunityAutomationService;
 use App\Services\EvidenceSyncService;
 use App\Services\NewsAggregationService;
 use App\Services\TrustScoreService;
+use App\Services\TrafficAnalyticsService;
 use Database\Seeders\ProductionBaselineSeeder;
 
 Artisan::command('inspire', function () {
@@ -287,6 +288,7 @@ Artisan::command('truthshield:preflight-production {--require-external}', functi
     $check(User::query()->where('is_admin', true)->exists(), 'No admin user exists. Run truthshield:bootstrap-admin.');
     $check(DB::getSchemaBuilder()->hasTable('jobs'), 'jobs table missing; queue cannot run.');
     $check(DB::getSchemaBuilder()->hasTable('operational_events'), 'operational_events table missing.');
+    $check(DB::getSchemaBuilder()->hasTable('traffic_events'), 'traffic_events table missing.');
     $warn(config('queue.default') !== 'sync', 'QUEUE_CONNECTION should not be sync in production.');
     $warn(config('mail.default') !== 'array', 'MAIL_MAILER=array is test-only. Use log or a real provider.');
 
@@ -342,6 +344,21 @@ Artisan::command('truthshield:seed-production-baseline', function () {
 
     $this->info('Production baseline data seeded.');
 })->purpose('Seed production-safe baseline data without demo users or local test content.');
+
+Artisan::command('truthshield:aggregate-traffic {--hours=48}', function (TrafficAnalyticsService $traffic) {
+    $hours = max(1, (int) $this->option('hours'));
+    $result = $traffic->aggregate(now()->subHours($hours), now());
+
+    $this->info("Traffic aggregated: hourly={$result['hourly']} daily={$result['daily']}.");
+})->purpose('Aggregate privacy-first traffic events into hourly and daily summaries.');
+
+Artisan::command('truthshield:prune-traffic {--raw-days=} {--summary-days=}', function (TrafficAnalyticsService $traffic) {
+    $rawDays = (int) ($this->option('raw-days') ?: config('truthshield_traffic.raw_retention_days', 14));
+    $summaryDays = (int) ($this->option('summary-days') ?: config('truthshield_traffic.summary_retention_days', 400));
+    $result = $traffic->prune($rawDays, $summaryDays);
+
+    $this->info("Traffic pruned: events={$result['events']} hourly={$result['hourly']} daily={$result['daily']}.");
+})->purpose('Prune old raw traffic events while retaining aggregate summaries.');
 
 Artisan::command('truthshield:seed-launch-policies', function () {
     $policies = [
@@ -669,3 +686,5 @@ Schedule::command('truthshield:run-community-automation')->everyFifteenMinutes()
 Schedule::command('truthshield:seed-launch-policies')->daily();
 Schedule::command('truthshield:check-extension-selectors')->daily();
 Schedule::command('truthshield:refresh-evidence-quality --limit=500')->hourly();
+Schedule::command('truthshield:aggregate-traffic --hours=48')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('truthshield:prune-traffic')->daily()->withoutOverlapping();

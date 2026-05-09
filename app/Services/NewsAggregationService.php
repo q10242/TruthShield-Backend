@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Evidence;
 use App\Models\NewsUrl;
 use App\Models\Tag;
 use App\Models\Vote;
@@ -11,9 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 class NewsAggregationService
 {
-    public function __construct(private readonly NewsSnapshotService $snapshots)
-    {
-    }
+    public function __construct(private readonly NewsSnapshotService $snapshots) {}
 
     public function statusForFingerprint(array $fingerprint, string $locale = 'zh-TW'): array
     {
@@ -22,7 +21,7 @@ class NewsAggregationService
         $cachedMissing = Cache::store(config('truthshield.status_cache_store'))->get($missingCacheKey);
 
         if (is_array($cachedMissing)) {
-            return $this->localizeStatusPayload($this->normalizeEmptyStatus($cachedMissing), $locale);
+            return $this->withCacheStatus($this->localizeStatusPayload($this->normalizeEmptyStatus($cachedMissing), $locale), 'hit');
         }
 
         $newsUrl = NewsUrl::query()->where('hash', $fingerprint['hash'])->first();
@@ -31,7 +30,7 @@ class NewsAggregationService
             $empty = $this->emptyStatus($fingerprint['hash'], $fingerprint['normalized_url']);
             Cache::store(config('truthshield.status_cache_store'))->put($missingCacheKey, $empty, now()->addMinutes(2));
 
-            return $this->localizeStatusPayload($empty, $locale);
+            return $this->withCacheStatus($this->localizeStatusPayload($empty, $locale), 'miss');
         }
 
         $this->ensureVotingWindow($newsUrl);
@@ -42,8 +41,16 @@ class NewsAggregationService
 
         $cacheKey = $this->statusCacheKey($newsUrl, $locale);
         $ttl = now()->addSeconds(max(1, min(600, now()->diffInSeconds($newsUrl->voting_closes_at, false))));
+        $cache = Cache::store(config('truthshield.status_cache_store'));
 
-        return Cache::store(config('truthshield.status_cache_store'))->remember($cacheKey, $ttl, fn () => $this->localizeStatusPayload($this->buildStatusPayload($newsUrl), $locale));
+        if ($cache->has($cacheKey)) {
+            return $this->withCacheStatus($cache->get($cacheKey), 'hit');
+        }
+
+        $status = $this->localizeStatusPayload($this->buildStatusPayload($newsUrl), $locale);
+        $cache->put($cacheKey, $status, $ttl);
+
+        return $this->withCacheStatus($status, 'miss');
     }
 
     public function evidenceForFingerprint(array $fingerprint, string $locale = 'zh-TW'): array
@@ -202,7 +209,7 @@ class NewsAggregationService
             ->withCount(['reactions as helpful_count' => fn ($query) => $query->where('helpful', true)])
             ->withCount(['reactions as unhelpful_count' => fn ($query) => $query->where('helpful', false)])
             ->orderByDesc(
-                \App\Models\Evidence::query()
+                Evidence::query()
                     ->select('quality_score')
                     ->whereColumn('evidences.vote_id', 'votes.id')
                     ->limit(1)
@@ -383,13 +390,13 @@ class NewsAggregationService
 
         if ($severity === 'positive') {
             return $locale === 'en'
-                ? '✅ Majority recommendation: ' . $tagName
-                : '✅ 多數專家推薦：' . $tagName;
+                ? '✅ Majority recommendation: '.$tagName
+                : '✅ 多數專家推薦：'.$tagName;
         }
 
         return $locale === 'en'
-            ? '⚠️ ' . (int) round($percentage) . '% users labeled: ' . $tagName
-            : '⚠️ ' . (int) round($percentage) . '% 使用者標註：' . $tagName;
+            ? '⚠️ '.(int) round($percentage).'% users labeled: '.$tagName
+            : '⚠️ '.(int) round($percentage).'% 使用者標註：'.$tagName;
     }
 
     private function secondaryTagDistribution(NewsUrl $newsUrl): array
@@ -455,5 +462,12 @@ class NewsAggregationService
     private function normalizeLocale(string $locale): string
     {
         return str_starts_with(strtolower($locale), 'en') ? 'en' : 'zh-TW';
+    }
+
+    private function withCacheStatus(array $status, string $cacheStatus): array
+    {
+        $status['cache_status'] = $cacheStatus;
+
+        return $status;
     }
 }

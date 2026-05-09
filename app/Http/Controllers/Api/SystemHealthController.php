@@ -3,27 +3,30 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\AccountEdge;
 use App\Models\AbuseEvent;
+use App\Models\AccountEdge;
 use App\Models\ApiClient;
 use App\Models\BugReport;
 use App\Models\Donation;
+use App\Models\Evidence;
 use App\Models\EvidenceReport;
-use App\Models\ExtensionSelectorCheck;
 use App\Models\ExtensionEvent;
+use App\Models\ExtensionSelectorCheck;
 use App\Models\NewsDomainReport;
 use App\Models\NewsUrl;
 use App\Models\OperationalEvent;
 use App\Models\RateLimitPolicy;
+use App\Models\TrafficEvent;
 use App\Models\TrustedEvidenceSource;
 use App\Models\UserDataRequest;
+use App\Services\TrafficAnalyticsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class SystemHealthController extends Controller
 {
-    public function show(): JsonResponse
+    public function show(TrafficAnalyticsService $traffic): JsonResponse
     {
         $database = true;
         $cache = true;
@@ -83,13 +86,16 @@ class SystemHealthController extends Controller
                         'selector_failures_24h' => ExtensionSelectorCheck::query()->where('success', false)->where('checked_at', '>=', now()->subDay())->count(),
                         'active_trusted_evidence_sources' => TrustedEvidenceSource::query()->where('is_active', true)->count(),
                         'active_rate_limit_policies' => RateLimitPolicy::query()->where('is_active', true)->count(),
-                        'pending_evidence_snapshots' => \App\Models\Evidence::query()->where('snapshot_status', 'pending')->count(),
+                        'pending_evidence_snapshots' => Evidence::query()->where('snapshot_status', 'pending')->count(),
                         'pending_donations' => Donation::query()->where('status', Donation::STATUS_PENDING)->count(),
                         'paid_donations_24h' => Donation::query()->where('status', Donation::STATUS_PAID)->where('paid_at', '>=', now()->subDay())->count(),
                         'pending_user_data_requests' => UserDataRequest::query()->where('status', 'pending')->count(),
                         'open_bug_reports' => BugReport::query()->whereIn('status', ['new', 'triaged', 'in_progress'])->count(),
                         'open_security_reports' => BugReport::query()->where('report_type', 'security')->whereIn('status', ['new', 'triaged', 'in_progress'])->count(),
                         'critical_bug_reports' => BugReport::query()->where('severity', 'critical')->whereIn('status', ['new', 'triaged', 'in_progress'])->count(),
+                        'traffic_events_24h' => $this->tableCount('traffic_events')
+                            ? TrafficEvent::query()->where('created_at', '>=', now()->subDay())->count()
+                            : 0,
                     ],
                 ];
             },
@@ -106,10 +112,18 @@ class SystemHealthController extends Controller
             + (($metrics['counts']['critical_bug_reports'] ?? 0) * 3)
         );
         $degradedReasons = [];
-        if (! $database) $degradedReasons[] = 'database';
-        if (! $cache) $degradedReasons[] = 'cache';
-        if (! $queueHealthy) $degradedReasons[] = 'queue';
-        if (! $schedulerHealthy) $degradedReasons[] = 'scheduler';
+        if (! $database) {
+            $degradedReasons[] = 'database';
+        }
+        if (! $cache) {
+            $degradedReasons[] = 'cache';
+        }
+        if (! $queueHealthy) {
+            $degradedReasons[] = 'queue';
+        }
+        if (! $schedulerHealthy) {
+            $degradedReasons[] = 'scheduler';
+        }
 
         return response()->json([
             'ok' => $database && $cache && $queueHealthy && $schedulerHealthy,
@@ -128,6 +142,7 @@ class SystemHealthController extends Controller
                 'limits' => config('truthshield.email_limits', []),
             ],
             'counts' => $metrics['counts'],
+            'traffic' => $traffic->publicSummary(),
             'governance_pressure_score' => min(100, $governancePressure * 10),
             'thresholds' => [
                 'min_read_seconds_before_vote' => (int) config('truthshield.min_read_seconds_before_vote', 15),

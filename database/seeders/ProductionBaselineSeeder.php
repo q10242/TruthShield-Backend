@@ -9,6 +9,7 @@ use App\Models\NewsDomain;
 use App\Models\RateLimitPolicy;
 use App\Models\SystemSetting;
 use App\Models\TrustedEvidenceSource;
+use App\Models\YoutubeChannel;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
@@ -24,6 +25,7 @@ class ProductionBaselineSeeder extends Seeder
         $this->seedRateLimits();
         $this->seedTrustedEvidenceSources();
         $this->seedNewsDomains();
+        $this->seedYoutubeChannels();
         if (app()->environment('production')) {
             $this->deactivateLocalOnlyDomains();
         }
@@ -195,6 +197,28 @@ class ProductionBaselineSeeder extends Seeder
             ]);
     }
 
+    private function seedYoutubeChannels(): void
+    {
+        foreach ($this->youtubeChannels() as $channel) {
+            $outlet = MediaOutlet::query()->where('slug', $channel['outlet_slug'])->first();
+            $criteria = $channel['handle']
+                ? ['handle' => $channel['handle']]
+                : ['channel_url' => $channel['channel_url']];
+
+            YoutubeChannel::query()->updateOrCreate($criteria, [
+                'media_outlet_id' => $outlet?->id,
+                'channel_id' => $channel['channel_id'] ?? null,
+                'handle' => $channel['handle'],
+                'title' => $channel['title'],
+                'channel_url' => $channel['channel_url'],
+                'channel_type' => $channel['channel_type'] ?? 'news',
+                'status' => 'active',
+                'is_active' => true,
+                'notes' => $channel['notes'] ?? 'Production baseline official YouTube news channel.',
+            ]);
+        }
+    }
+
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -246,5 +270,85 @@ class ProductionBaselineSeeder extends Seeder
 
             return $domain;
         }, $domains);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function youtubeChannels(): array
+    {
+        return [
+            [
+                'outlet_slug' => 'cna',
+                'handle' => 'cnataiwan',
+                'title' => '中央社 CNA',
+                'channel_url' => 'https://www.youtube.com/user/cnataiwan',
+                'notes' => 'Official Central News Agency YouTube channel.',
+            ],
+            [
+                'outlet_slug' => 'pts-news',
+                'handle' => 'PNNPTS',
+                'title' => '公視新聞網',
+                'channel_url' => 'https://www.youtube.com/@PNNPTS',
+                'notes' => 'Official PTS News YouTube channel.',
+            ],
+            [
+                'outlet_slug' => 'tvbs-news',
+                'handle' => 'TVBSNEWS01',
+                'title' => 'TVBS NEWS',
+                'channel_url' => 'https://www.youtube.com/@TVBSNEWS01',
+                'notes' => 'Official TVBS News YouTube channel.',
+            ],
+            [
+                'outlet_slug' => 'setn',
+                'handle' => 'setnews',
+                'title' => '三立LIVE新聞',
+                'channel_url' => 'https://www.youtube.com/@setnews',
+                'notes' => 'Official SET News YouTube channel.',
+            ],
+            [
+                'outlet_slug' => 'ftv-news',
+                'handle' => 'FTVCP',
+                'title' => '民視新聞網 Formosa TV News network',
+                'channel_url' => 'https://www.youtube.com/@FTVCP',
+                'notes' => 'Official FTV News YouTube channel.',
+            ],
+            [
+                'outlet_slug' => 'ettoday',
+                'handle' => 'ETtoday',
+                'title' => 'ETtoday新聞雲',
+                'channel_url' => 'https://www.youtube.com/@ETtoday',
+                'notes' => 'Official ETtoday YouTube channel.',
+            ],
+            [
+                'outlet_slug' => 'ltn',
+                'handle' => 'LTNNews',
+                'title' => '自由時報電子報',
+                'channel_url' => 'https://www.youtube.com/@LTNNews',
+                'notes' => 'Official Liberty Times YouTube channel.',
+            ],
+            [
+                'outlet_slug' => 'chinatimes',
+                'handle' => 'ChinaTimes',
+                'title' => '中時新聞網',
+                'channel_url' => 'https://www.youtube.com/@ChinaTimes',
+                'notes' => 'Official China Times YouTube channel.',
+            ],
+            [
+                'outlet_slug' => 'udn',
+                'handle' => 'udnvideo',
+                'title' => '聯合影音',
+                'channel_url' => 'https://www.youtube.com/@udnvideo',
+                'notes' => 'Official UDN video YouTube channel.',
+            ],
+            [
+                'outlet_slug' => 'rti',
+                'handle' => 'RTIofficial',
+                'title' => '中央廣播電臺 RTI',
+                'channel_url' => 'https://www.youtube.com/@RTIofficial',
+                'channel_type' => 'public_affairs',
+                'notes' => 'Official Radio Taiwan International YouTube channel.',
+            ],
+        ];
     }
 }

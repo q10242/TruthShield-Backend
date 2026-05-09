@@ -113,6 +113,12 @@ class TruthShieldApiTest extends TestCase
                 'list_url_pattern' => '^/(feed|channel|@|results|playlist|shorts/?$)',
             ])
             ->assertJsonFragment(['domain' => 'youtu.be']);
+
+        $this->getJson('/api/youtube-channels')
+            ->assertOk()
+            ->assertJsonFragment(['handle' => 'TVBSNEWS01'])
+            ->assertJsonFragment(['handle' => 'setnews'])
+            ->assertJsonFragment(['handle' => 'PNNPTS']);
     }
 
     public function test_tags_response_shape(): void

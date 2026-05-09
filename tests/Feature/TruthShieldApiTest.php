@@ -2090,6 +2090,9 @@ class TruthShieldApiTest extends TestCase
         Mail::fake();
         config([
             'services.ecpay.checkout_url' => 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5',
+            'services.ecpay.merchant_id' => 'TESTMERCHANT',
+            'services.ecpay.hash_key' => 'test-hash-key',
+            'services.ecpay.hash_iv' => 'test-hash-iv',
             'services.ecpay.api_base_url' => 'http://127.0.0.1:18080',
             'services.ecpay.web_base_url' => 'http://127.0.0.1:15173',
         ]);
@@ -2164,6 +2167,9 @@ class TruthShieldApiTest extends TestCase
     {
         config([
             'services.ecpay.checkout_url' => 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5',
+            'services.ecpay.merchant_id' => 'TESTMERCHANT',
+            'services.ecpay.hash_key' => 'test-hash-key',
+            'services.ecpay.hash_iv' => 'test-hash-iv',
             'services.ecpay.api_base_url' => 'http://127.0.0.1:18080',
             'services.ecpay.web_base_url' => 'http://127.0.0.1:15173',
         ]);

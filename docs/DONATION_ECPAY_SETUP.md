@@ -1,13 +1,13 @@
 # TruthShield ECPay Donation Setup
 
-## Local Defaults
+## Local Configuration
 
-The local Docker stack uses ECPay staging values:
+Set ECPay credentials in your local or server environment. Do not commit real production or staging credentials to git.
 
 - `ECPAY_CHECKOUT_URL=https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5`
-- `ECPAY_MERCHANT_ID=<ECPAY_STAGING_MERCHANT_ID>`
-- `ECPAY_HASH_KEY=<ECPAY_STAGING_HASH_KEY>`
-- `ECPAY_HASH_IV=<ECPAY_STAGING_HASH_IV>`
+- `ECPAY_MERCHANT_ID=<ecpay-merchant-id>`
+- `ECPAY_HASH_KEY=<ecpay-hash-key>`
+- `ECPAY_HASH_IV=<ecpay-hash-iv>`
 
 ## Production Checklist
 

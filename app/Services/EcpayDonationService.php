@@ -6,6 +6,7 @@ use App\Models\Donation;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 class EcpayDonationService
 {
@@ -77,22 +78,22 @@ class EcpayDonationService
 
     public function checkoutUrl(): string
     {
-        return (string) config('services.ecpay.checkout_url', 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5');
+        return $this->requiredConfig('checkout_url');
     }
 
     private function merchantId(): string
     {
-        return (string) config('services.ecpay.merchant_id', '<ECPAY_STAGING_MERCHANT_ID>');
+        return $this->requiredConfig('merchant_id');
     }
 
     private function hashKey(): string
     {
-        return (string) config('services.ecpay.hash_key', '<ECPAY_STAGING_HASH_KEY>');
+        return $this->requiredConfig('hash_key');
     }
 
     private function hashIv(): string
     {
-        return (string) config('services.ecpay.hash_iv', '<ECPAY_STAGING_HASH_IV>');
+        return $this->requiredConfig('hash_iv');
     }
 
     private function apiUrl(string $path): string
@@ -114,5 +115,16 @@ class EcpayDonationService
             'zh-CN' => 'CHI',
             default => null,
         };
+    }
+
+    private function requiredConfig(string $key): string
+    {
+        $value = trim((string) config("services.ecpay.{$key}", ''));
+
+        if ($value === '') {
+            throw new RuntimeException("ECPay config [services.ecpay.{$key}] is not configured.");
+        }
+
+        return $value;
     }
 }

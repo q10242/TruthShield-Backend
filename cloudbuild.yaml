@@ -3,13 +3,13 @@ substitutions:
   _AR_HOSTNAME: asia-east1-docker.pkg.dev
   _AR_REPOSITORY: truthshield
   _SERVICE_NAME: truthshield-api
-  _QUEUE_DEPLOY_ENABLED: "true"
-  _QUEUE_INSTANCE: "<QUEUE_VM_NAME>"
-  _QUEUE_ZONE: asia-east1-a
-  _QUEUE_ENV_FILE: /path/to/worker.env
+  _QUEUE_DEPLOY_ENABLED: "false"
+  _QUEUE_INSTANCE: "__SET_ME_IN_TRIGGER__"
+  _QUEUE_ZONE: "__SET_ME_IN_TRIGGER__"
+  _QUEUE_ENV_FILE: "__SET_ME_IN_TRIGGER__"
   _QUEUE_CONTAINER_NAME: truthshield-worker
   _QUEUE_DOCKER_NETWORK: "__SET_ME_IN_TRIGGER__"
-  _QUEUE_SSH_USER: <QUEUE_SSH_USER>
+  _QUEUE_SSH_USER: "__SET_ME_IN_TRIGGER__"
   _QUEUE_IMAGE_CLEANUP_KEEP: "3"
 
 steps:

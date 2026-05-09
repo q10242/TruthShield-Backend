@@ -148,14 +148,16 @@ The Cloud Build config can also update a queue VM after pushing the API image. S
 
 ```text
 _QUEUE_DEPLOY_ENABLED=true
-_QUEUE_INSTANCE=truthshield-worker
-_QUEUE_ZONE=asia-east1-b
-_QUEUE_ENV_FILE=/path/to/worker.env
+_QUEUE_INSTANCE=<queue-vm-name>
+_QUEUE_ZONE=<queue-vm-zone>
+_QUEUE_ENV_FILE=<absolute-env-file-path-on-queue-host>
 _QUEUE_CONTAINER_NAME=truthshield-worker
-_QUEUE_DOCKER_NETWORK=infra
-_QUEUE_SSH_USER=<QUEUE_SSH_USER>
+_QUEUE_DOCKER_NETWORK=<docker-network-name>
+_QUEUE_SSH_USER=<ssh-user>
 _QUEUE_IMAGE_CLEANUP_KEEP=3
 ```
+
+Keep production substitution values in the Cloud Build trigger or deployment environment, not in the public repository.
 
 The queue host must have Docker, permission to pull from Artifact Registry, a populated env file, and a deploy user that can run Docker. If PostgreSQL and Redis run in Docker, put the worker on the same Docker network and set `DB_HOST` / `REDIS_HOST` to their container names in `worker.env`. The remote deploy script pulls the same image, runs migration/seed/bootstrap commands once, starts `queue:work redis`, installs a crontab entry that runs `schedule:run` through the worker container, and removes older TruthShield images after a successful worker start.
 

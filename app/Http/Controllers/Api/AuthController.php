@@ -22,11 +22,16 @@ class AuthController extends Controller
             'redirect_url' => ['nullable', 'url', 'max:2048'],
         ]);
 
+        $redirectUrl = $validated['redirect_url'] ?? null;
+        if ($redirectUrl && ! $this->isAllowedFrontendRedirect($redirectUrl)) {
+            return response()->json(['message' => 'OAuth redirect URL is not allowed.'], 422);
+        }
+
         $plainState = Str::random(48);
         $state = OauthLoginState::query()->create([
             'provider' => $provider,
             'state_hash' => hash('sha256', $plainState),
-            'redirect_url' => $validated['redirect_url'] ?? null,
+            'redirect_url' => $redirectUrl,
             'user_id' => $request->user()?->id,
             'expires_at' => now()->addMinutes(10),
             'metadata' => ['source' => 'oauth_begin'],
@@ -50,15 +55,19 @@ class AuthController extends Controller
             ->redirect();
     }
 
-    public function socialiteCallback(Request $request, string $provider): JsonResponse
+    public function socialiteCallback(Request $request, string $provider)
     {
         abort_unless(in_array($provider, ['facebook', 'google', 'github'], true), 404);
+
+        $redirectUrl = $this->redirectUrlForState($provider, $request->query('state'));
 
         $socialiteUser = Socialite::driver($provider)->stateless()->user();
         $email = $socialiteUser->getEmail();
 
         if (! $email) {
-            return response()->json(['message' => 'OAuth provider did not return a verified email.'], 422);
+            return redirect()->away($this->frontendLoginUrl($redirectUrl, [
+                'oauth_error' => 'OAuth provider did not return a verified email.',
+            ]));
         }
 
         $synthetic = Request::create('/internal/oauth-callback', 'POST', [
@@ -68,7 +77,20 @@ class AuthController extends Controller
             'state' => $request->query('state'),
         ]);
 
-        return $this->oauthCallback($synthetic, $provider);
+        $response = $this->oauthCallback($synthetic, $provider);
+        $payload = $response->getData(true);
+
+        if ($response->getStatusCode() >= 400) {
+            return redirect()->away($this->frontendLoginUrl($redirectUrl, [
+                'oauth_error' => $payload['message'] ?? 'OAuth sign-in failed.',
+            ]));
+        }
+
+        return redirect()->away($this->frontendLoginUrl($redirectUrl, [
+            'truthshield_oauth' => '1',
+            'token' => $payload['token'],
+            'user' => $this->base64UrlEncode(json_encode($payload['user'])),
+        ]));
     }
 
     public function devLogin(Request $request, BotProtectionService $botProtection): JsonResponse
@@ -222,5 +244,61 @@ class AuthController extends Controller
         );
 
         return response()->json(['identity' => $identity]);
+    }
+
+    private function redirectUrlForState(string $provider, mixed $plainState): ?string
+    {
+        if (! is_string($plainState) || $plainState === '') {
+            return null;
+        }
+
+        $state = OauthLoginState::query()
+            ->where('provider', $provider)
+            ->where('state_hash', hash('sha256', $plainState))
+            ->whereNull('used_at')
+            ->where('expires_at', '>', now())
+            ->first();
+
+        return $state?->redirect_url;
+    }
+
+    private function isAllowedFrontendRedirect(string $url): bool
+    {
+        $frontendUrl = config('app.frontend_url') ?: env('FRONTEND_URL');
+        if (! $frontendUrl) {
+            return app()->environment(['local', 'testing']);
+        }
+
+        $candidate = parse_url($url);
+        $frontend = parse_url($frontendUrl);
+        if (! is_array($candidate) || ! is_array($frontend)) {
+            return false;
+        }
+
+        return ($candidate['scheme'] ?? null) === ($frontend['scheme'] ?? null)
+            && ($candidate['host'] ?? null) === ($frontend['host'] ?? null)
+            && (int) ($candidate['port'] ?? $this->defaultPort($candidate['scheme'] ?? null)) === (int) ($frontend['port'] ?? $this->defaultPort($frontend['scheme'] ?? null));
+    }
+
+    private function frontendLoginUrl(?string $redirectUrl, array $fragmentParams): string
+    {
+        $target = $redirectUrl && $this->isAllowedFrontendRedirect($redirectUrl)
+            ? $redirectUrl
+            : rtrim((string) (config('app.frontend_url') ?: env('FRONTEND_URL') ?: config('app.url')), '/') . '/login';
+
+        $fragment = http_build_query($fragmentParams, '', '&', PHP_QUERY_RFC3986);
+        $withoutFragment = Str::before($target, '#');
+
+        return $withoutFragment . '#' . $fragment;
+    }
+
+    private function base64UrlEncode(string $value): string
+    {
+        return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+    }
+
+    private function defaultPort(?string $scheme): int
+    {
+        return $scheme === 'http' ? 80 : 443;
     }
 }

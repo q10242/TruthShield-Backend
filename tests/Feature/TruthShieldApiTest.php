@@ -1735,6 +1735,14 @@ class TruthShieldApiTest extends TestCase
 
     public function test_oauth_begin_state_and_identity_link_flow(): void
     {
+        config(['app.frontend_url' => 'https://truthshield.test']);
+
+        $this->postJson('/api/auth/google/begin', [
+            'redirect_url' => 'https://attacker.test/auth/callback',
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'OAuth redirect URL is not allowed.');
+
         $state = $this->postJson('/api/auth/google/begin', [
             'redirect_url' => 'https://truthshield.test/auth/callback',
         ])

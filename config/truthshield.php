@@ -70,6 +70,8 @@ return [
         'www.businessweekly.com.tw',
         'udn.com',
         'www.chinatimes.com',
+        'ctinews.com',
+        'www.ctinews.com',
         'www.ettoday.net',
         'www.setn.com',
         'news.ltn.com.tw',

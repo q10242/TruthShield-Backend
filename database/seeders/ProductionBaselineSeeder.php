@@ -245,6 +245,8 @@ class ProductionBaselineSeeder extends Seeder
             ['domain' => 'www.businessweekly.com.tw', 'outlet_name' => '商業周刊', 'outlet_slug' => 'businessweekly', 'blocked_path_pattern' => $blockedLists],
             ['domain' => 'udn.com', 'outlet_name' => '聯合新聞網', 'outlet_slug' => 'udn', 'blocked_path_pattern' => $blockedLists],
             ['domain' => 'www.chinatimes.com', 'outlet_name' => '中時新聞網', 'outlet_slug' => 'chinatimes', 'blocked_path_pattern' => $blockedLists],
+            ['domain' => 'ctinews.com', 'outlet_name' => '中天新聞網', 'outlet_slug' => 'cti-news', 'article_url_pattern' => '^/news/', 'blocked_path_pattern' => $blockedLists],
+            ['domain' => 'www.ctinews.com', 'outlet_name' => '中天新聞網', 'outlet_slug' => 'cti-news', 'article_url_pattern' => '^/news/', 'blocked_path_pattern' => $blockedLists],
             ['domain' => 'www.ettoday.net', 'outlet_name' => 'ETtoday新聞雲', 'outlet_slug' => 'ettoday', 'blocked_path_pattern' => $blockedLists],
             ['domain' => 'www.setn.com', 'outlet_name' => '三立新聞網', 'outlet_slug' => 'setn', 'blocked_path_pattern' => $blockedLists],
             ['domain' => 'news.ltn.com.tw', 'outlet_name' => '自由時報', 'outlet_slug' => 'ltn', 'blocked_path_pattern' => $blockedLists],

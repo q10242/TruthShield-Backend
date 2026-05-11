@@ -5,6 +5,8 @@
   {"domain":"www.businessweekly.com.tw","article_selector":"article","title_selector":"h1","content_selector":"article"},
   {"domain":"udn.com","article_selector":"article","title_selector":"h1","content_selector":"article"},
   {"domain":"www.chinatimes.com","article_selector":"article","title_selector":"h1","content_selector":"article"},
+  {"domain":"ctinews.com","article_selector":"article","title_selector":"h1","content_selector":"article"},
+  {"domain":"www.ctinews.com","article_selector":"article","title_selector":"h1","content_selector":"article"},
   {"domain":"www.ettoday.net","article_selector":"article","title_selector":"h1","content_selector":"article"},
   {"domain":"www.setn.com","article_selector":"article","title_selector":"h1","content_selector":"article"},
   {"domain":"news.ltn.com.tw","article_selector":"article","title_selector":"h1","content_selector":"article"},

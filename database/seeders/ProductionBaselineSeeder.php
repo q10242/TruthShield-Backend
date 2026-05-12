@@ -262,6 +262,17 @@ class ProductionBaselineSeeder extends Seeder
             ['domain' => 'www.taisounds.com', 'outlet_name' => '太報', 'outlet_slug' => 'taisounds', 'blocked_path_pattern' => $blockedLists],
             ['domain' => 'www.upmedia.mg', 'outlet_name' => '上報', 'outlet_slug' => 'upmedia', 'blocked_path_pattern' => $blockedLists],
             ['domain' => 'tw.nextapple.com', 'outlet_name' => '壹蘋新聞網', 'outlet_slug' => 'nextapple-tw', 'blocked_path_pattern' => $blockedLists],
+            ['domain' => 'www.businesstoday.com.tw', 'outlet_name' => '今周刊', 'outlet_slug' => 'business-today', 'blocked_path_pattern' => $blockedLists],
+            ['domain' => 'finance.ettoday.net', 'outlet_name' => 'ETtoday財經雲', 'outlet_slug' => 'ettoday-finance', 'blocked_path_pattern' => $blockedLists],
+            ['domain' => 'www.peoplenews.tw', 'outlet_name' => '民報', 'outlet_slug' => 'people-news', 'blocked_path_pattern' => $blockedLists],
+            ['domain' => 'news.ebc.net.tw', 'outlet_name' => '東森新聞', 'outlet_slug' => 'ebc-news', 'blocked_path_pattern' => $blockedLists],
+            ['domain' => 'www.nexttv.com.tw', 'outlet_name' => '壹電視', 'outlet_slug' => 'next-tv', 'blocked_path_pattern' => $blockedLists],
+            ['domain' => 'www.taiwannews.com.tw', 'outlet_name' => 'Taiwan News', 'outlet_slug' => 'taiwan-news', 'blocked_path_pattern' => $blockedLists],
+            ['domain' => 'english.cw.com.tw', 'outlet_name' => 'CommonWealth Magazine English', 'outlet_slug' => 'commonwealth-english', 'blocked_path_pattern' => $blockedLists],
+            ['domain' => 'www.taiwanplus.com', 'outlet_name' => 'TaiwanPlus', 'outlet_slug' => 'taiwan-plus', 'blocked_path_pattern' => $blockedLists],
+            ['domain' => 'www.taipeitimes.com', 'outlet_name' => 'Taipei Times', 'outlet_slug' => 'taipei-times', 'blocked_path_pattern' => $blockedLists],
+            ['domain' => 'www.mnews.tw', 'outlet_name' => '鏡新聞', 'outlet_slug' => 'mnews', 'blocked_path_pattern' => $blockedLists],
+            ['domain' => 'www.cmmedia.com.tw', 'outlet_name' => '信傳媒', 'outlet_slug' => 'cmmedia', 'blocked_path_pattern' => $blockedLists],
         ];
 
         foreach (['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be'] as $youtubeDomain) {

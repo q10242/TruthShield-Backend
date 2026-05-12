@@ -195,9 +195,19 @@ class CommunityMaintenanceController extends Controller
     private function suggestedPattern(string $url, string $classification): ?string
     {
         $path = (string) parse_url($url, PHP_URL_PATH);
+        $query = (string) parse_url($url, PHP_URL_QUERY);
 
         if ($path === '' || $path === '/') {
             return '^/$';
+        }
+
+        if ($query !== '' && $classification === 'article') {
+            parse_str($query, $queryParams);
+            foreach ($queryParams as $key => $value) {
+                if (is_scalar($value) && preg_match('/^\d{2,}$/', (string) $value)) {
+                    return '^' . preg_quote("{$path}?{$key}=", '/') . '\\d+';
+                }
+            }
         }
 
         $pattern = preg_quote($path, '/');

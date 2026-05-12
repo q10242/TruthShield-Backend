@@ -72,6 +72,7 @@ return [
         'www.chinatimes.com',
         'ctinews.com',
         'www.ctinews.com',
+        'news.cts.com.tw',
         'www.ettoday.net',
         'www.setn.com',
         'news.ltn.com.tw',

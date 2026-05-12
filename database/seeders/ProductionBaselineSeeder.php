@@ -254,7 +254,7 @@ class ProductionBaselineSeeder extends Seeder
             ['domain' => 'tw.news.yahoo.com', 'outlet_name' => 'Yahoo奇摩新聞', 'outlet_slug' => 'yahoo-news-tw', 'article_url_pattern' => '\\.html$', 'blocked_path_pattern' => $blockedLists],
             ['domain' => 'www.storm.mg', 'outlet_name' => '風傳媒', 'outlet_slug' => 'storm-media', 'article_url_pattern' => '^/article/\\d+', 'blocked_path_pattern' => $blockedLists],
             ['domain' => 'www.thenewslens.com', 'outlet_name' => '關鍵評論網', 'outlet_slug' => 'the-news-lens', 'article_url_pattern' => '^/(?:article|feature)/', 'blocked_path_pattern' => $blockedLists],
-            ['domain' => 'www.mirrormedia.mg', 'outlet_name' => '鏡週刊', 'outlet_slug' => 'mirror-media', 'article_url_pattern' => '^/story/', 'blocked_path_pattern' => $blockedLists],
+            ['domain' => 'www.mirrormedia.mg', 'outlet_name' => '鏡週刊', 'outlet_slug' => 'mirror-media', 'article_url_pattern' => '^/(?:story|external)/', 'blocked_path_pattern' => $blockedLists],
             ['domain' => 'www.rti.org.tw', 'outlet_name' => '中央廣播電臺', 'outlet_slug' => 'rti', 'article_url_pattern' => '^/news/view/id/\\d+', 'blocked_path_pattern' => $blockedLists],
             ['domain' => 'www.ftvnews.com.tw', 'outlet_name' => '民視新聞網', 'outlet_slug' => 'ftv-news', 'article_url_pattern' => '^/news/detail/', 'blocked_path_pattern' => $blockedLists],
             ['domain' => 'news.tvbs.com.tw', 'outlet_name' => 'TVBS新聞網', 'outlet_slug' => 'tvbs-news', 'article_url_pattern' => '^/[^/]+/\\d+', 'blocked_path_pattern' => $blockedLists],

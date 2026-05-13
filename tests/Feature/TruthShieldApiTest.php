@@ -21,8 +21,11 @@ use App\Models\EvidenceReport;
 use App\Models\EvidenceSnapshot;
 use App\Models\ExtensionEvent;
 use App\Models\ExtensionSelectorCheck;
+use App\Models\EventEditLog;
+use App\Models\EventRelationship;
 use App\Models\MediaOutlet;
 use App\Models\NewsChangeReport;
+use App\Models\NewsEvent;
 use App\Models\NewsDomain;
 use App\Models\NewsDomainReport;
 use App\Models\NewsUrl;
@@ -254,6 +257,110 @@ class TruthShieldApiTest extends TestCase
             ->assertCreated();
 
         $this->assertFalse(Cache::store(config('truthshield.status_cache_store'))->has($cacheKey));
+    }
+
+    public function test_user_can_create_event_and_pin_timeline_entry(): void
+    {
+        $user = User::factory()->create();
+
+        $event = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/events', [
+                'name' => '三班護病比爭議',
+                'summary' => '多家媒體報導護病比政策與護理人力爭議。',
+                'news_url' => 'https://www.cna.com.tw/news/ahel/202605130001.aspx',
+                'title_snapshot' => '三班護病比政策引發討論',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.name', '三班護病比爭議')
+            ->json('data');
+
+        $this->assertDatabaseHas((new NewsEvent)->getTable(), [
+            'id' => $event['id'],
+            'created_by' => $user->id,
+        ]);
+        $this->assertDatabaseHas((new EventEditLog)->getTable(), [
+            'news_event_id' => $event['id'],
+            'action' => 'created',
+            'subject_type' => 'NewsEvent',
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/events/{$event['id']}/timeline", [
+                'title' => '衛福部說明護病比政策',
+                'summary' => '官方說明政策推動時程，媒體後續跟進各方回應。',
+                'occurred_at' => '2026-05-13T10:00:00+08:00',
+                'source_type' => 'news',
+                'source_url' => 'https://www.cna.com.tw/news/ahel/202605130001.aspx',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.title', '衛福部說明護病比政策');
+
+        $this->getJson("/api/events/{$event['id']}/timeline")
+            ->assertOk()
+            ->assertJsonFragment(['title' => '衛福部說明護病比政策']);
+    }
+
+    public function test_relationship_requires_source_and_creates_review_task_for_high_risk_relation(): void
+    {
+        $user = User::factory()->create();
+        $event = NewsEvent::query()->create([
+            'created_by' => $user->id,
+            'name' => '政治人物關係事件',
+            'slug' => 'political-relationship-event',
+            'summary' => '測試人物與組織關係圖。',
+            'last_activity_at' => now(),
+        ]);
+
+        $targetEntity = $this->actingAs($user, 'sanctum')
+            ->postJson("/api/events/{$event->id}/entities", [
+                'name' => '某政黨',
+                'entity_type' => 'organization',
+                'source_url' => 'https://example.com/org',
+            ])
+            ->assertCreated()
+            ->json('data');
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/events/{$event->id}/relationships", [
+                'from_entity_name' => '王小明',
+                'from_entity_type' => 'person',
+                'to_entity_id' => $targetEntity['id'],
+                'relationship_type' => '資助',
+                'source_type' => 'news',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('source_url');
+
+        TrustedEvidenceSource::query()->create([
+            'host' => 'cna.com.tw',
+            'source_type' => 'news',
+            'trust_bonus' => 0.2,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/events/{$event->id}/relationships", [
+                'from_entity_name' => '王小明',
+                'from_entity_type' => 'person',
+                'to_entity_id' => $targetEntity['id'],
+                'relationship_type' => '資助',
+                'description' => '新聞提到資金往來，需要社群確認。',
+                'source_type' => 'news',
+                'source_url' => 'https://www.cna.com.tw/news/aipl/202605130099.aspx',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('task_created', true);
+
+        $this->assertDatabaseHas((new EventRelationship)->getTable(), [
+            'news_event_id' => $event->id,
+            'relationship_type' => '資助',
+            'is_high_risk' => true,
+        ]);
+        $this->assertDatabaseHas((new CommunityTask)->getTable(), [
+            'type' => 'event_relationship_review',
+            'subject_type' => EventRelationship::class,
+            'status' => 'open',
+        ]);
     }
 
     public function test_status_response_includes_display_fields(): void

@@ -69,6 +69,10 @@ class CommunityTaskResource extends Resource
                     'trusted_source_candidate' => '可信來源',
                     'evidence_quality_review' => '證據品質',
                     'controversial_news' => '高爭議新聞',
+                    'event_merge_candidate' => '事件合併',
+                    'event_timeline_review' => '時間線確認',
+                    'event_relationship_review' => '人物/組織關係',
+                    'event_relationship_report' => '被檢舉關係',
                 ]),
             ])
             ->actions([

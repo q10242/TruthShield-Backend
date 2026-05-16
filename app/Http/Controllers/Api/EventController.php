@@ -497,6 +497,7 @@ class EventController extends Controller
             'news_url' => ['nullable', 'url', 'max:4096'],
             'evidence_id' => ['nullable', 'integer', 'exists:evidences,id'],
             'official_response_id' => ['nullable', 'integer', 'exists:official_responses,id'],
+            'is_bidirectional' => ['nullable', 'boolean'],
         ]);
 
         $fromEntity = isset($validated['from_entity_id'])
@@ -542,6 +543,7 @@ class EventController extends Controller
             'source_url' => $validated['source_url'],
             'source_type' => $validated['source_type'],
             'is_high_risk' => $isHighRisk,
+            'is_bidirectional' => $validated['is_bidirectional'] ?? false,
         ]);
 
         $event->forceFill([

@@ -381,7 +381,6 @@ class EventController extends Controller
             'y' => ['required', 'numeric', 'min:40', 'max:400'],
         ]);
 
-        $before = $entity->toArray();
         $metadata = $entity->metadata ?? [];
         $metadata['graph_position'] = [
             'x' => round((float) $validated['x'], 2),
@@ -389,8 +388,6 @@ class EventController extends Controller
         ];
 
         $entity->forceFill(['metadata' => $metadata])->save();
-        $event->forceFill(['last_activity_at' => now()])->save();
-        $this->logEdit($event, $request, 'positioned', $entity, $before, $entity->fresh()->toArray(), 'Updated event graph node position.');
 
         return response()->json(['data' => $entity->fresh()]);
     }

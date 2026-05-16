@@ -287,7 +287,7 @@ class EventController extends Controller
     {
         return response()->json([
             'entities' => $event->entities()
-                ->with('outgoingRelationships')
+                ->with(['outgoingRelationships', 'globalEntity:id,name,entity_type,description,wikipedia_url'])
                 ->orderBy('entity_type')
                 ->orderBy('name')
                 ->get(),
@@ -307,6 +307,7 @@ class EventController extends Controller
             'aliases.*' => ['string', 'max:120'],
             'description' => ['nullable', 'string', 'max:1000'],
             'source_url' => ['nullable', 'url', 'max:4096'],
+            'global_entity_id' => ['nullable', 'integer', 'exists:global_entities,id'],
         ]);
 
         $entity = EventEntity::query()->firstOrCreate(
@@ -316,6 +317,7 @@ class EventController extends Controller
                 'name' => $validated['name'],
             ],
             [
+                'global_entity_id' => $validated['global_entity_id'] ?? null,
                 'created_by' => $request->user()?->id,
                 'aliases' => $validated['aliases'] ?? null,
                 'description' => $validated['description'] ?? null,
@@ -323,10 +325,15 @@ class EventController extends Controller
             ],
         );
 
+        // Link to global entity if not already set (e.g. entity already existed locally)
+        if (! $entity->global_entity_id && isset($validated['global_entity_id'])) {
+            $entity->forceFill(['global_entity_id' => $validated['global_entity_id']])->save();
+        }
+
         $event->forceFill(['last_activity_at' => now()])->save();
         $this->logEdit($event, $request, 'created', $entity, null, $entity->toArray(), 'Created event entity.');
 
-        return response()->json(['data' => $entity], 201);
+        return response()->json(['data' => $entity->load('globalEntity')], 201);
     }
 
     public function updateEntity(Request $request, NewsEvent $event, EventEntity $entity): JsonResponse

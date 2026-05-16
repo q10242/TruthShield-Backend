@@ -13,6 +13,7 @@ class EventEntity extends Model
 
     protected $fillable = [
         'news_event_id',
+        'global_entity_id',
         'created_by',
         'entity_type',
         'name',
@@ -35,6 +36,11 @@ class EventEntity extends Model
     public function event(): BelongsTo
     {
         return $this->belongsTo(NewsEvent::class, 'news_event_id');
+    }
+
+    public function globalEntity(): BelongsTo
+    {
+        return $this->belongsTo(GlobalEntity::class);
     }
 
     public function outgoingRelationships(): HasMany

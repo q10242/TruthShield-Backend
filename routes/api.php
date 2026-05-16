@@ -147,8 +147,16 @@ Route::post('/vote', [VoteController::class, 'store'])->middleware(['auth:sanctu
 Route::post('/events', [EventController::class, 'store'])->middleware(['auth:sanctum', 'throttle:20,1']);
 Route::post('/events/{event}/items', [EventController::class, 'storeItem'])->middleware(['auth:sanctum', 'throttle:30,1']);
 Route::post('/events/{event}/timeline', [EventController::class, 'storeTimeline'])->middleware(['auth:sanctum', 'throttle:30,1']);
+Route::patch('/events/{event}/timeline/{entry}', [EventController::class, 'updateTimeline'])->middleware(['auth:sanctum', 'throttle:30,1']);
+Route::delete('/events/{event}/timeline/{entry}', [EventController::class, 'deleteTimeline'])->middleware(['auth:sanctum', 'throttle:30,1']);
 Route::post('/events/{event}/entities', [EventController::class, 'storeEntity'])->middleware(['auth:sanctum', 'throttle:30,1']);
+Route::patch('/events/{event}/entities/{entity}', [EventController::class, 'updateEntity'])->middleware(['auth:sanctum', 'throttle:30,1']);
+Route::patch('/events/{event}/entities/{entity}/position', [EventController::class, 'updateEntityPosition'])->middleware(['auth:sanctum', 'throttle:120,1']);
+Route::delete('/events/{event}/entities/{entity}', [EventController::class, 'deleteEntity'])->middleware(['auth:sanctum', 'throttle:30,1']);
+Route::post('/events/{event}/entities/{entity}/merge', [EventController::class, 'mergeEntity'])->middleware(['auth:sanctum', 'throttle:20,1']);
 Route::post('/events/{event}/relationships', [EventController::class, 'storeRelationship'])->middleware(['auth:sanctum', 'throttle:30,1']);
+Route::patch('/events/{event}/relationships/{relationship}', [EventController::class, 'updateRelationship'])->middleware(['auth:sanctum', 'throttle:30,1']);
+Route::delete('/events/{event}/relationships/{relationship}', [EventController::class, 'deleteRelationship'])->middleware(['auth:sanctum', 'throttle:30,1']);
 Route::post('/events/{event}/edit-logs/{log}/rollback', [EventController::class, 'rollback'])->middleware(['auth:sanctum', 'throttle:10,1']);
 Route::post('/evidence/{vote}/reaction', [EvidenceController::class, 'react'])->middleware(['auth:sanctum', 'throttle:reaction']);
 Route::post('/evidence/{vote}/report', [EvidenceController::class, 'report'])->middleware(['auth:sanctum', 'throttle:10,1']);

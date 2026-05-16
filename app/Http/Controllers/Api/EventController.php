@@ -37,17 +37,37 @@ class EventController extends Controller
         '指控',
     ];
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, UrlFingerprintService $fingerprints): JsonResponse
     {
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:120'],
+            'news_url' => ['nullable', 'url', 'max:4096'],
             'status' => ['nullable', 'string', 'max:40'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
+        $newsUrl = null;
+        if ($validated['news_url'] ?? null) {
+            try {
+                $fingerprint = $fingerprints->fingerprint($validated['news_url']);
+                $newsUrl = NewsUrl::query()->where('hash', $fingerprint['hash'])->first();
+            } catch (InvalidArgumentException $exception) {
+                return response()->json(['message' => $exception->getMessage()], 422);
+            }
+        }
+
         $query = NewsEvent::query()
             ->withCount(['items', 'timelineEntries', 'entities', 'relationships'])
             ->with('primaryNewsUrl:id,title_snapshot,normalized_url')
+            ->when(($validated['news_url'] ?? null) && ! $newsUrl, fn ($builder) => $builder->whereRaw('1 = 0'))
+            ->when($newsUrl, function ($builder) use ($newsUrl): void {
+                $builder->where(function ($inner) use ($newsUrl): void {
+                    $inner->where('primary_news_url_id', $newsUrl->id)
+                        ->orWhereHas('items', fn ($item) => $item->where('news_url_id', $newsUrl->id))
+                        ->orWhereHas('timelineEntries', fn ($entry) => $entry->where('news_url_id', $newsUrl->id))
+                        ->orWhereHas('relationships', fn ($relationship) => $relationship->where('news_url_id', $newsUrl->id));
+                });
+            })
             ->when($validated['q'] ?? null, function ($builder, string $q): void {
                 $builder->where(function ($inner) use ($q): void {
                     $inner->where('name', 'ilike', "%{$q}%")
@@ -110,7 +130,12 @@ class EventController extends Controller
 
     public function show(NewsEvent $event): JsonResponse
     {
-        return response()->json($this->showPayload($event));
+        $metadata = $event->metadata ?? [];
+        $metadata['view_count'] = (int) ($metadata['view_count'] ?? 0) + 1;
+        $metadata['last_viewed_at'] = now()->toJSON();
+        $event->forceFill(['metadata' => $metadata])->save();
+
+        return response()->json($this->showPayload($event->fresh()));
     }
 
     public function storeItem(Request $request, NewsEvent $event, UrlFingerprintService $fingerprints): JsonResponse
@@ -204,6 +229,60 @@ class EventController extends Controller
         return response()->json(['data' => $entry->load(['newsUrl', 'evidence', 'creator'])], 201);
     }
 
+    public function updateTimeline(Request $request, NewsEvent $event, NewsEventTimelineEntry $entry, UrlFingerprintService $fingerprints): JsonResponse
+    {
+        $this->abortUnlessTimelineBelongsToEvent($event, $entry);
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:180'],
+            'summary' => ['required', 'string', 'max:2000'],
+            'occurred_at' => ['required', 'date'],
+            'source_type' => ['required', 'string', Rule::in(['news', 'evidence', 'official_response', 'external'])],
+            'source_url' => ['required_without:evidence_id,official_response_id', 'nullable', 'url', 'max:4096'],
+            'news_url' => ['nullable', 'url', 'max:4096'],
+            'evidence_id' => ['nullable', 'integer', 'exists:evidences,id'],
+            'official_response_id' => ['nullable', 'integer', 'exists:official_responses,id'],
+        ]);
+
+        $newsUrl = null;
+        if (($validated['news_url'] ?? null) || (($validated['source_type'] ?? null) === 'news' && ($validated['source_url'] ?? null))) {
+            $newsUrl = $this->ensureNewsUrl($fingerprints, $validated['news_url'] ?? $validated['source_url'], $validated['title']);
+            $this->attachNewsItem($event, $newsUrl, $request->user()?->id, [
+                'title' => $newsUrl->title_snapshot ?: $validated['title'],
+                'summary' => $validated['summary'],
+            ]);
+        }
+
+        $before = $entry->toArray();
+        $entry->forceFill([
+            'news_url_id' => $newsUrl?->id,
+            'evidence_id' => $validated['evidence_id'] ?? null,
+            'official_response_id' => $validated['official_response_id'] ?? null,
+            'title' => $validated['title'],
+            'summary' => $validated['summary'],
+            'occurred_at' => $validated['occurred_at'],
+            'source_url' => $validated['source_url'] ?? $newsUrl?->normalized_url,
+            'source_type' => $validated['source_type'],
+        ])->save();
+
+        $event->forceFill(['last_activity_at' => now()])->save();
+        $this->logEdit($event, $request, 'updated', $entry, $before, $entry->fresh()->toArray(), 'Updated timeline entry.');
+
+        return response()->json(['data' => $entry->fresh()->load(['newsUrl', 'evidence', 'creator'])]);
+    }
+
+    public function deleteTimeline(Request $request, NewsEvent $event, NewsEventTimelineEntry $entry): JsonResponse
+    {
+        $this->abortUnlessTimelineBelongsToEvent($event, $entry);
+
+        $before = $entry->toArray();
+        $entry->delete();
+        $event->forceFill(['last_activity_at' => now()])->save();
+        $this->logEdit($event, $request, 'deleted', $entry, $before, null, 'Deleted timeline entry.');
+
+        return response()->json(['message' => 'Timeline entry deleted.']);
+    }
+
     public function graph(NewsEvent $event): JsonResponse
     {
         return response()->json([
@@ -248,6 +327,160 @@ class EventController extends Controller
         $this->logEdit($event, $request, 'created', $entity, null, $entity->toArray(), 'Created event entity.');
 
         return response()->json(['data' => $entity], 201);
+    }
+
+    public function updateEntity(Request $request, NewsEvent $event, EventEntity $entity): JsonResponse
+    {
+        $this->abortUnlessEntityBelongsToEvent($event, $entity);
+
+        $validated = $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:160',
+                Rule::unique('event_entities', 'name')
+                    ->where('news_event_id', $event->id)
+                    ->where('entity_type', $request->input('entity_type', $entity->entity_type))
+                    ->ignore($entity->id),
+            ],
+            'entity_type' => ['required', 'string', Rule::in(['person', 'organization'])],
+            'aliases' => ['nullable', 'array', 'max:10'],
+            'aliases.*' => ['string', 'max:120'],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'source_url' => ['nullable', 'url', 'max:4096'],
+        ]);
+
+        $before = $entity->toArray();
+        $entity->forceFill([
+            'name' => $validated['name'],
+            'entity_type' => $validated['entity_type'],
+            'aliases' => $validated['aliases'] ?? null,
+            'description' => $validated['description'] ?? null,
+            'source_url' => $validated['source_url'] ?? null,
+        ])->save();
+
+        $event->forceFill(['last_activity_at' => now()])->save();
+        $this->logEdit($event, $request, 'updated', $entity, $before, $entity->fresh()->toArray(), 'Updated event entity.');
+
+        return response()->json(['data' => $entity->fresh()]);
+    }
+
+    public function updateEntityPosition(Request $request, NewsEvent $event, EventEntity $entity): JsonResponse
+    {
+        $this->abortUnlessEntityBelongsToEvent($event, $entity);
+
+        $validated = $request->validate([
+            'x' => ['required', 'numeric', 'min:40', 'max:480'],
+            'y' => ['required', 'numeric', 'min:40', 'max:400'],
+        ]);
+
+        $before = $entity->toArray();
+        $metadata = $entity->metadata ?? [];
+        $metadata['graph_position'] = [
+            'x' => round((float) $validated['x'], 2),
+            'y' => round((float) $validated['y'], 2),
+        ];
+
+        $entity->forceFill(['metadata' => $metadata])->save();
+        $event->forceFill(['last_activity_at' => now()])->save();
+        $this->logEdit($event, $request, 'positioned', $entity, $before, $entity->fresh()->toArray(), 'Updated event graph node position.');
+
+        return response()->json(['data' => $entity->fresh()]);
+    }
+
+    public function deleteEntity(Request $request, NewsEvent $event, EventEntity $entity): JsonResponse
+    {
+        $this->abortUnlessEntityBelongsToEvent($event, $entity);
+
+        $before = $entity->toArray();
+        $relationships = EventRelationship::query()
+            ->where('news_event_id', $event->id)
+            ->where(fn ($query) => $query->where('from_entity_id', $entity->id)->orWhere('to_entity_id', $entity->id))
+            ->get();
+
+        foreach ($relationships as $relationship) {
+            $relationshipBefore = $relationship->toArray();
+            $relationship->delete();
+            $this->logEdit($event, $request, 'deleted', $relationship, $relationshipBefore, null, "Deleted relationship while deleting entity {$entity->name}.");
+        }
+
+        $entity->delete();
+        $event->forceFill(['last_activity_at' => now()])->save();
+        $this->logEdit($event, $request, 'deleted', $entity, $before, null, 'Deleted event entity.');
+
+        return response()->json(['message' => 'Entity deleted.', 'deleted_relationships' => $relationships->count()]);
+    }
+
+    public function mergeEntity(Request $request, NewsEvent $event, EventEntity $entity): JsonResponse
+    {
+        $this->abortUnlessEntityBelongsToEvent($event, $entity);
+
+        $validated = $request->validate([
+            'target_entity_id' => [
+                'required',
+                'integer',
+                Rule::exists('event_entities', 'id')->where('news_event_id', $event->id),
+            ],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        if ((int) $validated['target_entity_id'] === (int) $entity->id) {
+            return response()->json([
+                'message' => 'Cannot merge an entity into itself.',
+                'errors' => ['target_entity_id' => ['Cannot merge an entity into itself.']],
+            ], 422);
+        }
+
+        $target = EventEntity::query()
+            ->where('news_event_id', $event->id)
+            ->findOrFail($validated['target_entity_id']);
+
+        $sourceBefore = $entity->toArray();
+        $changedRelationships = collect();
+
+        DB::transaction(function () use ($request, $event, $entity, $target, $sourceBefore, $validated, &$changedRelationships): void {
+            $relationships = EventRelationship::query()
+                ->where('news_event_id', $event->id)
+                ->where(fn ($query) => $query->where('from_entity_id', $entity->id)->orWhere('to_entity_id', $entity->id))
+                ->get();
+
+            foreach ($relationships as $relationship) {
+                $before = $relationship->toArray();
+                $fromId = (int) $relationship->from_entity_id === (int) $entity->id ? $target->id : $relationship->from_entity_id;
+                $toId = (int) $relationship->to_entity_id === (int) $entity->id ? $target->id : $relationship->to_entity_id;
+
+                if ((int) $fromId === (int) $toId) {
+                    $relationship->delete();
+                    $this->logEdit($event, $request, 'deleted', $relationship, $before, null, "Deleted self-loop relationship while merging {$entity->name} into {$target->name}.");
+                    continue;
+                }
+
+                $relationship->forceFill([
+                    'from_entity_id' => $fromId,
+                    'to_entity_id' => $toId,
+                ])->save();
+                $fresh = $relationship->fresh();
+                $changedRelationships->push($fresh);
+                $this->logEdit($event, $request, 'updated', $relationship, $before, $fresh->toArray(), "Moved relationship while merging {$entity->name} into {$target->name}.");
+            }
+
+            $metadata = array_merge($entity->metadata ?? [], [
+                'merged_into_entity_id' => $target->id,
+                'merged_into_entity_name' => $target->name,
+                'merge_reason' => $validated['reason'] ?? null,
+            ]);
+
+            $entity->forceFill(['metadata' => $metadata])->save();
+            $entity->delete();
+            $event->forceFill(['last_activity_at' => now()])->save();
+            $this->logEdit($event, $request, 'merged', $entity, $sourceBefore, null, "Merged entity {$entity->name} into {$target->name}.");
+        });
+
+        return response()->json([
+            'message' => 'Entity merged.',
+            'data' => $target->fresh(),
+            'moved_relationships' => $changedRelationships->count(),
+        ]);
     }
 
     public function storeRelationship(Request $request, NewsEvent $event, UrlFingerprintService $fingerprints): JsonResponse
@@ -327,6 +560,90 @@ class EventController extends Controller
         ], 201);
     }
 
+    public function updateRelationship(Request $request, NewsEvent $event, EventRelationship $relationship, UrlFingerprintService $fingerprints): JsonResponse
+    {
+        $this->abortUnlessRelationshipBelongsToEvent($event, $relationship);
+
+        $validated = $request->validate([
+            'from_entity_id' => ['required', 'integer', Rule::exists('event_entities', 'id')->where('news_event_id', $event->id)],
+            'to_entity_id' => ['required', 'integer', Rule::exists('event_entities', 'id')->where('news_event_id', $event->id)],
+            'relationship_type' => ['required', 'string', 'max:80'],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'source_url' => ['required', 'url', 'max:4096'],
+            'source_type' => ['required', 'string', Rule::in(['news', 'evidence', 'official_response', 'external'])],
+            'news_url' => ['nullable', 'url', 'max:4096'],
+            'evidence_id' => ['nullable', 'integer', 'exists:evidences,id'],
+            'official_response_id' => ['nullable', 'integer', 'exists:official_responses,id'],
+        ]);
+
+        if ((int) $validated['from_entity_id'] === (int) $validated['to_entity_id']) {
+            return response()->json([
+                'message' => 'Relationship endpoints must be different.',
+                'errors' => ['to_entity_id' => ['Relationship endpoints must be different.']],
+            ], 422);
+        }
+
+        $isHighRisk = $this->isHighRiskRelationship($validated['relationship_type']);
+        if ($isHighRisk && ! ($validated['evidence_id'] ?? null) && ! $this->isTrustedSourceUrl($validated['source_url'])) {
+            return response()->json([
+                'message' => 'High-risk relationships require an existing evidence record or a trusted source URL.',
+                'errors' => [
+                    'source_url' => ['High-risk relationships require an existing evidence record or a trusted source URL.'],
+                ],
+            ], 422);
+        }
+
+        $newsUrl = null;
+        if (($validated['source_type'] === 'news' || ($validated['news_url'] ?? null)) && ($validated['source_url'] ?? null)) {
+            $newsUrl = $this->ensureNewsUrl($fingerprints, $validated['news_url'] ?? $validated['source_url']);
+            $this->attachNewsItem($event, $newsUrl, $request->user()?->id, [
+                'title' => $newsUrl->title_snapshot,
+                'summary' => $validated['description'] ?? null,
+            ]);
+        }
+
+        $before = $relationship->toArray();
+        $relationship->forceFill([
+            'from_entity_id' => $validated['from_entity_id'],
+            'to_entity_id' => $validated['to_entity_id'],
+            'news_url_id' => $newsUrl?->id,
+            'evidence_id' => $validated['evidence_id'] ?? null,
+            'official_response_id' => $validated['official_response_id'] ?? null,
+            'relationship_type' => $validated['relationship_type'],
+            'description' => $validated['description'] ?? null,
+            'source_url' => $validated['source_url'],
+            'source_type' => $validated['source_type'],
+            'is_high_risk' => $isHighRisk,
+        ])->save();
+
+        $event->forceFill([
+            'last_activity_at' => now(),
+            'controversy_score' => $isHighRisk && ! $before['is_high_risk'] ? $event->controversy_score + 1 : $event->controversy_score,
+        ])->save();
+
+        $this->logEdit($event, $request, 'updated', $relationship, $before, $relationship->fresh()->toArray(), 'Updated event relationship.');
+        if ($isHighRisk) {
+            $this->createRelationshipTask($event, $relationship);
+        }
+
+        return response()->json([
+            'data' => $relationship->fresh()->load(['fromEntity', 'toEntity', 'newsUrl', 'evidence']),
+            'task_created' => $isHighRisk,
+        ]);
+    }
+
+    public function deleteRelationship(Request $request, NewsEvent $event, EventRelationship $relationship): JsonResponse
+    {
+        $this->abortUnlessRelationshipBelongsToEvent($event, $relationship);
+
+        $before = $relationship->toArray();
+        $relationship->delete();
+        $event->forceFill(['last_activity_at' => now()])->save();
+        $this->logEdit($event, $request, 'deleted', $relationship, $before, null, 'Deleted event relationship.');
+
+        return response()->json(['message' => 'Relationship deleted.']);
+    }
+
     public function editLogs(NewsEvent $event): JsonResponse
     {
         return response()->json([
@@ -342,6 +659,7 @@ class EventController extends Controller
                     'subject_type' => $log->subject_type,
                     'subject_id' => $log->subject_id,
                     'reason' => $log->reason,
+                    'changes' => $this->logChangeSummary($log),
                     'created_at' => $log->created_at?->toJSON(),
                     'user' => $log->user ? [
                         'name' => $log->user->publicName(),
@@ -350,6 +668,32 @@ class EventController extends Controller
                     ] : null,
                 ]),
         ]);
+    }
+
+    private function logChangeSummary(EventEditLog $log): array
+    {
+        $after = is_array($log->after) ? $log->after : [];
+        $before = is_array($log->before) ? $log->before : [];
+        $source = $after ?: $before;
+
+        $fields = match ($log->subject_type) {
+            'NewsEvent' => ['name', 'summary', 'status', 'is_disputed'],
+            'NewsEventItem' => ['item_type', 'title', 'summary', 'source_url'],
+            'NewsEventTimelineEntry' => ['title', 'summary', 'occurred_at', 'source_type', 'source_url'],
+            'EventEntity' => ['name', 'entity_type', 'description', 'source_url'],
+            'EventRelationship' => ['relationship_type', 'description', 'source_type', 'source_url', 'is_high_risk'],
+            default => ['name', 'title', 'summary', 'source_url'],
+        };
+
+        return collect($fields)
+            ->filter(fn (string $field): bool => array_key_exists($field, $source))
+            ->map(fn (string $field): array => [
+                'field' => $field,
+                'before' => $before[$field] ?? null,
+                'after' => $after[$field] ?? null,
+            ])
+            ->values()
+            ->all();
     }
 
     public function rollback(Request $request, NewsEvent $event, EventEditLog $log): JsonResponse
@@ -402,6 +746,7 @@ class EventController extends Controller
             'status' => $event->status,
             'is_disputed' => $event->is_disputed,
             'controversy_score' => $event->controversy_score,
+            'view_count' => (int) data_get($event->metadata, 'view_count', 0),
             'last_activity_at' => $event->last_activity_at?->toJSON(),
             'created_at' => $event->created_at?->toJSON(),
             'primary_news' => $event->primaryNewsUrl,
@@ -534,6 +879,21 @@ class EventController extends Controller
                 ],
             ],
         );
+    }
+
+    private function abortUnlessEntityBelongsToEvent(NewsEvent $event, EventEntity $entity): void
+    {
+        abort_unless((int) $entity->news_event_id === (int) $event->id, 404);
+    }
+
+    private function abortUnlessRelationshipBelongsToEvent(NewsEvent $event, EventRelationship $relationship): void
+    {
+        abort_unless((int) $relationship->news_event_id === (int) $event->id, 404);
+    }
+
+    private function abortUnlessTimelineBelongsToEvent(NewsEvent $event, NewsEventTimelineEntry $entry): void
+    {
+        abort_unless((int) $entry->news_event_id === (int) $event->id, 404);
     }
 
     private function modelForLog(EventEditLog $log): ?Model

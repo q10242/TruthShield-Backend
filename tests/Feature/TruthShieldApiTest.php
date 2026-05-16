@@ -284,6 +284,10 @@ class TruthShieldApiTest extends TestCase
             'subject_type' => 'NewsEvent',
         ]);
 
+        $this->getJson('/api/events?news_url='.urlencode('https://www.cna.com.tw/news/ahel/202605130001.aspx'))
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $event['id']);
+
         $this->actingAs($user, 'sanctum')
             ->postJson("/api/events/{$event['id']}/timeline", [
                 'title' => '衛福部說明護病比政策',
@@ -298,6 +302,11 @@ class TruthShieldApiTest extends TestCase
         $this->getJson("/api/events/{$event['id']}/timeline")
             ->assertOk()
             ->assertJsonFragment(['title' => '衛福部說明護病比政策']);
+
+        $this->getJson("/api/events/{$event['id']}/edit-logs")
+            ->assertOk()
+            ->assertJsonFragment(['field' => 'title'])
+            ->assertJsonFragment(['after' => '衛福部說明護病比政策']);
     }
 
     public function test_relationship_requires_source_and_creates_review_task_for_high_risk_relation(): void
@@ -361,6 +370,137 @@ class TruthShieldApiTest extends TestCase
             'subject_type' => EventRelationship::class,
             'status' => 'open',
         ]);
+    }
+
+    public function test_event_graph_and_timeline_edits_are_logged(): void
+    {
+        $user = User::factory()->create();
+        TrustedEvidenceSource::query()->create([
+            'host' => 'cna.com.tw',
+            'source_type' => 'news',
+            'is_active' => true,
+        ]);
+
+        $event = NewsEvent::query()->create([
+            'created_by' => $user->id,
+            'name' => '三班護病比事件',
+            'slug' => 'nurse-ratio-event-edits',
+            'summary' => '測試社群編輯紀錄。',
+            'last_activity_at' => now(),
+        ]);
+
+        $timeline = $this->actingAs($user, 'sanctum')
+            ->postJson("/api/events/{$event->id}/timeline", [
+                'title' => '衛福部公告標準',
+                'summary' => '公告各層級醫院三班護病比標準。',
+                'occurred_at' => '2024-01-26 10:00:00',
+                'source_type' => 'news',
+                'source_url' => 'https://www.cna.com.tw/news/ahel/202401260026.aspx',
+            ])
+            ->assertCreated()
+            ->json('data');
+
+        $this->actingAs($user, 'sanctum')
+            ->patchJson("/api/events/{$event->id}/timeline/{$timeline['id']}", [
+                'title' => '衛福部公告三班護病比標準',
+                'summary' => '更新摘要。',
+                'occurred_at' => '2024-01-26 11:00:00',
+                'source_type' => 'news',
+                'source_url' => 'https://www.cna.com.tw/news/ahel/202401260026.aspx',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.title', '衛福部公告三班護病比標準');
+
+        $entityA = $this->actingAs($user, 'sanctum')
+            ->postJson("/api/events/{$event->id}/entities", [
+                'name' => '衛福部',
+                'entity_type' => 'organization',
+            ])
+            ->assertCreated()
+            ->json('data');
+
+        $entityB = $this->actingAs($user, 'sanctum')
+            ->postJson("/api/events/{$event->id}/entities", [
+                'name' => '醫院端',
+                'entity_type' => 'organization',
+            ])
+            ->assertCreated()
+            ->json('data');
+
+        $relationship = $this->actingAs($user, 'sanctum')
+            ->postJson("/api/events/{$event->id}/relationships", [
+                'from_entity_id' => $entityA['id'],
+                'to_entity_id' => $entityB['id'],
+                'relationship_type' => '訂定標準',
+                'description' => '主管機關公告標準。',
+                'source_type' => 'news',
+                'source_url' => 'https://www.cna.com.tw/news/ahel/202401260026.aspx',
+            ])
+            ->assertCreated()
+            ->json('data');
+
+        $this->actingAs($user, 'sanctum')
+            ->patchJson("/api/events/{$event->id}/relationships/{$relationship['id']}", [
+                'from_entity_id' => $entityA['id'],
+                'to_entity_id' => $entityB['id'],
+                'relationship_type' => '訂定標準與獎勵',
+                'description' => '更新關係說明。',
+                'source_type' => 'news',
+                'source_url' => 'https://www.cna.com.tw/news/ahel/202401260026.aspx',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.relationship_type', '訂定標準與獎勵');
+
+        $this->actingAs($user, 'sanctum')
+            ->patchJson("/api/events/{$event->id}/entities/{$entityB['id']}", [
+                'name' => '醫療機構',
+                'entity_type' => 'organization',
+                'description' => '醫院與醫療機構端。',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.name', '醫療機構');
+
+        $this->actingAs($user, 'sanctum')
+            ->patchJson("/api/events/{$event->id}/entities/{$entityB['id']}/position", [
+                'x' => 320,
+                'y' => 210,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.metadata.graph_position.x', 320)
+            ->assertJsonPath('data.metadata.graph_position.y', 210);
+
+        $duplicate = $this->actingAs($user, 'sanctum')
+            ->postJson("/api/events/{$event->id}/entities", [
+                'name' => '醫院',
+                'entity_type' => 'organization',
+            ])
+            ->assertCreated()
+            ->json('data');
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/events/{$event->id}/entities/{$duplicate['id']}/merge", [
+                'target_entity_id' => $entityB['id'],
+                'reason' => '合併重複節點。',
+            ])
+            ->assertOk()
+            ->assertJsonPath('message', 'Entity merged.');
+
+        $this->actingAs($user, 'sanctum')
+            ->deleteJson("/api/events/{$event->id}/relationships/{$relationship['id']}")
+            ->assertOk();
+
+        $this->actingAs($user, 'sanctum')
+            ->deleteJson("/api/events/{$event->id}/timeline/{$timeline['id']}")
+            ->assertOk();
+
+        $this->getJson("/api/events/{$event->id}/edit-logs")
+            ->assertOk()
+            ->assertJsonFragment(['action' => 'updated'])
+            ->assertJsonFragment(['action' => 'positioned'])
+            ->assertJsonFragment(['action' => 'merged'])
+            ->assertJsonFragment(['action' => 'deleted'])
+            ->assertJsonFragment(['field' => 'relationship_type'])
+            ->assertJsonFragment(['field' => 'title']);
     }
 
     public function test_status_response_includes_display_fields(): void

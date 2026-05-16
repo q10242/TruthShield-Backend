@@ -19,6 +19,7 @@ use App\Services\UrlFingerprintService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -44,6 +45,9 @@ class EventController extends Controller
             'news_url' => ['nullable', 'url', 'max:4096'],
             'status' => ['nullable', 'string', 'max:40'],
             'sort' => ['nullable', 'string', Rule::in(['updated', 'created', 'views', 'recent'])],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            // legacy param kept for backwards compat
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -86,11 +90,20 @@ class EventController extends Controller
             default   => $query->orderByDesc('last_activity_at')->latest(),
         };
 
-        $limit = (int) ($validated['limit'] ?? 30);
+        $perPage = (int) ($validated['per_page'] ?? $validated['limit'] ?? 20);
+        $page = (int) ($validated['page'] ?? 1);
+        $total = $query->count();
+        $items = $query->offset(($page - 1) * $perPage)->limit($perPage)->get();
 
         return response()->json([
-            'data' => $query->limit($limit)->get()->map(fn (NewsEvent $event) => $this->eventPayload($event)),
-            'meta' => ['limit' => $limit, 'sort' => $validated['sort'] ?? 'updated'],
+            'data' => $items->map(fn (NewsEvent $event) => $this->eventPayload($event)),
+            'meta' => [
+                'sort' => $validated['sort'] ?? 'updated',
+                'per_page' => $perPage,
+                'page' => $page,
+                'total' => $total,
+                'last_page' => (int) ceil($total / $perPage),
+            ],
         ]);
     }
 
@@ -134,10 +147,13 @@ class EventController extends Controller
         return response()->json($this->showPayload($event->fresh()), 201);
     }
 
-    public function show(NewsEvent $event): JsonResponse
+    public function show(Request $request, NewsEvent $event): JsonResponse
     {
-        $event->increment('view_count');
-        $event->forceFill(['last_viewed_at' => now()])->save();
+        $key = 'ev_view:' . $event->id . ':' . md5($request->ip() . '|' . $request->userAgent());
+        if (Cache::add($key, 1, now()->addHour())) {
+            $event->increment('view_count');
+            $event->forceFill(['last_viewed_at' => now()])->save();
+        }
 
         return response()->json($this->showPayload($event->fresh()));
     }

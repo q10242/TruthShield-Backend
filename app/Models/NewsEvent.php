@@ -20,7 +20,9 @@ class NewsEvent extends Model
         'status',
         'is_disputed',
         'controversy_score',
+        'view_count',
         'last_activity_at',
+        'last_viewed_at',
         'metadata',
     ];
 
@@ -29,7 +31,9 @@ class NewsEvent extends Model
         return [
             'is_disputed' => 'boolean',
             'controversy_score' => 'integer',
+            'view_count' => 'integer',
             'last_activity_at' => 'datetime',
+            'last_viewed_at' => 'datetime',
             'metadata' => 'array',
         ];
     }

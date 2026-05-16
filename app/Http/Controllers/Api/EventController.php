@@ -43,6 +43,7 @@ class EventController extends Controller
             'q' => ['nullable', 'string', 'max:120'],
             'news_url' => ['nullable', 'url', 'max:4096'],
             'status' => ['nullable', 'string', 'max:40'],
+            'sort' => ['nullable', 'string', Rule::in(['updated', 'created', 'views', 'recent'])],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -76,15 +77,20 @@ class EventController extends Controller
                         ->orWhereHas('items.newsUrl', fn ($news) => $news->where('title_snapshot', 'ilike', "%{$q}%"));
                 });
             })
-            ->where('status', $validated['status'] ?? 'active')
-            ->orderByDesc('last_activity_at')
-            ->latest();
+            ->where('status', $validated['status'] ?? 'active');
+
+        match ($validated['sort'] ?? 'updated') {
+            'created' => $query->latest(),
+            'views'   => $query->orderByDesc('view_count')->latest(),
+            'recent'  => $query->orderByDesc('last_viewed_at')->latest(),
+            default   => $query->orderByDesc('last_activity_at')->latest(),
+        };
 
         $limit = (int) ($validated['limit'] ?? 30);
 
         return response()->json([
             'data' => $query->limit($limit)->get()->map(fn (NewsEvent $event) => $this->eventPayload($event)),
-            'meta' => ['limit' => $limit],
+            'meta' => ['limit' => $limit, 'sort' => $validated['sort'] ?? 'updated'],
         ]);
     }
 
@@ -130,10 +136,8 @@ class EventController extends Controller
 
     public function show(NewsEvent $event): JsonResponse
     {
-        $metadata = $event->metadata ?? [];
-        $metadata['view_count'] = (int) ($metadata['view_count'] ?? 0) + 1;
-        $metadata['last_viewed_at'] = now()->toJSON();
-        $event->forceFill(['metadata' => $metadata])->save();
+        $event->increment('view_count');
+        $event->forceFill(['last_viewed_at' => now()])->save();
 
         return response()->json($this->showPayload($event->fresh()));
     }
@@ -752,7 +756,8 @@ class EventController extends Controller
             'status' => $event->status,
             'is_disputed' => $event->is_disputed,
             'controversy_score' => $event->controversy_score,
-            'view_count' => (int) data_get($event->metadata, 'view_count', 0),
+            'view_count' => $event->view_count,
+            'last_viewed_at' => $event->last_viewed_at?->toJSON(),
             'last_activity_at' => $event->last_activity_at?->toJSON(),
             'created_at' => $event->created_at?->toJSON(),
             'primary_news' => $event->primaryNewsUrl,

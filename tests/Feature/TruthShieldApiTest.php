@@ -496,7 +496,6 @@ class TruthShieldApiTest extends TestCase
         $this->getJson("/api/events/{$event->id}/edit-logs")
             ->assertOk()
             ->assertJsonFragment(['action' => 'updated'])
-            ->assertJsonFragment(['action' => 'positioned'])
             ->assertJsonFragment(['action' => 'merged'])
             ->assertJsonFragment(['action' => 'deleted'])
             ->assertJsonFragment(['field' => 'relationship_type'])

@@ -516,7 +516,7 @@ class EventController extends Controller
             'to_entity_id' => ['required', 'integer', Rule::exists('event_entities', 'id')->where('news_event_id', $event->id)],
             'relationship_type' => ['required', 'string', 'max:80'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'source_url' => ['required', 'url', 'max:4096'],
+            'source_url' => ['nullable', 'url', 'max:4096'],
             'source_type' => ['required', 'string', Rule::in(['news', 'evidence', 'official_response', 'external'])],
             'news_url' => ['nullable', 'url', 'max:4096'],
             'evidence_id' => ['nullable', 'integer', 'exists:evidences,id'],
@@ -532,7 +532,7 @@ class EventController extends Controller
                     'entity_type' => $validated['from_entity_type'],
                     'name' => $validated['from_entity_name'],
                 ],
-                ['created_by' => $request->user()?->id, 'source_url' => $validated['source_url']],
+                ['created_by' => $request->user()?->id, 'source_url' => $validated['source_url'] ?? null],
             );
 
         $newsUrl = null;
@@ -545,7 +545,7 @@ class EventController extends Controller
         }
 
         $isHighRisk = $this->isHighRiskRelationship($validated['relationship_type']);
-        if ($isHighRisk && ! ($validated['evidence_id'] ?? null) && ! $this->isTrustedSourceUrl($validated['source_url'])) {
+        if ($isHighRisk && ! ($validated['evidence_id'] ?? null) && ! $this->isTrustedSourceUrl($validated['source_url'] ?? null)) {
             return response()->json([
                 'message' => 'High-risk relationships require an existing evidence record or a trusted source URL.',
                 'errors' => [
@@ -564,7 +564,7 @@ class EventController extends Controller
             'created_by' => $request->user()?->id,
             'relationship_type' => $validated['relationship_type'],
             'description' => $validated['description'] ?? null,
-            'source_url' => $validated['source_url'],
+            'source_url' => $validated['source_url'] ?? null,
             'source_type' => $validated['source_type'],
             'is_high_risk' => $isHighRisk,
             'is_bidirectional' => $validated['is_bidirectional'] ?? false,
@@ -595,7 +595,7 @@ class EventController extends Controller
             'to_entity_id' => ['required', 'integer', Rule::exists('event_entities', 'id')->where('news_event_id', $event->id)],
             'relationship_type' => ['required', 'string', 'max:80'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'source_url' => ['required', 'url', 'max:4096'],
+            'source_url' => ['nullable', 'url', 'max:4096'],
             'source_type' => ['required', 'string', Rule::in(['news', 'evidence', 'official_response', 'external'])],
             'news_url' => ['nullable', 'url', 'max:4096'],
             'evidence_id' => ['nullable', 'integer', 'exists:evidences,id'],
@@ -610,7 +610,7 @@ class EventController extends Controller
         }
 
         $isHighRisk = $this->isHighRiskRelationship($validated['relationship_type']);
-        if ($isHighRisk && ! ($validated['evidence_id'] ?? null) && ! $this->isTrustedSourceUrl($validated['source_url'])) {
+        if ($isHighRisk && ! ($validated['evidence_id'] ?? null) && ! $this->isTrustedSourceUrl($validated['source_url'] ?? null)) {
             return response()->json([
                 'message' => 'High-risk relationships require an existing evidence record or a trusted source URL.',
                 'errors' => [
@@ -637,7 +637,7 @@ class EventController extends Controller
             'official_response_id' => $validated['official_response_id'] ?? null,
             'relationship_type' => $validated['relationship_type'],
             'description' => $validated['description'] ?? null,
-            'source_url' => $validated['source_url'],
+            'source_url' => $validated['source_url'] ?? null,
             'source_type' => $validated['source_type'],
             'is_high_risk' => $isHighRisk,
         ])->save();
@@ -870,8 +870,12 @@ class EventController extends Controller
             || in_array($normalized, self::HIGH_RISK_RELATIONSHIPS, true);
     }
 
-    private function isTrustedSourceUrl(string $url): bool
+    private function isTrustedSourceUrl(?string $url): bool
     {
+        if (! $url) {
+            return false;
+        }
+
         $host = strtolower((string) parse_url($url, PHP_URL_HOST));
         if ($host === '') {
             return false;

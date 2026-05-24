@@ -95,7 +95,7 @@ return new class extends Migration
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->string('relationship_type', 80)->index();
             $table->text('description')->nullable();
-            $table->text('source_url');
+            $table->text('source_url')->nullable();
             $table->string('source_type', 40)->default('news')->index();
             $table->boolean('is_high_risk')->default(false)->index();
             $table->boolean('is_disputed')->default(false)->index();

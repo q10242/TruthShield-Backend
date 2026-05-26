@@ -68,29 +68,28 @@ class EvidenceLibraryController extends Controller
         $limit = (int) ($validated['limit'] ?? 50);
         $total = (clone $query)->count();
 
-        match ($validated['sort'] ?? 'helpful') {
+        $sort = $validated['sort'] ?? 'helpful';
+        $useCollectionSort = in_array($sort, ['helpful', 'controversial'], true);
+
+        match ($sort) {
             'latest' => $query->latest('votes.updated_at'),
-            'controversial' => $query
-                ->orderByRaw(
-                    $this->evidenceReactionCountOrderSql() . ' + ' . $this->evidenceReactionCountOrderSql() . ' DESC',
-                    [true, false],
-                )
-                ->latest('votes.updated_at'),
             'quality' => $query
                 ->orderByDesc(\App\Models\Evidence::query()
                     ->select('quality_score')
                     ->whereColumn('evidences.vote_id', 'votes.id')
                     ->limit(1))
                 ->latest('votes.updated_at'),
-            default => $query
-                ->orderByRaw(
-                    $this->evidenceReactionWeightOrderSql() . ' - ' . $this->evidenceReactionWeightOrderSql() . ' DESC',
-                    [true, false],
-                )
-                ->latest('votes.updated_at'),
+            default => $query->latest('votes.updated_at'),
         };
 
-        $rows = $query->limit($limit)->get();
+        $rows = $useCollectionSort
+            ? $query->get()
+                ->sortByDesc(fn (Vote $vote) => $sort === 'controversial'
+                    ? (int) $vote->helpful_count + (int) $vote->unhelpful_count
+                    : (float) $vote->helpful_weight - (float) $vote->unhelpful_weight)
+                ->take($limit)
+                ->values()
+            : $query->limit($limit)->get();
 
         return response()->json([
             'meta' => [
@@ -126,16 +125,6 @@ class EvidenceLibraryController extends Controller
                 'net_helpful_weight' => round((float) ($vote->helpful_weight ?? 0) - (float) ($vote->unhelpful_weight ?? 0), 4),
             ]),
         ]);
-    }
-
-    private function evidenceReactionWeightOrderSql(): string
-    {
-        return 'COALESCE((select sum(evidence_reactions.weight_score) from evidence_reactions where evidence_reactions.vote_id = votes.id and evidence_reactions.helpful = ?), 0)';
-    }
-
-    private function evidenceReactionCountOrderSql(): string
-    {
-        return 'COALESCE((select count(*) from evidence_reactions where evidence_reactions.vote_id = votes.id and evidence_reactions.helpful = ?), 0)';
     }
 
     private function officialResponses(array $validated): JsonResponse

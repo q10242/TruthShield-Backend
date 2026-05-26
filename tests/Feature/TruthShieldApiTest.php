@@ -57,6 +57,7 @@ use App\Services\TransactionalEmailService;
 use Database\Seeders\TagSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
@@ -1014,10 +1015,20 @@ class TruthShieldApiTest extends TestCase
             'type' => 'evidence.reported',
         ]);
 
+        DB::enableQueryLog();
+
         $this->getJson('/api/evidence-library')
             ->assertOk()
             ->assertJsonPath('data.0.id', $vote->id)
             ->assertJsonPath('meta.total', 1);
+
+        $countQuery = collect(DB::getQueryLog())
+            ->pluck('query')
+            ->first(fn (string $query) => str_contains($query, 'count(*) as aggregate'));
+
+        $this->assertNotNull($countQuery);
+        $this->assertStringNotContainsString('helpful_weight', $countQuery);
+        $this->assertStringNotContainsString('unhelpful_weight', $countQuery);
 
         $vote->forceFill(['hidden' => true, 'moderation_status' => 'hidden'])->save();
 

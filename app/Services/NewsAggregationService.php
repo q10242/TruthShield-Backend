@@ -93,6 +93,7 @@ class NewsAggregationService
     {
         Cache::store(config('truthshield.status_cache_store'))->forget($this->statusCacheKey($newsUrl, 'zh-TW'));
         Cache::store(config('truthshield.status_cache_store'))->forget($this->statusCacheKey($newsUrl, 'en'));
+        Cache::store(config('truthshield.status_cache_store'))->forget($this->legacyStatusCacheKey($newsUrl));
         $this->forgetMissingStatusCache($newsUrl->hash);
     }
 
@@ -450,6 +451,13 @@ class NewsAggregationService
         $locale = $this->normalizeLocale($locale);
 
         return "news:status:{$version}:{$locale}:{$newsUrl->hash}";
+    }
+
+    private function legacyStatusCacheKey(NewsUrl $newsUrl): string
+    {
+        $version = config('truthshield.status_cache_version', 'v1');
+
+        return "news:status:{$version}:{$newsUrl->hash}";
     }
 
     private function missingStatusCacheKey(string $hash): string

@@ -71,7 +71,10 @@ class EvidenceLibraryController extends Controller
         match ($validated['sort'] ?? 'helpful') {
             'latest' => $query->latest('votes.updated_at'),
             'controversial' => $query
-                ->orderByRaw('COALESCE(helpful_count, 0) + COALESCE(unhelpful_count, 0) DESC')
+                ->orderByRaw(
+                    $this->evidenceReactionCountOrderSql() . ' + ' . $this->evidenceReactionCountOrderSql() . ' DESC',
+                    [true, false],
+                )
                 ->latest('votes.updated_at'),
             'quality' => $query
                 ->orderByDesc(\App\Models\Evidence::query()
@@ -80,7 +83,10 @@ class EvidenceLibraryController extends Controller
                     ->limit(1))
                 ->latest('votes.updated_at'),
             default => $query
-                ->orderByRaw('COALESCE(helpful_weight, 0) - COALESCE(unhelpful_weight, 0) DESC')
+                ->orderByRaw(
+                    $this->evidenceReactionWeightOrderSql() . ' - ' . $this->evidenceReactionWeightOrderSql() . ' DESC',
+                    [true, false],
+                )
                 ->latest('votes.updated_at'),
         };
 
@@ -120,6 +126,16 @@ class EvidenceLibraryController extends Controller
                 'net_helpful_weight' => round((float) ($vote->helpful_weight ?? 0) - (float) ($vote->unhelpful_weight ?? 0), 4),
             ]),
         ]);
+    }
+
+    private function evidenceReactionWeightOrderSql(): string
+    {
+        return 'COALESCE((select sum(evidence_reactions.weight_score) from evidence_reactions where evidence_reactions.vote_id = votes.id and evidence_reactions.helpful = ?), 0)';
+    }
+
+    private function evidenceReactionCountOrderSql(): string
+    {
+        return 'COALESCE((select count(*) from evidence_reactions where evidence_reactions.vote_id = votes.id and evidence_reactions.helpful = ?), 0)';
     }
 
     private function officialResponses(array $validated): JsonResponse

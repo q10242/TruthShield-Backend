@@ -1030,6 +1030,28 @@ class TruthShieldApiTest extends TestCase
         $this->assertStringNotContainsString('helpful_weight', $countQuery);
         $this->assertStringNotContainsString('unhelpful_weight', $countQuery);
 
+        $libraryQuery = collect(DB::getQueryLog())
+            ->pluck('query')
+            ->first(fn (string $query) => str_contains($query, 'from "votes"') && str_contains($query, 'evidence_reactions'));
+
+        $this->assertNotNull($libraryQuery);
+        $this->assertStringNotContainsString('COALESCE(helpful_weight', $libraryQuery);
+        $this->assertStringNotContainsString('COALESCE(unhelpful_weight', $libraryQuery);
+
+        DB::flushQueryLog();
+
+        $this->getJson('/api/evidence-library?sort=controversial')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $vote->id);
+
+        $controversialQuery = collect(DB::getQueryLog())
+            ->pluck('query')
+            ->first(fn (string $query) => str_contains($query, 'from "votes"') && str_contains($query, 'evidence_reactions'));
+
+        $this->assertNotNull($controversialQuery);
+        $this->assertStringNotContainsString('COALESCE(helpful_count', $controversialQuery);
+        $this->assertStringNotContainsString('COALESCE(unhelpful_count', $controversialQuery);
+
         $vote->forceFill(['hidden' => true, 'moderation_status' => 'hidden'])->save();
 
         $this->getJson('/api/evidence-library')

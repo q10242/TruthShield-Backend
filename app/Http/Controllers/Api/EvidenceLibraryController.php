@@ -65,6 +65,9 @@ class EvidenceLibraryController extends Controller
                     ->orWhereHas('reactions', fn ($reactionQuery) => $reactionQuery->where('helpful', false)));
         }
 
+        $limit = (int) ($validated['limit'] ?? 50);
+        $total = (clone $query)->count();
+
         match ($validated['sort'] ?? 'helpful') {
             'latest' => $query->latest('votes.updated_at'),
             'controversial' => $query
@@ -81,8 +84,6 @@ class EvidenceLibraryController extends Controller
                 ->latest('votes.updated_at'),
         };
 
-        $limit = (int) ($validated['limit'] ?? 50);
-        $total = (clone $query)->count();
         $rows = $query->limit($limit)->get();
 
         return response()->json([
@@ -141,13 +142,13 @@ class EvidenceLibraryController extends Controller
             $query->whereHas('newsUrl', fn ($urlQuery) => $urlQuery->where('normalized_url', 'like', '%://' . $validated['domain'] . '/%'));
         }
 
+        $limit = (int) ($validated['limit'] ?? 50);
+        $total = (clone $query)->count();
+
         match ($validated['sort'] ?? 'helpful') {
             'latest' => $query->latest('published_at'),
             default => $query->orderByRaw('(helpful_weight - unhelpful_weight) desc')->latest('published_at'),
         };
-
-        $limit = (int) ($validated['limit'] ?? 50);
-        $total = (clone $query)->count();
 
         return response()->json([
             'meta' => [

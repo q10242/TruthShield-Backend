@@ -1,4 +1,5 @@
 [
+  {"domain":"cna.com.tw","article_selector":"article","title_selector":"h1","content_selector":"article"},
   {"domain":"www.cna.com.tw","article_selector":"article","title_selector":"h1","content_selector":"article"},
   {"domain":"news.pts.org.tw","article_selector":"article","title_selector":"h1","content_selector":"article"},
   {"domain":"www.cw.com.tw","article_selector":"article","title_selector":"h1","content_selector":"article"},

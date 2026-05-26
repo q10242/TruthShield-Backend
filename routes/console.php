@@ -436,6 +436,7 @@ Artisan::command('truthshield:check-extension-selectors', function () {
 
     NewsDomain::query()->where('is_active', true)->get()->each(function (NewsDomain $domain) use (&$count): void {
         $selectors = array_filter([$domain->article_selector, $domain->title_selector, $domain->content_selector]);
+        $usesBuiltInVideoDetection = in_array($domain->domain, ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be'], true);
 
         foreach (['article_selector' => $domain->article_selector, 'title_selector' => $domain->title_selector, 'content_selector' => $domain->content_selector] as $type => $selector) {
             ExtensionSelectorCheck::query()->create([
@@ -443,9 +444,13 @@ Artisan::command('truthshield:check-extension-selectors', function () {
                 'domain' => $domain->domain,
                 'check_type' => $type,
                 'selector' => $selector,
-                'success' => filled($selector) || $type === 'article_selector',
+                'success' => filled($selector) || $type === 'article_selector' || $usesBuiltInVideoDetection,
                 'checked_at' => now(),
-                'metadata' => ['configured_selector_count' => count($selectors), 'mode' => 'static_config_check'],
+                'metadata' => [
+                    'configured_selector_count' => count($selectors),
+                    'mode' => 'static_config_check',
+                    'uses_built_in_video_detection' => $usesBuiltInVideoDetection,
+                ],
             ]);
             $count++;
         }

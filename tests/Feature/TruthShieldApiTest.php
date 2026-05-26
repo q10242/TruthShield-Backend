@@ -1184,7 +1184,10 @@ class TruthShieldApiTest extends TestCase
         $this->getJson('/api/leaderboard/trust')
             ->assertOk()
             ->assertJsonPath('data.0.name', 'High Trust')
-            ->assertJsonPath('data.0.badges.0.slug', 'test-badge');
+            ->assertJsonPath('data.0.badges.0.slug', 'test-badge')
+            ->assertJsonMissingPath('data.0.email')
+            ->assertJsonMissingPath('data.0.is_admin')
+            ->assertJsonMissingPath('data.0.badges.0.pivot');
 
         $this->getJson("/api/news/by-id/{$newsUrl->id}")
             ->assertOk()

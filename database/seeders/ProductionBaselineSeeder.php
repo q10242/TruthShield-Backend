@@ -10,8 +10,8 @@ use App\Models\RateLimitPolicy;
 use App\Models\SystemSetting;
 use App\Models\TrustedEvidenceSource;
 use App\Models\YoutubeChannel;
+use App\Support\ExtensionSelectorFixtures;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
 class ProductionBaselineSeeder extends Seeder
@@ -156,7 +156,7 @@ class ProductionBaselineSeeder extends Seeder
 
     private function seedNewsDomains(): void
     {
-        $selectorFixtures = $this->selectorFixturesByDomain();
+        $selectorFixtures = ExtensionSelectorFixtures::byDomain();
 
         foreach ($this->newsDomains() as $domain) {
             $domain = array_replace($selectorFixtures[$domain['domain']] ?? [], $domain);
@@ -189,22 +189,6 @@ class ProductionBaselineSeeder extends Seeder
                 ],
             );
         }
-    }
-
-    /**
-     * @return array<string, array<string, mixed>>
-     */
-    private function selectorFixturesByDomain(): array
-    {
-        $path = database_path('fixtures/extension_selectors.json');
-
-        if (! File::exists($path)) {
-            return [];
-        }
-
-        return collect(json_decode(File::get($path), true, flags: JSON_THROW_ON_ERROR))
-            ->mapWithKeys(fn (array $row): array => [strtolower($row['domain']) => $row])
-            ->all();
     }
 
     private function deactivateLocalOnlyDomains(): void

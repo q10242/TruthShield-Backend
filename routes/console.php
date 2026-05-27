@@ -23,6 +23,7 @@ use App\Services\TrafficAnalyticsService;
 use App\Services\TransactionalEmailService;
 use App\Services\TrustScoreService;
 use App\Services\UrlFingerprintService;
+use App\Support\ExtensionSelectorFixtures;
 use Database\Seeders\ProductionBaselineSeeder;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -435,10 +436,14 @@ Artisan::command('truthshield:check-extension-selectors', function () {
     $count = 0;
 
     NewsDomain::query()->where('is_active', true)->get()->each(function (NewsDomain $domain) use (&$count): void {
-        $selectors = array_filter([$domain->article_selector, $domain->title_selector, $domain->content_selector]);
+        $fixture = ExtensionSelectorFixtures::forDomain($domain->domain);
+        $articleSelector = $domain->article_selector ?: ($fixture['article_selector'] ?? null);
+        $titleSelector = $domain->title_selector ?: ($fixture['title_selector'] ?? null);
+        $contentSelector = $domain->content_selector ?: ($fixture['content_selector'] ?? null);
+        $selectors = array_filter([$articleSelector, $titleSelector, $contentSelector]);
         $usesBuiltInVideoDetection = in_array($domain->domain, ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be'], true);
 
-        foreach (['article_selector' => $domain->article_selector, 'title_selector' => $domain->title_selector, 'content_selector' => $domain->content_selector] as $type => $selector) {
+        foreach (['article_selector' => $articleSelector, 'title_selector' => $titleSelector, 'content_selector' => $contentSelector] as $type => $selector) {
             ExtensionSelectorCheck::query()->create([
                 'news_domain_id' => $domain->id,
                 'domain' => $domain->domain,

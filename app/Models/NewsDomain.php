@@ -33,8 +33,8 @@ class NewsDomain extends Model
 
     protected static function booted(): void
     {
-        static::saved(fn () => Cache::store(config('truthshield.status_cache_store'))->forget('lookup:news-domains:v2'));
-        static::deleted(fn () => Cache::store(config('truthshield.status_cache_store'))->forget('lookup:news-domains:v2'));
+        static::saved(fn () => Cache::store(config('truthshield.status_cache_store'))->forget('lookup:news-domains:v3'));
+        static::deleted(fn () => Cache::store(config('truthshield.status_cache_store'))->forget('lookup:news-domains:v3'));
     }
 
     public function mediaOutlet(): BelongsTo

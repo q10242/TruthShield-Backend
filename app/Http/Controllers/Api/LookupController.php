@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\NewsDomain;
 use App\Models\Tag;
+use App\Support\ExtensionSelectorFixtures;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -58,9 +59,10 @@ class LookupController extends Controller
         return response()
             ->json([
                 'data' => Cache::store(config('truthshield.status_cache_store'))->remember(
-                    'lookup:news-domains:v2',
+                    'lookup:news-domains:v3',
                     now()->addMinutes(5),
                     function (): array {
+                        $selectorFixtures = ExtensionSelectorFixtures::byDomain();
                         $domains = NewsDomain::query()
                             ->where('is_active', true)
                             ->orderBy('priority')
@@ -83,16 +85,20 @@ class LookupController extends Controller
 
                         return $domains
                             ->values()
-                            ->map(fn ($domain) => [
-                                'domain' => $domain->domain,
-                                'article_selector' => $domain->article_selector,
-                                'title_selector' => $domain->title_selector,
-                                'content_selector' => $domain->content_selector,
-                                'blocked_path_pattern' => $domain->blocked_path_pattern,
-                                'article_url_pattern' => $domain->article_url_pattern,
-                                'list_url_pattern' => $domain->list_url_pattern,
-                                'priority' => $domain->priority,
-                            ])
+                            ->map(function ($domain) use ($selectorFixtures): array {
+                                $fixture = $selectorFixtures[strtolower($domain->domain)] ?? [];
+
+                                return [
+                                    'domain' => $domain->domain,
+                                    'article_selector' => $domain->article_selector ?: ($fixture['article_selector'] ?? null),
+                                    'title_selector' => $domain->title_selector ?: ($fixture['title_selector'] ?? null),
+                                    'content_selector' => $domain->content_selector ?: ($fixture['content_selector'] ?? null),
+                                    'blocked_path_pattern' => $domain->blocked_path_pattern,
+                                    'article_url_pattern' => $domain->article_url_pattern,
+                                    'list_url_pattern' => $domain->list_url_pattern,
+                                    'priority' => $domain->priority,
+                                ];
+                            })
                             ->all();
                     },
                 ),

@@ -105,6 +105,48 @@ class TruthShieldApiTest extends TestCase
             ]);
     }
 
+    public function test_news_domains_use_selector_fixtures_when_database_selectors_are_empty(): void
+    {
+        NewsDomain::query()->updateOrCreate(
+            ['domain' => 'cna.com.tw'],
+            [
+                'is_active' => true,
+                'article_selector' => null,
+                'title_selector' => null,
+                'content_selector' => null,
+                'article_url_pattern' => '^/news/.+\\.aspx$',
+            ],
+        );
+
+        $domain = collect($this->getJson('/api/news-domains')->assertOk()->json('data'))
+            ->firstWhere('domain', 'cna.com.tw');
+
+        $this->assertSame('article', $domain['article_selector']);
+        $this->assertSame('h1', $domain['title_selector']);
+        $this->assertSame('article', $domain['content_selector']);
+    }
+
+    public function test_selector_check_command_uses_fixture_selectors_when_database_selectors_are_empty(): void
+    {
+        NewsDomain::query()->updateOrCreate(
+            ['domain' => 'cna.com.tw'],
+            [
+                'is_active' => true,
+                'article_selector' => null,
+                'title_selector' => null,
+                'content_selector' => null,
+                'article_url_pattern' => '^/news/.+\\.aspx$',
+            ],
+        );
+
+        $this->artisan('truthshield:check-extension-selectors')->assertExitCode(0);
+
+        $this->assertSame(0, ExtensionSelectorCheck::query()
+            ->where('domain', 'cna.com.tw')
+            ->where('success', false)
+            ->count());
+    }
+
     public function test_seeded_youtube_domains_are_available_for_video_pages(): void
     {
         $this->seed();

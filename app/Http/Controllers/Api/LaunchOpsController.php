@@ -41,7 +41,7 @@ class LaunchOpsController extends Controller
                 ->get(['id', 'domain', 'check_type', 'success', 'selector', 'metadata', 'checked_at']),
             'summary' => [
                 'total' => ExtensionSelectorCheck::query()->count(),
-                'failed_24h' => ExtensionSelectorCheck::query()->where('success', false)->where('checked_at', '>=', now()->subDay())->count(),
+                'failed_24h' => ExtensionSelectorCheck::query()->actionableFailures()->where('checked_at', '>=', now()->subDay())->count(),
             ],
         ]);
     }

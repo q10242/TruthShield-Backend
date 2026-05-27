@@ -40,7 +40,7 @@ class TransparencyController extends Controller
 {
     public function show(TrafficAnalyticsService $traffic): JsonResponse
     {
-        return response()->json(Cache::store(config('truthshield.status_cache_store'))->remember('transparency:summary:v5', now()->addSeconds(30), function () use ($traffic): array {
+        return response()->json(Cache::store(config('truthshield.status_cache_store'))->remember('transparency:summary:v6', now()->addSeconds(30), function () use ($traffic): array {
             $trafficSummary = $traffic->publicSummary();
 
             return [
@@ -78,7 +78,7 @@ class TransparencyController extends Controller
                 'high_risk_account_edges' => AccountEdge::query()->where('score', '>=', 50)->count(),
                 'active_api_clients' => ApiClient::query()->where('status', 'active')->count(),
                 'operational_events_24h' => OperationalEvent::query()->where('created_at', '>=', now()->subDay())->count(),
-                'selector_failures_24h' => ExtensionSelectorCheck::query()->where('success', false)->where('checked_at', '>=', now()->subDay())->count(),
+                'selector_failures_24h' => ExtensionSelectorCheck::query()->actionableFailures()->where('checked_at', '>=', now()->subDay())->count(),
                 'active_trusted_evidence_sources' => TrustedEvidenceSource::query()->where('is_active', true)->count(),
                 'active_rate_limit_policies' => RateLimitPolicy::query()->where('is_active', true)->count(),
                 'community_open_tasks' => CommunityTask::query()->where('status', 'open')->count(),

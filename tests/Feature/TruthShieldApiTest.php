@@ -2123,6 +2123,14 @@ class TruthShieldApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('check.success', false);
 
+        ExtensionSelectorCheck::query()->create([
+            'domain' => 'youtube.com',
+            'check_type' => 'title_selector',
+            'success' => false,
+            'checked_at' => now(),
+            'metadata' => ['uses_built_in_video_detection' => true],
+        ]);
+
         $this->getJson('/api/trusted-evidence-sources')
             ->assertOk()
             ->assertJsonStructure(['data' => [['host', 'source_type', 'trust_bonus']]]);
@@ -2135,6 +2143,8 @@ class TruthShieldApiTest extends TestCase
             ->assertOk()
             ->json();
 
+        $this->assertSame(0, ExtensionSelectorCheck::query()->actionableFailures()->where('domain', 'youtube.com')->count());
+        $this->assertSame(ExtensionSelectorCheck::query()->actionableFailures()->where('checked_at', '>=', now()->subDay())->count(), $payload['summary']['failed_24h']);
         $this->assertGreaterThanOrEqual(1, $payload['summary']['failed_24h']);
     }
 

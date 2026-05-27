@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class ExtensionSelectorCheck extends Model
 {
+    public const BUILT_IN_VIDEO_DOMAINS = ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be'];
+
     protected $fillable = ['news_domain_id', 'domain', 'check_type', 'success', 'selector', 'metadata', 'checked_at'];
 
     protected function casts(): array
@@ -22,6 +24,7 @@ class ExtensionSelectorCheck extends Model
     {
         return $query
             ->where('success', false)
+            ->whereNotIn('domain', self::BUILT_IN_VIDEO_DOMAINS)
             ->where(function (Builder $query): void {
                 $query
                     ->whereNull('metadata->uses_built_in_video_detection')

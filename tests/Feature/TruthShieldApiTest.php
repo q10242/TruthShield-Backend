@@ -16,18 +16,18 @@ use App\Models\BugReport;
 use App\Models\CommunitySignal;
 use App\Models\CommunityTask;
 use App\Models\Donation;
+use App\Models\EventEditLog;
+use App\Models\EventRelationship;
 use App\Models\Evidence;
 use App\Models\EvidenceReport;
 use App\Models\EvidenceSnapshot;
 use App\Models\ExtensionEvent;
 use App\Models\ExtensionSelectorCheck;
-use App\Models\EventEditLog;
-use App\Models\EventRelationship;
 use App\Models\MediaOutlet;
 use App\Models\NewsChangeReport;
-use App\Models\NewsEvent;
 use App\Models\NewsDomain;
 use App\Models\NewsDomainReport;
+use App\Models\NewsEvent;
 use App\Models\NewsUrl;
 use App\Models\NewsUrlSnapshot;
 use App\Models\OfficialResponse;
@@ -2271,6 +2271,21 @@ class TruthShieldApiTest extends TestCase
         $this->assertGreaterThanOrEqual(30, NewsDomain::query()->count());
 
         $this->artisan('truthshield:stress-status --requests=5')->assertExitCode(0);
+    }
+
+    public function test_production_baseline_keeps_selector_fixtures_for_core_domains(): void
+    {
+        $this->artisan('truthshield:seed-production-baseline')->assertExitCode(0);
+
+        $cnaDomain = NewsDomain::query()->where('domain', 'cna.com.tw')->firstOrFail();
+        $wwwCnaDomain = NewsDomain::query()->where('domain', 'www.cna.com.tw')->firstOrFail();
+
+        $this->assertSame('article', $cnaDomain->article_selector);
+        $this->assertSame('h1', $cnaDomain->title_selector);
+        $this->assertSame('article', $cnaDomain->content_selector);
+        $this->assertSame('article', $wwwCnaDomain->article_selector);
+        $this->assertSame('h1', $wwwCnaDomain->title_selector);
+        $this->assertSame('article', $wwwCnaDomain->content_selector);
     }
 
     public function test_privacy_first_traffic_events_and_summary_flow(): void

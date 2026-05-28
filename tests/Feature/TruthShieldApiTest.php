@@ -2188,6 +2188,15 @@ class TruthShieldApiTest extends TestCase
         $this->assertSame(0, ExtensionSelectorCheck::query()->actionableFailures()->where('domain', 'youtube.com')->count());
         $this->assertSame(ExtensionSelectorCheck::query()->actionableFailures()->where('checked_at', '>=', now()->subDay())->count(), $payload['summary']['failed_24h']);
         $this->assertGreaterThanOrEqual(1, $payload['summary']['failed_24h']);
+
+        $failedPayload = $this->getJson('/api/extension/selector-checks?failed=1&hours=24')
+            ->assertOk()
+            ->assertJsonPath('summary.query.failed', true)
+            ->json('data');
+
+        $this->assertContains('selectors.test', collect($failedPayload)->pluck('domain')->all());
+        $this->assertNotContains('youtube.com', collect($failedPayload)->pluck('domain')->all());
+        $this->assertTrue(collect($failedPayload)->every(fn (array $check) => $check['success'] === false));
     }
 
     public function test_admin_governance_can_hide_restore_review_restrict_and_adjust(): void

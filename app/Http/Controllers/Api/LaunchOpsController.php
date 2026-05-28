@@ -32,16 +32,38 @@ class LaunchOpsController extends Controller
         ]);
     }
 
-    public function selectorChecks(): JsonResponse
+    public function selectorChecks(Request $request): JsonResponse
     {
+        $limit = max(1, min(500, (int) $request->integer('limit', 100)));
+        $hours = $request->integer('hours');
+        $hours = $hours ? max(1, min(720, (int) $hours)) : null;
+
+        $checks = ExtensionSelectorCheck::query()
+            ->latest('checked_at');
+
+        if ($request->boolean('failed')) {
+            $checks->actionableFailures();
+        } elseif ($request->has('success')) {
+            $checks->where('success', $request->boolean('success'));
+        }
+
+        if ($hours) {
+            $checks->where('checked_at', '>=', now()->subHours($hours));
+        }
+
         return response()->json([
-            'data' => ExtensionSelectorCheck::query()
-                ->latest('checked_at')
-                ->limit(100)
+            'data' => $checks
+                ->limit($limit)
                 ->get(['id', 'domain', 'check_type', 'success', 'selector', 'metadata', 'checked_at']),
             'summary' => [
                 'total' => ExtensionSelectorCheck::query()->count(),
                 'failed_24h' => ExtensionSelectorCheck::query()->actionableFailures()->where('checked_at', '>=', now()->subDay())->count(),
+                'query' => [
+                    'failed' => $request->boolean('failed'),
+                    'success' => $request->has('success') ? $request->boolean('success') : null,
+                    'hours' => $hours,
+                    'limit' => $limit,
+                ],
             ],
         ]);
     }

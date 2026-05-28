@@ -18,7 +18,9 @@ return [
     'paths' => ['api/*', 'sanctum/csrf-cookie'],
     'allowed_methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     'allowed_origins' => array_values(array_unique([...$defaultOrigins, ...$configuredOrigins])),
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        '#^chrome-extension://[a-p]{32}$#',
+    ],
     'allowed_headers' => [
         'Accept',
         'Accept-Language',

@@ -1958,6 +1958,105 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonPath('community_demoted_evidence', 1);
     }
 
+    public function test_official_response_tasks_only_open_for_right_of_reply_consensus(): void
+    {
+        config([
+            'truthshield_community.min_distinct_users' => 2,
+            'truthshield_community.thresholds.official_response_request' => 2.0,
+        ]);
+
+        $this->seed(TagSeeder::class);
+        $users = User::factory()->count(2)->create(['trust_score' => 1.5]);
+        $clickbait = Tag::query()->where('slug', 'clickbait-title')->firstOrFail();
+        $lackOfBalance = Tag::query()->where('slug', 'lack-of-balance')->firstOrFail();
+        $clickbaitNews = NewsUrl::query()->create([
+            'hash' => hash('sha256', 'https://example.com/clickbait'),
+            'original_url' => 'https://example.com/clickbait',
+            'normalized_url' => 'https://example.com/clickbait',
+            'title_snapshot' => '聳動標題新聞',
+            'voting_closes_at' => now()->addHours(72),
+        ]);
+        $replyNews = NewsUrl::query()->create([
+            'hash' => hash('sha256', 'https://example.com/right-of-reply'),
+            'original_url' => 'https://example.com/right-of-reply',
+            'normalized_url' => 'https://example.com/right-of-reply',
+            'title_snapshot' => '缺少當事人說法的新聞',
+            'voting_closes_at' => now()->addHours(72),
+        ]);
+
+        foreach ($users as $user) {
+            Vote::query()->create([
+                'user_id' => $user->id,
+                'news_url_id' => $clickbaitNews->id,
+                'tag_id' => $clickbait->id,
+                'evidence_url' => 'https://example.com/evidence',
+                'evidence_note' => '標題和內文落差很大。',
+                'weight_score' => 1.5,
+            ]);
+            Vote::query()->create([
+                'user_id' => $user->id,
+                'news_url_id' => $replyNews->id,
+                'tag_id' => $lackOfBalance->id,
+                'evidence_note' => '報導缺少被指涉方說法。',
+                'weight_score' => 1.5,
+            ]);
+        }
+
+        $this->artisan('truthshield:run-community-automation')->assertExitCode(0);
+
+        $this->assertDatabaseMissing('community_tasks', [
+            'type' => 'needs_official_response',
+            'subject_key' => "news:official-response:{$clickbaitNews->id}",
+        ]);
+        $this->assertDatabaseHas('community_tasks', [
+            'type' => 'needs_official_response',
+            'subject_key' => "news:official-response:{$replyNews->id}",
+            'status' => 'open',
+        ]);
+
+        $task = CommunityTask::query()
+            ->where('type', 'needs_official_response')
+            ->where('subject_key', "news:official-response:{$replyNews->id}")
+            ->firstOrFail();
+
+        $this->assertSame(2, $task->metrics['right_of_reply_user_count']);
+        $this->assertSame(['lack-of-balance'], $task->metrics['trigger_tag_slugs']);
+    }
+
+    public function test_authenticated_users_can_propose_fact_check_tasks(): void
+    {
+        config([
+            'truthshield_community.thresholds.fact_check_request' => 2.0,
+        ]);
+
+        $user = User::factory()->create(['trust_score' => 2.5]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/community/tasks', [
+                'type' => 'fact_check_request',
+                'title' => '請求求證這則新聞',
+                'description' => '這篇新聞有關鍵說法需要更多公開資料確認。',
+                'source_url' => 'https://example.com/news/fact-check-me',
+                'note' => '需要查找原始資料。',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('task.type', 'fact_check_request')
+            ->assertJsonPath('task.status', 'open')
+            ->assertJsonPath('detail.actions.0.value', 'request_fact_check');
+
+        $this->assertDatabaseHas('community_tasks', [
+            'type' => 'fact_check_request',
+            'subject_type' => 'user_proposal',
+            'status' => 'open',
+            'title' => '請求求證這則新聞',
+        ]);
+        $this->assertDatabaseHas('community_signals', [
+            'signal_type' => 'fact_check_request',
+            'value' => 'request_fact_check',
+            'user_id' => $user->id,
+        ]);
+    }
+
     public function test_api_clients_can_be_created_listed_and_revoked(): void
     {
         $owner = User::factory()->create();

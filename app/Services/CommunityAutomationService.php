@@ -22,6 +22,11 @@ use Illuminate\Support\Str;
 
 class CommunityAutomationService
 {
+    private const OFFICIAL_RESPONSE_TAG_SLUGS = [
+        'lack-of-balance',
+        'single-source',
+    ];
+
     public function __construct(private readonly CommunityPolicyService $policy)
     {
     }
@@ -343,16 +348,19 @@ class CommunityAutomationService
     private function createOfficialResponseTasks(): int
     {
         $created = 0;
+        $this->resolveOfficialResponseTasksWithoutNeed();
 
         NewsUrl::query()
             ->whereDoesntHave('officialResponses', fn ($query) => $query->whereIn('status', ['published', 'pending']))
             ->whereHas('votes')
+            ->with(['votes.user:id', 'votes.tag:id,slug,severity'])
             ->withCount('votes')
             ->orderByDesc('votes_count')
             ->limit(100)
             ->get()
             ->each(function (NewsUrl $newsUrl) use (&$created): void {
-                if ($newsUrl->votes_count < 2 && ! $newsUrl->finalized_at) {
+                $metrics = $this->officialResponseMetrics($newsUrl);
+                if (! $this->needsOfficialResponseTask($metrics)) {
                     return;
                 }
 
@@ -360,14 +368,11 @@ class CommunityAutomationService
                     'needs_official_response',
                     $newsUrl,
                     "news:official-response:{$newsUrl->id}",
-                    '需要官方或本人澄清',
-                    $newsUrl->title_snapshot ?: $newsUrl->normalized_url,
-                    $newsUrl->finalized_at ? 70 : 60,
+                    '可能需要官方或本人澄清',
+                    $this->officialResponseTaskDescription($newsUrl, $metrics),
+                    $this->officialResponsePriority($newsUrl, $metrics),
                     "/news/{$newsUrl->id}",
-                    [
-                        'votes_count' => (int) $newsUrl->votes_count,
-                        'finalized_at' => $newsUrl->finalized_at?->toJSON(),
-                    ],
+                    $metrics,
                 );
 
                 if ($task->wasRecentlyCreated) {
@@ -376,6 +381,89 @@ class CommunityAutomationService
             });
 
         return $created;
+    }
+
+    private function resolveOfficialResponseTasksWithoutNeed(): void
+    {
+        CommunityTask::query()
+            ->where('type', 'needs_official_response')
+            ->whereIn('status', ['open', 'escalated'])
+            ->where('subject_type', NewsUrl::class)
+            ->with('subject')
+            ->get()
+            ->each(function (CommunityTask $task): void {
+                $newsUrl = $task->subject;
+                if (! $newsUrl instanceof NewsUrl) {
+                    $task->forceFill([
+                        'status' => 'resolved',
+                        'resolved_at' => now(),
+                        'resolved_reason' => 'subject_missing',
+                    ])->save();
+                    return;
+                }
+
+                $newsUrl->load(['votes.user:id', 'votes.tag:id,slug,severity', 'officialResponses']);
+                $hasResponse = $newsUrl->officialResponses
+                    ->whereIn('status', ['published', 'pending'])
+                    ->isNotEmpty();
+
+                if ($hasResponse || ! $this->needsOfficialResponseTask($this->officialResponseMetrics($newsUrl))) {
+                    $task->forceFill([
+                        'status' => 'resolved',
+                        'resolved_at' => now(),
+                        'resolved_reason' => $hasResponse ? 'official_response_exists' : 'official_response_not_required',
+                    ])->save();
+                }
+            });
+    }
+
+    private function officialResponseMetrics(NewsUrl $newsUrl): array
+    {
+        $votes = $newsUrl->relationLoaded('votes') ? $newsUrl->votes : $newsUrl->votes()->with('tag')->get();
+        $negativeVotes = $votes->filter(fn (Vote $vote): bool => $vote->tag?->severity !== 'positive');
+        $rightOfReplyVotes = $negativeVotes->filter(fn (Vote $vote): bool => in_array($vote->tag?->slug, self::OFFICIAL_RESPONSE_TAG_SLUGS, true));
+        $triggerSlugs = $rightOfReplyVotes
+            ->map(fn (Vote $vote): ?string => $vote->tag?->slug)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        return [
+            'votes_count' => (int) $votes->count(),
+            'negative_vote_count' => (int) $negativeVotes->count(),
+            'negative_weight' => round((float) $negativeVotes->sum('weight_score'), 4),
+            'right_of_reply_vote_count' => (int) $rightOfReplyVotes->count(),
+            'right_of_reply_user_count' => (int) $rightOfReplyVotes->pluck('user_id')->filter()->unique()->count(),
+            'right_of_reply_weight' => round((float) $rightOfReplyVotes->sum('weight_score'), 4),
+            'official_response_threshold' => $this->policy->threshold('official_response_request', 3.0),
+            'required_users' => $this->policy->minDistinctUsers(),
+            'trigger_tag_slugs' => $triggerSlugs,
+            'reason_code' => 'right_of_reply_negative_consensus',
+            'finalized_at' => $newsUrl->finalized_at?->toJSON(),
+        ];
+    }
+
+    private function needsOfficialResponseTask(array $metrics): bool
+    {
+        return (int) $metrics['right_of_reply_user_count'] >= $this->policy->minDistinctUsers()
+            && (float) $metrics['right_of_reply_weight'] >= $this->policy->threshold('official_response_request', 3.0);
+    }
+
+    private function officialResponseTaskDescription(NewsUrl $newsUrl, array $metrics): string
+    {
+        $title = $newsUrl->title_snapshot ?: $newsUrl->normalized_url;
+        $tags = implode(', ', $metrics['trigger_tag_slugs'] ?: self::OFFICIAL_RESPONSE_TAG_SLUGS);
+
+        return "{$title}：社群的可回應型負面標籤已達門檻（{$tags}），建議尋找媒體、當事人或機構回應。";
+    }
+
+    private function officialResponsePriority(NewsUrl $newsUrl, array $metrics): int
+    {
+        $threshold = max(1.0, (float) $metrics['official_response_threshold']);
+        $priority = (float) $metrics['right_of_reply_weight'] >= $threshold * 2 ? 75 : 65;
+
+        return $newsUrl->finalized_at ? min(90, $priority + 5) : $priority;
     }
 
     private function upsertTask(string $type, Model $subject, string $key, string $title, string $description, int $priority, string $actionUrl, array $metrics = [], bool $escalated = false): CommunityTask
@@ -518,6 +606,7 @@ class CommunityAutomationService
             'youtube_channel_candidate' => 'youtube_channel_report',
             'evidence_quality_review' => 'evidence_unhelpful',
             'needs_official_response' => 'official_response_request',
+            'fact_check_request' => 'fact_check_request',
             default => null,
         };
     }
@@ -531,6 +620,7 @@ class CommunityAutomationService
             'youtube_channel_candidate' => 'domain_report',
             'evidence_quality_review' => 'evidence_unhelpful',
             'needs_official_response' => 'official_response_request',
+            'fact_check_request' => 'fact_check_request',
             default => null,
         };
     }
@@ -564,6 +654,10 @@ class CommunityAutomationService
             'needs_official_response' => [
                 ['value' => 'needs_official_response', 'label' => '這則新聞需要官方或本人澄清'],
                 ['value' => 'reject_official_response_need', 'label' => '目前不需要官方澄清'],
+            ],
+            'fact_check_request' => [
+                ['value' => 'request_fact_check', 'label' => '這則新聞需要求證'],
+                ['value' => 'reject_fact_check_request', 'label' => '目前不需要求證任務'],
             ],
             default => [],
         };

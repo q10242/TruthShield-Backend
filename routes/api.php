@@ -87,6 +87,7 @@ Route::post('/url-classification-reports', [CommunityMaintenanceController::clas
 Route::post('/trusted-source-suggestions', [CommunityMaintenanceController::class, 'storeTrustedSourceSuggestion'])->middleware('throttle:20,1');
 Route::get('/community/tasks', [CommunityTaskController::class, 'index']);
 Route::get('/community/tasks/stats', [CommunityTaskController::class, 'stats']);
+Route::post('/community/tasks', [CommunityTaskController::class, 'store'])->middleware(['auth:sanctum', 'throttle:10,1']);
 Route::get('/community/tasks/{task}', [CommunityTaskController::class, 'show']);
 Route::post('/community/tasks/{task}/signal', [CommunityTaskController::class, 'signal'])->middleware(['auth:sanctum', 'throttle:20,1']);
 Route::get('/news/status', [NewsController::class, 'status'])->middleware('throttle:hover');

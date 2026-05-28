@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class CommunityTask extends Model
 {
@@ -32,5 +33,10 @@ class CommunityTask extends Model
             'expires_at' => 'datetime',
             'resolved_at' => 'datetime',
         ];
+    }
+
+    public function subject(): MorphTo
+    {
+        return $this->morphTo(__FUNCTION__, 'subject_type', 'subject_id');
     }
 }

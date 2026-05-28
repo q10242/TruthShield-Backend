@@ -2134,6 +2134,23 @@ class TruthShieldApiTest extends TestCase
         ])->assertStatus(422);
     }
 
+    public function test_socialite_callback_redirects_provider_denial_to_login(): void
+    {
+        config(['app.frontend_url' => 'https://truthshield.test']);
+
+        $state = $this->postJson('/api/auth/facebook/begin', [
+            'redirect_url' => 'https://truthshield.test/login',
+        ])
+            ->assertOk()
+            ->json('state');
+
+        $response = $this->get("/api/auth/facebook/socialite-callback?error=access_denied&error_reason=user_denied&state={$state}");
+
+        $response->assertRedirect();
+        $this->assertStringStartsWith('https://truthshield.test/login#', $response->headers->get('Location'));
+        $this->assertStringContainsString('oauth_error=OAuth%20sign-in%20was%20cancelled.', $response->headers->get('Location'));
+    }
+
     public function test_launch_ops_sources_rate_limits_and_selector_checks(): void
     {
         NewsDomain::query()->create([

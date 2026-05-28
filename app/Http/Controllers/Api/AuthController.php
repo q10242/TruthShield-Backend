@@ -61,6 +61,12 @@ class AuthController extends Controller
 
         $redirectUrl = $this->redirectUrlForState($provider, $request->query('state'));
 
+        if ($request->filled('error')) {
+            return redirect()->away($this->frontendLoginUrl($redirectUrl, [
+                'oauth_error' => $this->providerErrorMessage($request),
+            ]));
+        }
+
         $socialiteUser = Socialite::driver($provider)->stateless()->user();
         $email = $socialiteUser->getEmail();
 
@@ -290,6 +296,18 @@ class AuthController extends Controller
         $withoutFragment = Str::before($target, '#');
 
         return $withoutFragment . '#' . $fragment;
+    }
+
+    private function providerErrorMessage(Request $request): string
+    {
+        $reason = (string) $request->query('error_reason', '');
+        $error = (string) $request->query('error', '');
+
+        if (in_array($reason, ['user_denied', 'user_cancelled'], true) || $error === 'access_denied') {
+            return 'OAuth sign-in was cancelled.';
+        }
+
+        return (string) $request->query('error_description', 'OAuth sign-in failed.');
     }
 
     private function base64UrlEncode(string $value): string

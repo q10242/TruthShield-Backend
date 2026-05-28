@@ -2342,6 +2342,8 @@ class TruthShieldApiTest extends TestCase
 
         $cnaDomain = NewsDomain::query()->where('domain', 'cna.com.tw')->firstOrFail();
         $wwwCnaDomain = NewsDomain::query()->where('domain', 'www.cna.com.tw')->firstOrFail();
+        $artLtnDomain = NewsDomain::query()->where('domain', 'art.ltn.com.tw')->firstOrFail();
+        $defLtnDomain = NewsDomain::query()->where('domain', 'def.ltn.com.tw')->firstOrFail();
 
         $this->assertSame('article', $cnaDomain->article_selector);
         $this->assertSame('h1', $cnaDomain->title_selector);
@@ -2349,6 +2351,12 @@ class TruthShieldApiTest extends TestCase
         $this->assertSame('article', $wwwCnaDomain->article_selector);
         $this->assertSame('h1', $wwwCnaDomain->title_selector);
         $this->assertSame('article', $wwwCnaDomain->content_selector);
+        $this->assertSame('.whitecon.article', $artLtnDomain->article_selector);
+        $this->assertSame('.whitecon.article h1', $artLtnDomain->title_selector);
+        $this->assertSame('.whitecon.article .text', $artLtnDomain->content_selector);
+        $this->assertSame('.whitecon.article', $defLtnDomain->article_selector);
+        $this->assertSame('.whitecon.article h1', $defLtnDomain->title_selector);
+        $this->assertSame('.whitecon.article .text', $defLtnDomain->content_selector);
     }
 
     public function test_privacy_first_traffic_events_and_summary_flow(): void

@@ -2147,6 +2147,14 @@ class TruthShieldApiTest extends TestCase
             'title_selector' => null,
             'content_selector' => null,
         ]);
+        foreach (['money.udn.com', 'art.ltn.com.tw', 'def.ltn.com.tw'] as $domain) {
+            NewsDomain::query()->updateOrCreate(['domain' => $domain], [
+                'is_active' => true,
+                'article_selector' => null,
+                'title_selector' => null,
+                'content_selector' => null,
+            ]);
+        }
 
         $this->artisan('truthshield:seed-launch-policies')->assertExitCode(0);
         $this->assertGreaterThanOrEqual(4, RateLimitPolicy::query()->count());
@@ -2155,6 +2163,10 @@ class TruthShieldApiTest extends TestCase
         $this->artisan('truthshield:check-extension-selectors')->assertExitCode(0);
         $this->assertGreaterThanOrEqual(1, ExtensionSelectorCheck::query()->where('domain', 'selectors.test')->count());
         $this->assertSame(0, ExtensionSelectorCheck::query()->where('domain', 'youtube.com')->where('success', false)->count());
+        $this->assertSame(0, ExtensionSelectorCheck::query()
+            ->actionableFailures()
+            ->whereIn('domain', ['money.udn.com', 'art.ltn.com.tw', 'def.ltn.com.tw'])
+            ->count());
 
         $this->postJson('/api/extension/selector-checks', [
             'domain' => 'selectors.test',

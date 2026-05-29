@@ -16,6 +16,7 @@ use App\Models\TrustedSourceSuggestion;
 use App\Models\UrlClassificationReport;
 use App\Models\Vote;
 use App\Models\YoutubeChannelReport;
+use App\Services\TrustScoreService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -27,7 +28,7 @@ class CommunityAutomationService
         'single-source',
     ];
 
-    public function __construct(private readonly CommunityPolicyService $policy)
+    public function __construct(private readonly CommunityPolicyService $policy, private readonly TrustScoreService $trustScores)
     {
     }
 
@@ -134,6 +135,7 @@ class CommunityAutomationService
                     default => 'community_consensus_applied',
                 },
             ])->save();
+            $this->rewardTaskContributors($task->refresh(), $signalType);
 
             return $task->refresh();
         }
@@ -174,6 +176,51 @@ class CommunityAutomationService
             'total_signals' => (int) (clone $base)->count(),
             'required_users' => $this->policy->minDistinctUsers(),
         ];
+    }
+
+    private function rewardTaskContributors(CommunityTask $task, string $signalType): void
+    {
+        $values = match ($task->type) {
+            'fact_check_request' => ['submit_fact_check'],
+            'event_creation_request' => ['submit_event_created'],
+            default => [],
+        };
+        $delta = (float) config("truthshield_community.completion_trust_bonus.{$task->type}", 0);
+
+        if ($delta <= 0 || $values === []) {
+            return;
+        }
+
+        CommunitySignal::query()
+            ->where('signal_type', $signalType)
+            ->where('subject_key', $task->subject_key)
+            ->whereIn('value', $values)
+            ->whereNotNull('user_id')
+            ->with('user')
+            ->get()
+            ->unique('user_id')
+            ->each(function (CommunitySignal $signal) use ($task, $delta): void {
+                if (! $signal->user) {
+                    return;
+                }
+
+                $reason = "community_task_completed:{$task->id}";
+                $alreadyRewarded = $signal->user->trustScoreHistories()
+                    ->where('reason', $reason)
+                    ->exists();
+
+                if ($alreadyRewarded) {
+                    return;
+                }
+
+                $this->trustScores->adjust(
+                    $signal->user,
+                    $delta,
+                    $reason,
+                    null,
+                    "社群任務「{$task->title}」被共識判定完成，完成貢獻獲得信任分數獎勵。",
+                );
+            });
     }
 
     private function approveDomains(): int

@@ -16,4 +16,8 @@ return [
     'high_risk_source_types' => ['media', 'political_ad', 'sponsored'],
     'high_risk_domain_keywords' => ['ad', 'ads', 'promo', 'campaign', 'sponsor'],
     'task_stale_days' => 14,
+    'completion_trust_bonus' => [
+        'fact_check_request' => (float) env('TRUTHSHIELD_COMMUNITY_FACT_CHECK_BONUS', 0.04),
+        'event_creation_request' => (float) env('TRUTHSHIELD_COMMUNITY_EVENT_CREATION_BONUS', 0.05),
+    ],
 ];

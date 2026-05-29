@@ -2063,6 +2063,7 @@ class TruthShieldApiTest extends TestCase
         config([
             'truthshield_community.min_distinct_users' => 2,
             'truthshield_community.thresholds.fact_check_request' => 2.0,
+            'truthshield_community.completion_trust_bonus.fact_check_request' => 0.04,
         ]);
 
         $users = User::factory()->count(2)->create(['trust_score' => 1.2]);
@@ -2099,6 +2100,18 @@ class TruthShieldApiTest extends TestCase
             'status' => 'resolved',
             'resolved_reason' => 'fact_check_completed_by_community',
         ]);
+        foreach ($users as $user) {
+            $this->assertSame(1.24, round((float) $user->refresh()->trust_score, 2));
+            $this->assertDatabaseHas('trust_score_histories', [
+                'user_id' => $user->id,
+                'reason' => "community_task_completed:{$task->id}",
+            ]);
+        }
+
+        $this->artisan('truthshield:run-community-automation')->assertExitCode(0);
+        foreach ($users as $user) {
+            $this->assertSame(1.24, round((float) $user->refresh()->trust_score, 2));
+        }
     }
 
     public function test_authenticated_users_can_propose_event_creation_tasks_and_resolve_them(): void
@@ -2106,6 +2119,7 @@ class TruthShieldApiTest extends TestCase
         config([
             'truthshield_community.min_distinct_users' => 1,
             'truthshield_community.thresholds.event_creation_request' => 1.0,
+            'truthshield_community.completion_trust_bonus.event_creation_request' => 0.05,
         ]);
 
         $user = User::factory()->create(['trust_score' => 1.2]);
@@ -2145,6 +2159,11 @@ class TruthShieldApiTest extends TestCase
             'id' => $taskId,
             'status' => 'resolved',
             'resolved_reason' => 'event_created_by_community',
+        ]);
+        $this->assertSame(1.25, round((float) $user->refresh()->trust_score, 2));
+        $this->assertDatabaseHas('trust_score_histories', [
+            'user_id' => $user->id,
+            'reason' => "community_task_completed:{$taskId}",
         ]);
     }
 

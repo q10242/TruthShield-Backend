@@ -41,6 +41,7 @@ class CommunityAutomationService
             'controversy_tasks_created' => $this->createControversyTasks(),
             'maintenance_tasks_synced' => $this->syncMaintenanceTasks(),
             'official_response_tasks_created' => $this->createOfficialResponseTasks(),
+            'user_proposed_tasks_resolved' => $this->resolveUserProposedTasks(),
             'community_abuse_events_created' => $this->detectCommunitySignalAbuse(),
             'stale_tasks_expired' => $this->expireStaleTasks(),
         ];
@@ -106,6 +107,46 @@ class CommunityAutomationService
             ],
             'actions' => $this->actionsForTask($task),
         ];
+    }
+
+    public function resolveByTaskConsensus(CommunityTask $task): ?CommunityTask
+    {
+        if (! in_array($task->type, ['fact_check_request', 'needs_official_response', 'controversial_news'], true)) {
+            return null;
+        }
+
+        $signalType = $this->signalTypeForTask($task->type);
+        $thresholdKey = $this->thresholdKeyForTask($task->type);
+        if (! $signalType || ! $thresholdKey || $task->status === 'resolved') {
+            return null;
+        }
+
+        $approval = $this->signalSummary($signalType, $task->subject_key);
+        $rejection = $this->signalSummary("{$signalType}_rejection", $task->subject_key);
+
+        if ($this->passes($thresholdKey, $approval)) {
+            $task->forceFill([
+                'status' => 'resolved',
+                'resolved_at' => now(),
+                'resolved_reason' => $task->type === 'fact_check_request'
+                    ? 'fact_check_completed_by_community'
+                    : 'community_consensus_applied',
+            ])->save();
+
+            return $task->refresh();
+        }
+
+        if ($this->passes($thresholdKey, $rejection)) {
+            $task->forceFill([
+                'status' => 'resolved',
+                'resolved_at' => now(),
+                'resolved_reason' => 'community_rejected_task_need',
+            ])->save();
+
+            return $task->refresh();
+        }
+
+        return null;
     }
 
     private function approveDomains(): int
@@ -383,6 +424,23 @@ class CommunityAutomationService
         return $created;
     }
 
+    private function resolveUserProposedTasks(): int
+    {
+        $resolved = 0;
+
+        CommunityTask::query()
+            ->whereIn('type', ['fact_check_request', 'needs_official_response', 'controversial_news'])
+            ->whereIn('status', ['open', 'escalated'])
+            ->get()
+            ->each(function (CommunityTask $task) use (&$resolved): void {
+                if ($this->resolveByTaskConsensus($task)) {
+                    $resolved++;
+                }
+            });
+
+        return $resolved;
+    }
+
     private function resolveOfficialResponseTasksWithoutNeed(): void
     {
         CommunityTask::query()
@@ -656,7 +714,7 @@ class CommunityAutomationService
                 ['value' => 'reject_official_response_need', 'label' => '目前不需要官方澄清'],
             ],
             'fact_check_request' => [
-                ['value' => 'request_fact_check', 'label' => '這則新聞需要求證'],
+                ['value' => 'submit_fact_check', 'label' => '我已補上求證結果'],
                 ['value' => 'reject_fact_check_request', 'label' => '目前不需要求證任務'],
             ],
             default => [],

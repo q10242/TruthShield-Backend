@@ -144,6 +144,15 @@ class CommunityTaskController extends Controller
             'challenge_token' => ['nullable', 'string', 'max:2048'],
         ]);
 
+        if ($task->type === 'fact_check_request' && $validated['value'] === 'submit_fact_check' && ! trim((string) ($validated['note'] ?? ''))) {
+            return response()->json([
+                'message' => 'Fact-check result note is required.',
+                'errors' => [
+                    'note' => ['Fact-check result note is required.'],
+                ],
+            ], 422);
+        }
+
         $baseSignalType = $automation->signalTypeForTask($task->type);
         if (! $baseSignalType) {
             return response()->json(['message' => 'This task does not accept direct community signals.'], 422);
@@ -158,6 +167,7 @@ class CommunityTaskController extends Controller
             'task_type' => $task->type,
             'note' => $validated['note'] ?? null,
         ]);
+        $automation->resolveByTaskConsensus($task->refresh());
 
         return response()->json([
             'message' => 'Community signal recorded.',
@@ -185,7 +195,7 @@ class CommunityTaskController extends Controller
     private function proposalSignalValue(string $type): string
     {
         return match ($type) {
-            'fact_check_request' => 'request_fact_check',
+            'fact_check_request' => 'submit_fact_check',
             'needs_official_response' => 'needs_official_response',
             'evidence_quality_review' => 'confirm_evidence_unhelpful',
             'domain_candidate' => 'confirm_news_domain',

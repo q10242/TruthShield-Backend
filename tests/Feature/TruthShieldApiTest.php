@@ -2027,6 +2027,7 @@ class TruthShieldApiTest extends TestCase
     {
         config([
             'truthshield_community.thresholds.fact_check_request' => 2.0,
+            'truthshield_community.min_distinct_users' => 1,
         ]);
 
         $user = User::factory()->create(['trust_score' => 2.5]);
@@ -2042,7 +2043,7 @@ class TruthShieldApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('task.type', 'fact_check_request')
             ->assertJsonPath('task.status', 'open')
-            ->assertJsonPath('detail.actions.0.value', 'request_fact_check');
+            ->assertJsonPath('detail.actions.0.value', 'submit_fact_check');
 
         $this->assertDatabaseHas('community_tasks', [
             'type' => 'fact_check_request',
@@ -2052,8 +2053,51 @@ class TruthShieldApiTest extends TestCase
         ]);
         $this->assertDatabaseHas('community_signals', [
             'signal_type' => 'fact_check_request',
-            'value' => 'request_fact_check',
+            'value' => 'submit_fact_check',
             'user_id' => $user->id,
+        ]);
+    }
+
+    public function test_fact_check_tasks_require_result_notes_and_resolve_after_consensus(): void
+    {
+        config([
+            'truthshield_community.min_distinct_users' => 2,
+            'truthshield_community.thresholds.fact_check_request' => 2.0,
+        ]);
+
+        $users = User::factory()->count(2)->create(['trust_score' => 1.2]);
+        $task = CommunityTask::query()->create([
+            'type' => 'fact_check_request',
+            'subject_type' => 'user_proposal',
+            'subject_id' => null,
+            'subject_key' => 'user-proposal:fact_check_request:test',
+            'title' => '求證測試',
+            'description' => '需要兩人補上求證結果。',
+            'priority' => 60,
+            'status' => 'open',
+            'metrics' => ['proposal_count' => 1],
+        ]);
+
+        $this->actingAs($users[0], 'sanctum')
+            ->postJson("/api/community/tasks/{$task->id}/signal", [
+                'value' => 'submit_fact_check',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('note');
+
+        foreach ($users as $user) {
+            $this->actingAs($user, 'sanctum')
+                ->postJson("/api/community/tasks/{$task->id}/signal", [
+                    'value' => 'submit_fact_check',
+                    'note' => '已查到公開資料，關鍵說法需要修正。',
+                ])
+                ->assertCreated();
+        }
+
+        $this->assertDatabaseHas('community_tasks', [
+            'id' => $task->id,
+            'status' => 'resolved',
+            'resolved_reason' => 'fact_check_completed_by_community',
         ]);
     }
 

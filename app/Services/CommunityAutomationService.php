@@ -91,7 +91,7 @@ class CommunityAutomationService
     public function taskDetail(CommunityTask $task): array
     {
         $signalType = $this->signalTypeForTask($task->type);
-        $summary = $signalType ? $this->signalSummary($signalType, $task->subject_key) : ($task->metrics ?: []);
+        $summary = $signalType ? $this->taskApprovalSummary($task, $signalType) : ($task->metrics ?: []);
         $thresholdKey = $this->thresholdKeyForTask($task->type);
         $requiredScore = $thresholdKey ? $this->policy->threshold($thresholdKey, 0) : 0;
 
@@ -111,7 +111,7 @@ class CommunityAutomationService
 
     public function resolveByTaskConsensus(CommunityTask $task): ?CommunityTask
     {
-        if (! in_array($task->type, ['fact_check_request', 'needs_official_response', 'controversial_news'], true)) {
+        if (! in_array($task->type, ['fact_check_request', 'event_creation_request', 'needs_official_response', 'controversial_news'], true)) {
             return null;
         }
 
@@ -121,16 +121,18 @@ class CommunityAutomationService
             return null;
         }
 
-        $approval = $this->signalSummary($signalType, $task->subject_key);
+        $approval = $this->taskApprovalSummary($task, $signalType);
         $rejection = $this->signalSummary("{$signalType}_rejection", $task->subject_key);
 
         if ($this->passes($thresholdKey, $approval)) {
             $task->forceFill([
                 'status' => 'resolved',
                 'resolved_at' => now(),
-                'resolved_reason' => $task->type === 'fact_check_request'
-                    ? 'fact_check_completed_by_community'
-                    : 'community_consensus_applied',
+                'resolved_reason' => match ($task->type) {
+                    'fact_check_request' => 'fact_check_completed_by_community',
+                    'event_creation_request' => 'event_created_by_community',
+                    default => 'community_consensus_applied',
+                },
             ])->save();
 
             return $task->refresh();
@@ -147,6 +149,31 @@ class CommunityAutomationService
         }
 
         return null;
+    }
+
+    private function taskApprovalSummary(CommunityTask $task, string $signalType): array
+    {
+        return match ($task->type) {
+            'fact_check_request' => $this->signalSummaryForValues($signalType, $task->subject_key, ['submit_fact_check']),
+            'event_creation_request' => $this->signalSummaryForValues($signalType, $task->subject_key, ['submit_event_created']),
+            default => $this->signalSummary($signalType, $task->subject_key),
+        };
+    }
+
+    private function signalSummaryForValues(string $signalType, string $subjectKey, array $values): array
+    {
+        $base = CommunitySignal::query()
+            ->where('signal_type', $signalType)
+            ->where('subject_key', $subjectKey)
+            ->whereIn('value', $values);
+
+        return [
+            'weighted_score' => round((float) (clone $base)->whereNotNull('user_id')->sum('weight_score'), 4),
+            'distinct_users' => (int) (clone $base)->whereNotNull('user_id')->distinct('user_id')->count('user_id'),
+            'anonymous_signals' => (int) (clone $base)->whereNull('user_id')->count(),
+            'total_signals' => (int) (clone $base)->count(),
+            'required_users' => $this->policy->minDistinctUsers(),
+        ];
     }
 
     private function approveDomains(): int
@@ -429,7 +456,7 @@ class CommunityAutomationService
         $resolved = 0;
 
         CommunityTask::query()
-            ->whereIn('type', ['fact_check_request', 'needs_official_response', 'controversial_news'])
+            ->whereIn('type', ['fact_check_request', 'event_creation_request', 'needs_official_response', 'controversial_news'])
             ->whereIn('status', ['open', 'escalated'])
             ->get()
             ->each(function (CommunityTask $task) use (&$resolved): void {
@@ -665,6 +692,7 @@ class CommunityAutomationService
             'evidence_quality_review' => 'evidence_unhelpful',
             'needs_official_response' => 'official_response_request',
             'fact_check_request' => 'fact_check_request',
+            'event_creation_request' => 'event_creation_request',
             default => null,
         };
     }
@@ -679,6 +707,7 @@ class CommunityAutomationService
             'evidence_quality_review' => 'evidence_unhelpful',
             'needs_official_response' => 'official_response_request',
             'fact_check_request' => 'fact_check_request',
+            'event_creation_request' => 'event_creation_request',
             default => null,
         };
     }
@@ -716,6 +745,10 @@ class CommunityAutomationService
             'fact_check_request' => [
                 ['value' => 'submit_fact_check', 'label' => '我已補上求證結果'],
                 ['value' => 'reject_fact_check_request', 'label' => '目前不需要求證任務'],
+            ],
+            'event_creation_request' => [
+                ['value' => 'submit_event_created', 'label' => '我已建立事件脈絡'],
+                ['value' => 'reject_event_creation_request', 'label' => '目前不需要建立事件'],
             ],
             default => [],
         };

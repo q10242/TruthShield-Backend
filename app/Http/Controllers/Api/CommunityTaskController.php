@@ -17,6 +17,7 @@ class CommunityTaskController extends Controller
     private const USER_PROPOSABLE_TYPES = [
         'controversial_news',
         'fact_check_request',
+        'event_creation_request',
         'needs_official_response',
         'evidence_quality_review',
         'domain_candidate',
@@ -102,7 +103,7 @@ class CommunityTaskController extends Controller
                 'description' => $validated['description'],
                 'priority' => $existing?->priority ?? $this->initialPriorityFor($validated['type']),
                 'status' => $existing?->status ?? 'open',
-                'action_url' => $validated['source_url'] ?? null,
+                'action_url' => $validated['type'] === 'event_creation_request' ? '/events' : ($validated['source_url'] ?? null),
                 'metrics' => $metrics,
                 'generation_snapshot' => [
                     'reason' => 'user_proposed_task',
@@ -144,11 +145,15 @@ class CommunityTaskController extends Controller
             'challenge_token' => ['nullable', 'string', 'max:2048'],
         ]);
 
-        if ($task->type === 'fact_check_request' && $validated['value'] === 'submit_fact_check' && ! trim((string) ($validated['note'] ?? ''))) {
+        if (
+            in_array($task->type, ['fact_check_request', 'event_creation_request'], true)
+            && in_array($validated['value'], ['submit_fact_check', 'submit_event_created'], true)
+            && ! trim((string) ($validated['note'] ?? ''))
+        ) {
             return response()->json([
-                'message' => 'Fact-check result note is required.',
+                'message' => 'Result note is required.',
                 'errors' => [
-                    'note' => ['Fact-check result note is required.'],
+                    'note' => ['Result note is required.'],
                 ],
             ], 422);
         }
@@ -185,6 +190,7 @@ class CommunityTaskController extends Controller
     {
         return match ($type) {
             'fact_check_request' => 60,
+            'event_creation_request' => 58,
             'needs_official_response' => 55,
             'controversial_news' => 50,
             'evidence_quality_review' => 45,
@@ -195,7 +201,8 @@ class CommunityTaskController extends Controller
     private function proposalSignalValue(string $type): string
     {
         return match ($type) {
-            'fact_check_request' => 'submit_fact_check',
+            'fact_check_request' => 'request_fact_check',
+            'event_creation_request' => 'request_event_creation',
             'needs_official_response' => 'needs_official_response',
             'evidence_quality_review' => 'confirm_evidence_unhelpful',
             'domain_candidate' => 'confirm_news_domain',

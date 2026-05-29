@@ -2053,7 +2053,7 @@ class TruthShieldApiTest extends TestCase
         ]);
         $this->assertDatabaseHas('community_signals', [
             'signal_type' => 'fact_check_request',
-            'value' => 'submit_fact_check',
+            'value' => 'request_fact_check',
             'user_id' => $user->id,
         ]);
     }
@@ -2098,6 +2098,53 @@ class TruthShieldApiTest extends TestCase
             'id' => $task->id,
             'status' => 'resolved',
             'resolved_reason' => 'fact_check_completed_by_community',
+        ]);
+    }
+
+    public function test_authenticated_users_can_propose_event_creation_tasks_and_resolve_them(): void
+    {
+        config([
+            'truthshield_community.min_distinct_users' => 1,
+            'truthshield_community.thresholds.event_creation_request' => 1.0,
+        ]);
+
+        $user = User::factory()->create(['trust_score' => 1.2]);
+
+        $payload = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/community/tasks', [
+                'type' => 'event_creation_request',
+                'title' => '請建立事件脈絡',
+                'description' => '這個議題已有多篇相關新聞，需要整理成事件時間線。',
+                'source_url' => 'https://example.com/news/event-source',
+                'note' => '可先從這篇新聞開始。',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('task.type', 'event_creation_request')
+            ->assertJsonPath('task.action_url', '/events')
+            ->assertJsonPath('detail.actions.0.value', 'submit_event_created')
+            ->json();
+
+        $taskId = $payload['task']['id'];
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/community/tasks/{$taskId}/signal", [
+                'value' => 'submit_event_created',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('note');
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/community/tasks/{$taskId}/signal", [
+                'value' => 'submit_event_created',
+                'note' => '已建立事件：https://truth-shield.example/events/123',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('detail.task.status', 'resolved');
+
+        $this->assertDatabaseHas('community_tasks', [
+            'id' => $taskId,
+            'status' => 'resolved',
+            'resolved_reason' => 'event_created_by_community',
         ]);
     }
 

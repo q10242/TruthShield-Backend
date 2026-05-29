@@ -2074,6 +2074,36 @@ class TruthShieldApiTest extends TestCase
         ]);
     }
 
+    public function test_community_tasks_can_be_searched(): void
+    {
+        CommunityTask::query()->create([
+            'type' => 'fact_check_request',
+            'subject_type' => 'user_proposal',
+            'subject_id' => null,
+            'subject_key' => 'user-proposal:fact_check_request:alpha',
+            'title' => 'Alpha 求證任務',
+            'description' => '需要確認 Alpha 新聞。',
+            'priority' => 60,
+            'status' => 'open',
+        ]);
+        CommunityTask::query()->create([
+            'type' => 'event_creation_request',
+            'subject_type' => 'user_proposal',
+            'subject_id' => null,
+            'subject_key' => 'user-proposal:event_creation_request:beta',
+            'title' => 'Beta 建立事件',
+            'description' => '需要建立事件脈絡。',
+            'priority' => 58,
+            'status' => 'open',
+        ]);
+
+        $this->getJson('/api/community/tasks?q=Alpha')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.title', 'Alpha 求證任務')
+            ->assertJsonPath('meta.filters.q', 'Alpha');
+    }
+
     public function test_fact_check_tasks_require_result_notes_and_resolve_after_consensus(): void
     {
         config([

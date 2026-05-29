@@ -27,6 +27,7 @@ class CommunityTaskController extends Controller
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            'q' => ['nullable', 'string', 'max:120'],
             'type' => ['nullable', 'string', 'max:80'],
             'status' => ['nullable', 'string', 'in:open,escalated,resolved'],
             'priority' => ['nullable', 'integer', 'min:0', 'max:100'],
@@ -34,6 +35,17 @@ class CommunityTaskController extends Controller
         ]);
 
         $query = CommunityTask::query()
+            ->when($validated['q'] ?? null, function ($builder, string $q) {
+                $needle = '%' . str_replace(['%', '_'], ['\\%', '\\_'], trim($q)) . '%';
+
+                $builder->where(function ($query) use ($needle): void {
+                    $query
+                        ->where('title', 'like', $needle)
+                        ->orWhere('description', 'like', $needle)
+                        ->orWhere('subject_key', 'like', $needle)
+                        ->orWhere('type', 'like', $needle);
+                });
+            })
             ->when($validated['type'] ?? null, fn ($builder, $type) => $builder->where('type', $type))
             ->where('status', $validated['status'] ?? 'open')
             ->when(isset($validated['priority']), fn ($builder) => $builder->where('priority', '>=', $validated['priority']))
@@ -51,6 +63,7 @@ class CommunityTaskController extends Controller
                     'type' => $validated['type'] ?? null,
                     'status' => $validated['status'] ?? 'open',
                     'priority' => $validated['priority'] ?? null,
+                    'q' => $validated['q'] ?? null,
                 ],
             ],
             'data' => $query->limit($limit)->get(),

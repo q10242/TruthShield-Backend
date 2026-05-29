@@ -17,6 +17,10 @@ return [
     'high_risk_domain_keywords' => ['ad', 'ads', 'promo', 'campaign', 'sponsor'],
     'task_stale_days' => 14,
     'completion_trust_bonus' => [
+        'domain_candidate' => (float) env('TRUTHSHIELD_COMMUNITY_DOMAIN_BONUS', 0.02),
+        'url_rule_candidate' => (float) env('TRUTHSHIELD_COMMUNITY_URL_RULE_BONUS', 0.02),
+        'trusted_source_candidate' => (float) env('TRUTHSHIELD_COMMUNITY_TRUSTED_SOURCE_BONUS', 0.03),
+        'evidence_quality_review' => (float) env('TRUTHSHIELD_COMMUNITY_EVIDENCE_QUALITY_BONUS', 0.03),
         'fact_check_request' => (float) env('TRUTHSHIELD_COMMUNITY_FACT_CHECK_BONUS', 0.04),
         'event_creation_request' => (float) env('TRUTHSHIELD_COMMUNITY_EVENT_CREATION_BONUS', 0.05),
     ],

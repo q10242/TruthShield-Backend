@@ -1851,6 +1851,9 @@ class TruthShieldApiTest extends TestCase
             'truthshield_community.thresholds.domain_report' => 2.0,
             'truthshield_community.thresholds.url_classification' => 2.0,
             'truthshield_community.thresholds.trusted_source' => 2.0,
+            'truthshield_community.completion_trust_bonus.domain_candidate' => 0.02,
+            'truthshield_community.completion_trust_bonus.url_rule_candidate' => 0.02,
+            'truthshield_community.completion_trust_bonus.trusted_source_candidate' => 0.03,
         ]);
 
         $users = User::factory()->count(2)->create(['trust_score' => 1.5]);
@@ -1880,6 +1883,15 @@ class TruthShieldApiTest extends TestCase
         $this->assertDatabaseHas('news_domain_reports', ['domain' => 'auto-news.test', 'status' => 'community_approved']);
         $this->assertDatabaseHas('url_classification_reports', ['domain' => 'auto-news.test', 'status' => 'community_approved']);
         $this->assertDatabaseHas('trusted_source_suggestions', ['host' => 'drive.google.com', 'status' => 'community_approved']);
+
+        foreach ($users as $user) {
+            $this->assertSame(1.57, round((float) $user->refresh()->trust_score, 2));
+        }
+
+        $this->artisan('truthshield:run-community-automation')->assertExitCode(0);
+        foreach ($users as $user) {
+            $this->assertSame(1.57, round((float) $user->refresh()->trust_score, 2));
+        }
     }
 
     public function test_community_policy_can_be_overridden_from_system_settings(): void
@@ -1909,6 +1921,7 @@ class TruthShieldApiTest extends TestCase
             'truthshield_community.min_distinct_users' => 2,
             'truthshield_community.thresholds.trusted_source' => 2.0,
             'truthshield_community.thresholds.evidence_unhelpful' => 1.0,
+            'truthshield_community.completion_trust_bonus.evidence_quality_review' => 0.03,
             'truthshield.evidence_reaction_min_trust_score' => 0.5,
         ]);
 
@@ -1947,6 +1960,9 @@ class TruthShieldApiTest extends TestCase
             'status' => 'escalated',
         ]);
         $this->assertSame('community_demoted', $vote->evidence->refresh()->moderation_status);
+        foreach ($users as $user) {
+            $this->assertSame(1.53, round((float) $user->refresh()->trust_score, 2));
+        }
 
         $this->getJson('/api/community/tasks?status=escalated')
             ->assertOk()

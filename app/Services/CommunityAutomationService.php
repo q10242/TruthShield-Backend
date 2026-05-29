@@ -223,6 +223,46 @@ class CommunityAutomationService
             });
     }
 
+    private function rewardAcceptedSignalContributors(string $taskType, string $signalType, string $subjectKey, array $values, string $title): void
+    {
+        $delta = (float) config("truthshield_community.completion_trust_bonus.{$taskType}", 0);
+        if ($delta <= 0) {
+            return;
+        }
+
+        $reason = 'community_consensus:' . $taskType . ':' . substr(sha1($signalType . '|' . $subjectKey), 0, 12);
+
+        CommunitySignal::query()
+            ->where('signal_type', $signalType)
+            ->where('subject_key', $subjectKey)
+            ->whereIn('value', $values)
+            ->whereNotNull('user_id')
+            ->with('user')
+            ->get()
+            ->unique('user_id')
+            ->each(function (CommunitySignal $signal) use ($delta, $reason, $title): void {
+                if (! $signal->user) {
+                    return;
+                }
+
+                $alreadyRewarded = $signal->user->trustScoreHistories()
+                    ->where('reason', $reason)
+                    ->exists();
+
+                if ($alreadyRewarded) {
+                    return;
+                }
+
+                $this->trustScores->adjust(
+                    $signal->user,
+                    $delta,
+                    $reason,
+                    null,
+                    "社群共識採納「{$title}」，有效維護貢獻獲得信任分數獎勵。",
+                );
+            });
+    }
+
     private function approveDomains(): int
     {
         $count = 0;
@@ -254,6 +294,7 @@ class CommunityAutomationService
 
                 $report->forceFill(['status' => 'community_approved'])->save();
                 $this->resolveTask('domain_candidate', $report->domain);
+                $this->rewardAcceptedSignalContributors('domain_candidate', 'domain_report', $report->domain, ['missing_news_domain', 'confirm_news_domain'], "確認未收錄新聞站 {$report->domain}");
                 $this->recordEvent('community.domain.auto_approved', $report, "社群共識自動收錄新聞站 {$report->domain}", $summary);
                 $count++;
             });
@@ -291,6 +332,7 @@ class CommunityAutomationService
 
                 $report->forceFill(['status' => 'community_approved'])->save();
                 $this->resolveTask('url_rule_candidate', $key);
+                $this->rewardAcceptedSignalContributors('url_rule_candidate', 'url_classification', $key, [$report->classification, 'confirm_url_rule'], "確認 {$report->domain} URL 規則");
                 $this->recordEvent('community.url_rule.auto_applied', $report, "社群共識自動套用 {$report->domain} URL 規則", $summary);
                 $count++;
             });
@@ -327,6 +369,7 @@ class CommunityAutomationService
 
                 $suggestion->forceFill(['status' => 'community_approved'])->save();
                 $this->resolveTask('trusted_source_candidate', $key);
+                $this->rewardAcceptedSignalContributors('trusted_source_candidate', 'trusted_source', $key, [$suggestion->source_type, 'confirm_trusted_source'], "確認可信證據來源 {$suggestion->host}");
                 $this->recordEvent('community.trusted_source.auto_approved', $suggestion, "社群共識自動加入可信證據來源 {$suggestion->host}", $summary);
                 $count++;
             });
@@ -375,6 +418,8 @@ class CommunityAutomationService
                     'helpful_weight' => round($helpful, 4),
                     'unhelpful_weight' => round($unhelpful, 4),
                 ]);
+                $this->resolveTask('evidence_quality_review', "evidence:{$evidence->id}");
+                $this->rewardAcceptedSignalContributors('evidence_quality_review', 'evidence_unhelpful', "vote:{$vote->id}", ['unhelpful', 'confirm_evidence_unhelpful'], "確認證據品質 #{$evidence->id}");
                 $count++;
             });
 

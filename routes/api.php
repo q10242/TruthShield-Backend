@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\OpenApiController;
 use App\Http\Controllers\Api\OfficialResponseController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ReadSessionController;
+use App\Http\Controllers\Api\ReaderReactionController;
 use App\Http\Controllers\Api\SystemHealthController;
 use App\Http\Controllers\Api\TransparencyController;
 use App\Http\Controllers\Api\TrafficEventController;
@@ -91,6 +92,8 @@ Route::post('/community/tasks', [CommunityTaskController::class, 'store'])->midd
 Route::get('/community/tasks/{task}', [CommunityTaskController::class, 'show']);
 Route::post('/community/tasks/{task}/signal', [CommunityTaskController::class, 'signal'])->middleware(['auth:sanctum', 'throttle:20,1']);
 Route::get('/news/status', [NewsController::class, 'status'])->middleware('throttle:hover');
+Route::get('/reactions/summary', [ReaderReactionController::class, 'summary'])->middleware('throttle:120,1');
+Route::post('/reactions', [ReaderReactionController::class, 'store'])->middleware(['auth:sanctum', 'throttle:20,1']);
 Route::post('/news/snapshot', [NewsSnapshotController::class, 'store'])->middleware('throttle:30,1');
 Route::post('/news/change-reports', [NewsChangeReportController::class, 'store'])->middleware('throttle:20,1');
 Route::get('/news/search', [NewsSearchController::class, 'index']);

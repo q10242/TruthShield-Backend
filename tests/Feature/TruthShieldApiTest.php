@@ -34,6 +34,7 @@ use App\Models\OfficialResponse;
 use App\Models\OfficialResponseReaction;
 use App\Models\OperationalEvent;
 use App\Models\RateLimitPolicy;
+use App\Models\ReaderReaction;
 use App\Models\SystemSetting;
 use App\Models\Tag;
 use App\Models\TrafficDailySummary;
@@ -350,6 +351,110 @@ class TruthShieldApiTest extends TestCase
             ->assertOk()
             ->assertJsonFragment(['field' => 'title'])
             ->assertJsonFragment(['after' => '衛福部說明護病比政策']);
+    }
+
+    public function test_reader_reactions_are_event_scoped_and_update_per_user(): void
+    {
+        $owner = User::factory()->create();
+        $user = User::factory()->create(['trust_score' => 2.0]);
+
+        $event = $this->actingAs($owner, 'sanctum')
+            ->postJson('/api/events', [
+                'name' => '同一事件多篇新聞',
+                'summary' => '測試同一事件底下的閱讀後反應聚合。',
+                'news_url' => 'https://news.example.test/a',
+                'title_snapshot' => '第一篇新聞',
+            ])
+            ->assertCreated()
+            ->json('data');
+
+        $this->actingAs($owner, 'sanctum')
+            ->postJson("/api/events/{$event['id']}/items", [
+                'item_type' => 'news',
+                'news_url' => 'https://news.example.test/b',
+                'title' => '第二篇新聞',
+            ])
+            ->assertCreated();
+
+        $this->app['auth']->forgetGuards();
+        $this->postJson('/api/reactions', [
+            'news_url' => 'https://news.example.test/a',
+            'event_id' => $event['id'],
+            'feelings' => ['confused'],
+            'needs' => ['timeline'],
+        ])->assertUnauthorized();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/reactions', [
+                'news_url' => 'https://news.example.test/a',
+                'event_id' => $event['id'],
+                'feelings' => ['confused'],
+                'needs' => ['timeline'],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('target.subject_type', ReaderReaction::SUBJECT_NEWS_EVENT);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/reactions', [
+                'news_url' => 'https://news.example.test/b',
+                'event_id' => $event['id'],
+                'feelings' => ['relieved'],
+                'needs' => ['official_info'],
+            ])
+            ->assertOk()
+            ->assertJsonPath('summary.total_users', 1)
+            ->assertJsonPath('summary.feelings.0.key', 'relieved')
+            ->assertJsonPath('summary.needs.0.key', 'official_info');
+
+        $this->assertSame(1, ReaderReaction::query()
+            ->where('subject_type', ReaderReaction::SUBJECT_NEWS_EVENT)
+            ->where('subject_id', $event['id'])
+            ->count());
+
+        $this->getJson("/api/reactions/summary?event_id={$event['id']}")
+            ->assertOk()
+            ->assertJsonPath('summary.total_users', 1)
+            ->assertJsonPath('summary.feelings.0.key', 'relieved')
+            ->assertJsonPath('summary.needs.0.key', 'official_info')
+            ->assertJsonFragment(['emoji' => '😌']);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/reactions', [
+                'news_url' => 'https://news.example.test/b',
+                'event_id' => $event['id'],
+                'feelings' => ['relieved', 'clear', 'thankful', 'credible'],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('feelings');
+    }
+
+    public function test_reader_reaction_needs_can_create_event_creation_task_for_isolated_news(): void
+    {
+        $url = 'https://isolated-news.example.test/story';
+        $users = User::factory()->count(3)->create(['trust_score' => 1.2]);
+
+        foreach ($users as $user) {
+            $this->actingAs($user, 'sanctum')
+                ->postJson('/api/reactions', [
+                    'news_url' => $url,
+                    'feelings' => ['confused'],
+                    'needs' => ['timeline'],
+                ])
+                ->assertCreated()
+                ->assertJsonPath('target.subject_type', ReaderReaction::SUBJECT_NEWS_URL);
+        }
+
+        $newsUrl = NewsUrl::query()
+            ->where('original_url', $url)
+            ->orWhere('normalized_url', $url)
+            ->firstOrFail();
+
+        $this->assertDatabaseHas((new CommunityTask)->getTable(), [
+            'type' => 'event_creation_request',
+            'subject_key' => "news:event-creation:{$newsUrl->id}",
+            'subject_type' => NewsUrl::class,
+            'status' => 'open',
+        ]);
     }
 
     public function test_relationship_requires_source_and_creates_review_task_for_high_risk_relation(): void

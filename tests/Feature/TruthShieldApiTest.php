@@ -1190,6 +1190,13 @@ class TruthShieldApiTest extends TestCase
             ->assertOk();
     }
 
+    public function test_authenticated_api_routes_return_json_unauthorized_without_json_accept_header(): void
+    {
+        $this->get('/api/me/profile')
+            ->assertUnauthorized()
+            ->assertJsonPath('message', 'Unauthenticated.');
+    }
+
     public function test_public_algorithm_docs_trust_leaderboard_news_detail_and_export_endpoints(): void
     {
         $this->seed(TagSeeder::class);

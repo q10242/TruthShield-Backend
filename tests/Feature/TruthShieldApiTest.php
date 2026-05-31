@@ -1194,6 +1194,12 @@ class TruthShieldApiTest extends TestCase
     {
         $this->get('/api/me/profile')
             ->assertUnauthorized()
+            ->assertHeader('content-type', 'application/json')
+            ->assertJsonPath('message', 'Unauthenticated.');
+
+        $this->get('/api/account-graph/summary')
+            ->assertUnauthorized()
+            ->assertHeader('content-type', 'application/json')
             ->assertJsonPath('message', 'Unauthenticated.');
     }
 

@@ -58,10 +58,6 @@ class ReaderReactionController extends Controller
             : null;
         $relatedEvents = $newsUrl ? $this->relatedEvents($newsUrl) : collect();
 
-        if (! $event && $relatedEvents->isNotEmpty()) {
-            $event = $relatedEvents->first();
-        }
-
         $target = $event
             ? ['subject_type' => ReaderReaction::SUBJECT_NEWS_EVENT, 'subject_id' => $event->id]
             : ($newsUrl ? ['subject_type' => ReaderReaction::SUBJECT_NEWS_URL, 'subject_id' => $newsUrl->id] : null);
@@ -115,8 +111,6 @@ class ReaderReactionController extends Controller
                     'errors' => ['event_id' => ['The selected event is not related to this news URL.']],
                 ], 422);
             }
-        } elseif ($relatedEvents->isNotEmpty()) {
-            $event = $relatedEvents->first();
         }
 
         $subjectType = $event ? ReaderReaction::SUBJECT_NEWS_EVENT : ReaderReaction::SUBJECT_NEWS_URL;

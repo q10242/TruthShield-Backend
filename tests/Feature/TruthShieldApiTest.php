@@ -428,6 +428,49 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonValidationErrors('feelings');
     }
 
+    public function test_reader_reaction_defaults_to_news_url_even_when_news_has_related_event(): void
+    {
+        $owner = User::factory()->create();
+        $user = User::factory()->create(['trust_score' => 1.5]);
+        $url = 'https://news.example.test/related-default-news';
+
+        $event = $this->actingAs($owner, 'sanctum')
+            ->postJson('/api/events', [
+                'name' => '有關聯事件的新聞',
+                'summary' => '測試新聞頁心情預設保留在單篇新聞。',
+                'news_url' => $url,
+                'title_snapshot' => '關聯新聞',
+            ])
+            ->assertCreated()
+            ->json('data');
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/reactions', [
+                'news_url' => $url,
+                'feelings' => ['clear'],
+                'needs' => ['official_info'],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('target.subject_type', ReaderReaction::SUBJECT_NEWS_URL);
+
+        $this->assertSame(0, ReaderReaction::query()
+            ->where('subject_type', ReaderReaction::SUBJECT_NEWS_EVENT)
+            ->where('subject_id', $event['id'])
+            ->count());
+
+        $this->getJson('/api/reactions/summary?news_url='.urlencode($url))
+            ->assertOk()
+            ->assertJsonPath('target.subject_type', ReaderReaction::SUBJECT_NEWS_URL)
+            ->assertJsonPath('summary.total_users', 1)
+            ->assertJsonPath('summary.feelings.0.key', 'clear');
+
+        $this->getJson("/api/reactions/summary?event_id={$event['id']}")
+            ->assertOk()
+            ->assertJsonPath('target.subject_type', ReaderReaction::SUBJECT_NEWS_EVENT)
+            ->assertJsonPath('summary.total_users', 1)
+            ->assertJsonPath('summary.feelings.0.key', 'clear');
+    }
+
     public function test_reader_reaction_needs_can_create_event_creation_task_for_isolated_news(): void
     {
         $url = 'https://isolated-news.example.test/story';

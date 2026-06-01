@@ -151,21 +151,21 @@ Route::post('/me/notifications/read-all', [NotificationController::class, 'markA
 Route::post('/me/notifications/{notification}/read', [NotificationController::class, 'markRead'])->middleware('auth:sanctum');
 Route::post('/news/read-session', [ReadSessionController::class, 'store'])->middleware(['auth:sanctum', 'throttle:60,1']);
 Route::post('/vote', [VoteController::class, 'store'])->middleware(['auth:sanctum', 'throttle:vote']);
-Route::post('/events', [EventController::class, 'store'])->middleware(['auth:sanctum', 'throttle:20,1']);
-Route::post('/global-entities', [GlobalEntityController::class, 'store'])->middleware(['auth:sanctum', 'throttle:20,1']);
-Route::post('/events/{event}/items', [EventController::class, 'storeItem'])->middleware(['auth:sanctum', 'throttle:30,1']);
-Route::post('/events/{event}/timeline', [EventController::class, 'storeTimeline'])->middleware(['auth:sanctum', 'throttle:30,1']);
-Route::patch('/events/{event}/timeline/{entry}', [EventController::class, 'updateTimeline'])->middleware(['auth:sanctum', 'throttle:30,1']);
-Route::delete('/events/{event}/timeline/{entry}', [EventController::class, 'deleteTimeline'])->middleware(['auth:sanctum', 'throttle:30,1']);
-Route::post('/events/{event}/entities', [EventController::class, 'storeEntity'])->middleware(['auth:sanctum', 'throttle:30,1']);
-Route::patch('/events/{event}/entities/{entity}', [EventController::class, 'updateEntity'])->middleware(['auth:sanctum', 'throttle:30,1']);
-Route::patch('/events/{event}/entities/{entity}/position', [EventController::class, 'updateEntityPosition'])->middleware(['auth:sanctum', 'throttle:120,1']);
-Route::delete('/events/{event}/entities/{entity}', [EventController::class, 'deleteEntity'])->middleware(['auth:sanctum', 'throttle:30,1']);
-Route::post('/events/{event}/entities/{entity}/merge', [EventController::class, 'mergeEntity'])->middleware(['auth:sanctum', 'throttle:20,1']);
-Route::post('/events/{event}/relationships', [EventController::class, 'storeRelationship'])->middleware(['auth:sanctum', 'throttle:30,1']);
-Route::patch('/events/{event}/relationships/{relationship}', [EventController::class, 'updateRelationship'])->middleware(['auth:sanctum', 'throttle:30,1']);
-Route::delete('/events/{event}/relationships/{relationship}', [EventController::class, 'deleteRelationship'])->middleware(['auth:sanctum', 'throttle:30,1']);
-Route::post('/events/{event}/edit-logs/{log}/rollback', [EventController::class, 'rollback'])->middleware(['auth:sanctum', 'throttle:10,1']);
+Route::post('/events', [EventController::class, 'store'])->middleware(['auth:sanctum', 'event.trust', 'throttle:20,1']);
+Route::post('/global-entities', [GlobalEntityController::class, 'store'])->middleware(['auth:sanctum', 'event.trust', 'throttle:20,1']);
+Route::post('/events/{event}/items', [EventController::class, 'storeItem'])->middleware(['auth:sanctum', 'event.trust', 'throttle:30,1']);
+Route::post('/events/{event}/timeline', [EventController::class, 'storeTimeline'])->middleware(['auth:sanctum', 'event.trust', 'throttle:30,1']);
+Route::patch('/events/{event}/timeline/{entry}', [EventController::class, 'updateTimeline'])->middleware(['auth:sanctum', 'event.trust', 'throttle:30,1']);
+Route::delete('/events/{event}/timeline/{entry}', [EventController::class, 'deleteTimeline'])->middleware(['auth:sanctum', 'event.trust', 'throttle:30,1']);
+Route::post('/events/{event}/entities', [EventController::class, 'storeEntity'])->middleware(['auth:sanctum', 'event.trust', 'throttle:30,1']);
+Route::patch('/events/{event}/entities/{entity}', [EventController::class, 'updateEntity'])->middleware(['auth:sanctum', 'event.trust', 'throttle:30,1']);
+Route::patch('/events/{event}/entities/{entity}/position', [EventController::class, 'updateEntityPosition'])->middleware(['auth:sanctum', 'event.trust', 'throttle:120,1']);
+Route::delete('/events/{event}/entities/{entity}', [EventController::class, 'deleteEntity'])->middleware(['auth:sanctum', 'event.trust', 'throttle:30,1']);
+Route::post('/events/{event}/entities/{entity}/merge', [EventController::class, 'mergeEntity'])->middleware(['auth:sanctum', 'event.trust', 'throttle:20,1']);
+Route::post('/events/{event}/relationships', [EventController::class, 'storeRelationship'])->middleware(['auth:sanctum', 'event.trust', 'throttle:30,1']);
+Route::patch('/events/{event}/relationships/{relationship}', [EventController::class, 'updateRelationship'])->middleware(['auth:sanctum', 'event.trust', 'throttle:30,1']);
+Route::delete('/events/{event}/relationships/{relationship}', [EventController::class, 'deleteRelationship'])->middleware(['auth:sanctum', 'event.trust', 'throttle:30,1']);
+Route::post('/events/{event}/edit-logs/{log}/rollback', [EventController::class, 'rollback'])->middleware(['auth:sanctum', 'event.trust', 'throttle:10,1']);
 Route::post('/evidence/{vote}/reaction', [EvidenceController::class, 'react'])->middleware(['auth:sanctum', 'throttle:reaction']);
 Route::post('/evidence/{vote}/report', [EvidenceController::class, 'report'])->middleware(['auth:sanctum', 'throttle:10,1']);
 Route::post('/admin/evidences/{evidence}/hide', [AdminGovernanceController::class, 'hideEvidence'])->middleware('auth:sanctum');
@@ -184,6 +184,8 @@ Route::get('/user', function (Request $request, TrustScoreService $trustScores) 
         ...$user->toArray(),
         'can_react_to_evidence' => $trustScores->canReactToEvidence($user),
         'evidence_reaction_min_trust_score' => $trustScores->evidenceReactionMinTrustScore(),
+        'can_use_event_system' => $user->is_admin || (float) ($user->trust_score ?? 1.0) >= (float) config('truthshield.event_system_min_trust_score', 1.0),
+        'event_system_min_trust_score' => (float) config('truthshield.event_system_min_trust_score', 1.0),
         'min_read_seconds_before_vote' => (int) config('truthshield.min_read_seconds_before_vote', 15),
     ];
 })->middleware('auth:sanctum');

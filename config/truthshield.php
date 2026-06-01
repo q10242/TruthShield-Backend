@@ -6,6 +6,7 @@ return [
     'dev_login_enabled' => (bool) env('TRUTHSHIELD_DEV_LOGIN_ENABLED', env('APP_ENV') !== 'production'),
 
     'evidence_reaction_min_trust_score' => (float) env('TRUTHSHIELD_EVIDENCE_REACTION_MIN_TRUST_SCORE', 0.5),
+    'event_system_min_trust_score' => (float) env('TRUTHSHIELD_EVENT_SYSTEM_MIN_TRUST_SCORE', 1.0),
     'low_trust_vote_cap' => (float) env('TRUTHSHIELD_LOW_TRUST_VOTE_CAP', 0.25),
     'min_read_seconds_before_vote' => (int) env('TRUTHSHIELD_MIN_READ_SECONDS_BEFORE_VOTE', 15),
     'evidence_snapshot_max_bytes' => (int) env('TRUTHSHIELD_EVIDENCE_SNAPSHOT_MAX_BYTES', 5_242_880),

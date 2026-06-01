@@ -353,6 +353,32 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonFragment(['after' => '衛福部說明護病比政策']);
     }
 
+    public function test_low_trust_user_cannot_edit_event_system(): void
+    {
+        config(['truthshield.event_system_min_trust_score' => 1.0]);
+
+        $lowTrust = User::factory()->create(['trust_score' => 0.99]);
+        $admin = User::factory()->create(['trust_score' => 0.2, 'is_admin' => true]);
+
+        $this->actingAs($lowTrust, 'sanctum')
+            ->postJson('/api/events', [
+                'name' => '低信用事件',
+                'summary' => '這筆不應建立。',
+                'news_url' => 'https://news.example.test/low-trust-event',
+            ])
+            ->assertForbidden()
+            ->assertJsonPath('minimum_trust_score', 1)
+            ->assertJsonPath('trust_score', 0.99);
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/events', [
+                'name' => '管理員事件',
+                'summary' => '管理員低分仍可處理治理工作。',
+                'news_url' => 'https://news.example.test/admin-event',
+            ])
+            ->assertCreated();
+    }
+
     public function test_reader_reactions_are_event_scoped_and_update_per_user(): void
     {
         $owner = User::factory()->create();
@@ -1045,7 +1071,10 @@ class TruthShieldApiTest extends TestCase
 
     public function test_user_response_includes_evidence_reaction_permission(): void
     {
-        config(['truthshield.evidence_reaction_min_trust_score' => 0.5]);
+        config([
+            'truthshield.evidence_reaction_min_trust_score' => 0.5,
+            'truthshield.event_system_min_trust_score' => 1.0,
+        ]);
 
         $user = User::factory()->create(['trust_score' => 0.49]);
 
@@ -1054,6 +1083,8 @@ class TruthShieldApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('can_react_to_evidence', false)
             ->assertJsonPath('evidence_reaction_min_trust_score', 0.5)
+            ->assertJsonPath('can_use_event_system', false)
+            ->assertJsonPath('event_system_min_trust_score', 1)
             ->assertJsonStructure(['min_read_seconds_before_vote']);
     }
 

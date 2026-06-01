@@ -100,6 +100,7 @@ class AlgorithmController extends Controller
             ],
             'config' => [
                 'evidence_reaction_min_trust_score' => config('truthshield.evidence_reaction_min_trust_score'),
+                'event_system_min_trust_score' => config('truthshield.event_system_min_trust_score'),
                 'low_trust_vote_cap' => config('truthshield.low_trust_vote_cap'),
                 'algorithm_version' => config('truthshield.algorithm_version', 'truthshield-v1'),
             ],

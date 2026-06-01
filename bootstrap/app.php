@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use App\Http\Middleware\EnsureEventSystemTrust;
 use App\Http\Middleware\LocalAdminWebAuth;
 use App\Http\Middleware\RecordTrafficEvent;
 use Illuminate\Auth\AuthenticationException;
@@ -39,6 +40,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->appendToGroup('api', [
             RecordTrafficEvent::class,
+        ]);
+
+        $middleware->alias([
+            'event.trust' => EnsureEventSystemTrust::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

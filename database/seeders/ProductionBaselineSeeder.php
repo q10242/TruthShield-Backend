@@ -10,6 +10,7 @@ use App\Models\RateLimitPolicy;
 use App\Models\SystemSetting;
 use App\Models\TrustedEvidenceSource;
 use App\Models\YoutubeChannel;
+use App\Services\AchievementService;
 use App\Support\ExtensionSelectorFixtures;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
@@ -34,23 +35,22 @@ class ProductionBaselineSeeder extends Seeder
 
     private function seedBadges(): void
     {
-        foreach ([
-            ['name' => '早期查證者', 'slug' => 'early-verifier', 'description' => '完成第一批新聞查證貢獻。', 'color' => '#67e8f9'],
-            ['name' => '證據策展者', 'slug' => 'evidence-curator', 'description' => '提交的證據多次被標為有用。', 'color' => '#86efac'],
-            ['name' => '逆風觀察者', 'slug' => 'contrarian-scout', 'description' => '在定案前提出少數但有價值的判斷。', 'color' => '#fbbf24'],
-            ['name' => '第一面盾', 'slug' => 'first-shield', 'description' => '完成第一筆新聞投票。', 'color' => '#67e8f9'],
-            ['name' => '穩定查證者', 'slug' => 'steady-reviewer', 'description' => '完成 10 筆新聞查證。', 'color' => '#38bdf8'],
-            ['name' => '證據提供者', 'slug' => 'evidence-supplier', 'description' => '提交第一筆外部證據。', 'color' => '#86efac'],
-            ['name' => '證據審閱員', 'slug' => 'evidence-rater', 'description' => '完成 5 次證據有用/沒幫助評分。', 'color' => '#c4b5fd'],
-            ['name' => '閱讀紀律', 'slug' => 'reading-discipline', 'description' => '累積 5 篇新聞閱讀紀錄。', 'color' => '#facc15'],
-            ['name' => '信用成長', 'slug' => 'trust-growth', 'description' => '累積 3 筆信用分歷史。', 'color' => '#fb7185'],
-            ['name' => '護盾支持者', 'slug' => 'shield-supporter', 'description' => '完成第一筆專案捐款支持。', 'color' => '#f0abfc'],
-            ['name' => '快照守門員', 'slug' => 'snapshot-guardian', 'description' => '回報第一筆新聞改稿、刪文或存證需求。', 'color' => '#f97316'],
-            ['name' => '媒體觀察員', 'slug' => 'media-watchkeeper', 'description' => '參與過至少 5 筆具快照紀錄的新聞。', 'color' => '#a78bfa'],
-            ['name' => '新聞站維護者', 'slug' => 'domain-maintainer', 'description' => '協助確認新聞站收錄與分類規則。', 'color' => '#2dd4bf'],
-            ['name' => '濫用觀察員', 'slug' => 'abuse-observer', 'description' => '協助辨識異常投票與協同行為。', 'color' => '#fb923c'],
-            ['name' => '可信審查者', 'slug' => 'trusted-reviewer', 'description' => '長期提供高品質查證與證據評價。', 'color' => '#60a5fa'],
-        ] as $badge) {
+        $badges = collect(app(AchievementService::class)->definitions())
+            ->map(fn (array $definition): array => [
+                'name' => $definition['name'],
+                'slug' => $definition['slug'],
+                'description' => $definition['description'],
+                'color' => $definition['color'],
+            ])
+            ->merge([
+                ['name' => '逆風觀察者', 'slug' => 'contrarian-scout', 'description' => '在定案前提出少數但有價值的判斷。', 'color' => '#fbbf24'],
+                ['name' => '濫用觀察員', 'slug' => 'abuse-observer', 'description' => '協助辨識異常投票與協同行為。', 'color' => '#fb923c'],
+                ['name' => '可信審查者', 'slug' => 'trusted-reviewer', 'description' => '長期提供高品質查證與證據評價。', 'color' => '#60a5fa'],
+            ])
+            ->unique('slug')
+            ->values();
+
+        foreach ($badges as $badge) {
             Badge::query()->updateOrCreate(['slug' => $badge['slug']], $badge);
         }
     }

@@ -16,6 +16,7 @@ use App\Models\NewsUrl;
 use App\Models\OfficialResponse;
 use App\Models\TrustedEvidenceSource;
 use App\Services\UrlFingerprintService;
+use App\Support\EventTaxonomy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -38,12 +39,26 @@ class EventController extends Controller
         '指控',
     ];
 
+    public function options(Request $request): JsonResponse
+    {
+        $locale = $this->locale($request);
+
+        return response()->json([
+            'primary_categories' => EventTaxonomy::categoryOptions($locale),
+            'tags' => EventTaxonomy::tagOptions($locale),
+            'progress_statuses' => EventTaxonomy::progressStatusOptions($locale),
+        ]);
+    }
+
     public function index(Request $request, UrlFingerprintService $fingerprints): JsonResponse
     {
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:120'],
             'news_url' => ['nullable', 'url', 'max:4096'],
             'status' => ['nullable', 'string', 'max:40'],
+            'primary_category' => ['nullable', 'string', Rule::in(EventTaxonomy::categoryKeys())],
+            'tag' => ['nullable', 'string', Rule::in(EventTaxonomy::tagKeys())],
+            'progress_status' => ['nullable', 'string', Rule::in(EventTaxonomy::progressStatusKeys())],
             'sort' => ['nullable', 'string', Rule::in(['updated', 'created', 'views', 'recent'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'page' => ['nullable', 'integer', 'min:1'],
@@ -81,7 +96,10 @@ class EventController extends Controller
                         ->orWhereHas('items.newsUrl', fn ($news) => $news->where('title_snapshot', 'ilike', "%{$q}%"));
                 });
             })
-            ->where('status', $validated['status'] ?? 'active');
+            ->where('status', $validated['status'] ?? 'active')
+            ->when($validated['primary_category'] ?? null, fn ($builder, string $category) => $builder->where('primary_category', $category))
+            ->when($validated['tag'] ?? null, fn ($builder, string $tag) => $builder->whereJsonContains('tags', $tag))
+            ->when($validated['progress_status'] ?? null, fn ($builder, string $progressStatus) => $builder->where('progress_status', $progressStatus));
 
         match ($validated['sort'] ?? 'updated') {
             'created' => $query->latest(),
@@ -114,6 +132,10 @@ class EventController extends Controller
             'summary' => ['nullable', 'string', 'max:2000'],
             'news_url' => ['required', 'url', 'max:4096'],
             'title_snapshot' => ['nullable', 'string', 'max:255'],
+            'primary_category' => ['nullable', 'string', Rule::in(EventTaxonomy::categoryKeys())],
+            'tags' => ['nullable', 'array', 'max:5'],
+            'tags.*' => ['string', Rule::in(EventTaxonomy::tagKeys())],
+            'progress_status' => ['nullable', 'string', Rule::in(EventTaxonomy::progressStatusKeys())],
         ]);
 
         try {
@@ -129,6 +151,9 @@ class EventController extends Controller
                 'name' => $validated['name'],
                 'slug' => $this->uniqueSlug($validated['name']),
                 'summary' => $validated['summary'] ?? null,
+                'primary_category' => $validated['primary_category'] ?? null,
+                'tags' => $this->normalizeTags($validated['tags'] ?? []),
+                'progress_status' => $validated['progress_status'] ?? 'collecting',
                 'last_activity_at' => now(),
             ]);
 
@@ -145,6 +170,34 @@ class EventController extends Controller
         });
 
         return response()->json($this->showPayload($event->fresh()), 201);
+    }
+
+    public function update(Request $request, NewsEvent $event): JsonResponse
+    {
+        $validated = $request->validate([
+            'primary_category' => ['nullable', 'string', Rule::in(EventTaxonomy::categoryKeys())],
+            'tags' => ['nullable', 'array', 'max:5'],
+            'tags.*' => ['string', Rule::in(EventTaxonomy::tagKeys())],
+            'progress_status' => ['nullable', 'string', Rule::in(EventTaxonomy::progressStatusKeys())],
+        ]);
+
+        $before = $event->toArray();
+        $event->forceFill([
+            'primary_category' => array_key_exists('primary_category', $validated) ? ($validated['primary_category'] ?: null) : $event->primary_category,
+            'tags' => array_key_exists('tags', $validated) ? $this->normalizeTags($validated['tags'] ?? []) : ($event->tags ?? []),
+            'progress_status' => $validated['progress_status'] ?? $event->progress_status ?? 'collecting',
+            'last_activity_at' => now(),
+        ])->save();
+
+        $fresh = $event->fresh();
+        $this->logEdit($event, $request, 'updated', $fresh, $before, $fresh->toArray(), 'Updated event category, tags, or progress status.');
+        $this->recordModerationEvent($fresh, $request, 'event.metadata_updated', "事件「{$fresh->name}」更新分類、標籤或進度狀態。", [
+            'primary_category' => $fresh->primary_category,
+            'tags' => $fresh->tags ?? [],
+            'progress_status' => $fresh->progress_status,
+        ]);
+
+        return response()->json($this->showPayload($fresh));
     }
 
     public function show(Request $request, NewsEvent $event): JsonResponse
@@ -703,7 +756,7 @@ class EventController extends Controller
         $source = $after ?: $before;
 
         $fields = match ($log->subject_type) {
-            'NewsEvent' => ['name', 'summary', 'status', 'is_disputed'],
+            'NewsEvent' => ['name', 'summary', 'primary_category', 'tags', 'progress_status', 'status', 'is_disputed'],
             'NewsEventItem' => ['item_type', 'title', 'summary', 'source_url'],
             'NewsEventTimelineEntry' => ['title', 'summary', 'occurred_at', 'source_type', 'source_url'],
             'EventEntity' => ['name', 'entity_type', 'description', 'source_url'],
@@ -764,11 +817,24 @@ class EventController extends Controller
 
     private function eventPayload(NewsEvent $event): array
     {
+        $locale = $this->locale(request());
+        $tags = $event->tags ?? [];
+
         return [
             'id' => $event->id,
             'name' => $event->name,
             'slug' => $event->slug,
             'summary' => $event->summary,
+            'primary_category' => $event->primary_category,
+            'primary_category_label' => EventTaxonomy::categoryLabel($event->primary_category, $locale),
+            'tags' => $tags,
+            'tag_labels' => collect($tags)
+                ->map(fn (string $tag): ?string => EventTaxonomy::tagLabel($tag, $locale))
+                ->filter()
+                ->values()
+                ->all(),
+            'progress_status' => $event->progress_status ?? 'collecting',
+            'progress_status_label' => EventTaxonomy::progressStatusLabel($event->progress_status ?? 'collecting', $locale),
             'status' => $event->status,
             'is_disputed' => $event->is_disputed,
             'controversy_score' => $event->controversy_score,
@@ -818,6 +884,21 @@ class EventController extends Controller
                 'source_url' => $newsUrl->normalized_url,
             ],
         );
+    }
+
+    private function normalizeTags(array $tags): array
+    {
+        return collect($tags)
+            ->filter(fn ($tag): bool => is_string($tag) && in_array($tag, EventTaxonomy::tagKeys(), true))
+            ->unique()
+            ->take(5)
+            ->values()
+            ->all();
+    }
+
+    private function locale(Request $request): string
+    {
+        return $request->getPreferredLanguage(['zh-TW', 'zh', 'en']) ?? 'zh';
     }
 
     private function uniqueSlug(string $name): string

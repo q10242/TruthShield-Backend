@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\NewsEvent;
+use App\Support\EventTaxonomy;
 use Illuminate\Http\Response;
 use Illuminate\Support\Str;
 
@@ -90,7 +91,7 @@ class SharePreviewController extends Controller
 
         $font = $this->fontPath();
         $this->text($image, 'TruthShield 真相護盾', 92, 134, 31, $cyan, $font);
-        $this->text($image, '事件脈絡', 92, 184, 24, $emerald, $font);
+        $this->text($image, $this->eventMetaLabel($event), 92, 184, 24, $emerald, $font);
 
         $y = 280;
         foreach ($this->wrap($event->name, 15, 2) as $lineText) {
@@ -132,11 +133,20 @@ class SharePreviewController extends Controller
     private function eventDescription(NewsEvent $event): string
     {
         $summary = trim((string) $event->summary);
+        $meta = $this->eventMetaLabel($event);
         if ($summary !== '') {
-            return Str::limit(strip_tags($summary), 140);
+            return Str::limit($meta.' · '.strip_tags($summary), 140);
         }
 
-        return "這個事件目前整理了 {$event->items_count} 筆資料、{$event->timeline_entries_count} 個時間線節點與 {$event->relationships_count} 條人物/組織關係。";
+        return "{$meta} · 這個事件目前整理了 {$event->items_count} 筆資料、{$event->timeline_entries_count} 個時間線節點與 {$event->relationships_count} 條人物/組織關係。";
+    }
+
+    private function eventMetaLabel(NewsEvent $event): string
+    {
+        return collect([
+            EventTaxonomy::categoryLabel($event->primary_category, 'zh'),
+            EventTaxonomy::progressStatusLabel($event->progress_status ?? 'collecting', 'zh'),
+        ])->filter()->join(' · ') ?: '事件脈絡';
     }
 
     private function frontendUrl(string $path): string

@@ -9,6 +9,7 @@ use App\Models\NewsUrl;
 use App\Models\ReaderReaction;
 use App\Services\TrustScoreService;
 use App\Services\UrlFingerprintService;
+use App\Support\EventTaxonomy;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,6 +29,8 @@ class ReaderReactionController extends Controller
         'skeptical' => ['emoji' => '🤨', 'label' => '懷疑'],
         'misled' => ['emoji' => '⚠️', 'label' => '覺得被誤導'],
         'relieved' => ['emoji' => '😌', 'label' => '安心'],
+        'happy' => ['emoji' => '😊', 'label' => '看了開心'],
+        'indifferent' => ['emoji' => '😐', 'label' => '無所謂'],
         'clear' => ['emoji' => '🙂', 'label' => '覺得清楚'],
         'thankful' => ['emoji' => '🙏', 'label' => '感謝補充'],
         'insightful' => ['emoji' => '💡', 'label' => '有收穫'],
@@ -335,16 +338,32 @@ class ReaderReactionController extends Controller
 
     private function eventPayload(NewsEvent $event): array
     {
+        $locale = $this->locale(request());
+
         return [
             'id' => $event->id,
             'name' => $event->name,
             'summary' => $event->summary,
+            'primary_category' => $event->primary_category,
+            'primary_category_label' => EventTaxonomy::categoryLabel($event->primary_category, $locale),
+            'tags' => $event->tags ?? [],
+            'tag_labels' => collect($event->tags ?? [])
+                ->map(fn (string $tag): string => EventTaxonomy::tagLabel($tag, $locale) ?? $tag)
+                ->values()
+                ->all(),
+            'progress_status' => $event->progress_status,
+            'progress_status_label' => EventTaxonomy::progressStatusLabel($event->progress_status, $locale),
             'counts' => [
                 'items' => $event->items_count ?? null,
                 'timeline' => $event->timeline_entries_count ?? null,
                 'relationships' => $event->relationships_count ?? null,
             ],
         ];
+    }
+
+    private function locale(Request $request): string
+    {
+        return str_starts_with(strtolower($request->header('Accept-Language', 'zh-TW')), 'en') ? 'en' : 'zh-TW';
     }
 
     private function optionalUser(Request $request)

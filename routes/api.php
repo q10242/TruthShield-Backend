@@ -100,6 +100,7 @@ Route::get('/news/search', [NewsSearchController::class, 'index']);
 Route::get('/news/evidence', [EvidenceController::class, 'index']);
 Route::get('/news/official-responses', [OfficialResponseController::class, 'index']);
 Route::get('/news/by-id/{newsUrl}', [NewsDetailController::class, 'show']);
+Route::get('/events/options', [EventController::class, 'options']);
 Route::get('/events', [EventController::class, 'index']);
 Route::get('/events/{event}', [EventController::class, 'show']);
 Route::get('/events/{event}/timeline', [EventController::class, 'timeline']);
@@ -152,6 +153,7 @@ Route::post('/me/notifications/{notification}/read', [NotificationController::cl
 Route::post('/news/read-session', [ReadSessionController::class, 'store'])->middleware(['auth:sanctum', 'throttle:60,1']);
 Route::post('/vote', [VoteController::class, 'store'])->middleware(['auth:sanctum', 'throttle:vote']);
 Route::post('/events', [EventController::class, 'store'])->middleware(['auth:sanctum', 'event.trust', 'throttle:20,1']);
+Route::patch('/events/{event}', [EventController::class, 'update'])->middleware(['auth:sanctum', 'event.trust', 'throttle:20,1']);
 Route::post('/global-entities', [GlobalEntityController::class, 'store'])->middleware(['auth:sanctum', 'event.trust', 'throttle:20,1']);
 Route::post('/events/{event}/items', [EventController::class, 'storeItem'])->middleware(['auth:sanctum', 'event.trust', 'throttle:30,1']);
 Route::post('/events/{event}/timeline', [EventController::class, 'storeTimeline'])->middleware(['auth:sanctum', 'event.trust', 'throttle:30,1']);

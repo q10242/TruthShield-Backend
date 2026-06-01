@@ -442,7 +442,9 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonPath('summary.total_users', 1)
             ->assertJsonPath('summary.feelings.0.key', 'relieved')
             ->assertJsonPath('summary.needs.0.key', 'official_info')
-            ->assertJsonFragment(['emoji' => '😌']);
+            ->assertJsonFragment(['emoji' => '😌'])
+            ->assertJsonFragment(['key' => 'happy', 'emoji' => '😊', 'label' => '看了開心'])
+            ->assertJsonFragment(['key' => 'indifferent', 'emoji' => '😐', 'label' => '無所謂']);
 
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/reactions', [

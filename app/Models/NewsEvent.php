@@ -17,6 +17,9 @@ class NewsEvent extends Model
         'name',
         'slug',
         'summary',
+        'primary_category',
+        'tags',
+        'progress_status',
         'status',
         'is_disputed',
         'controversy_score',
@@ -30,6 +33,7 @@ class NewsEvent extends Model
     {
         return [
             'is_disputed' => 'boolean',
+            'tags' => 'array',
             'controversy_score' => 'integer',
             'view_count' => 'integer',
             'last_activity_at' => 'datetime',

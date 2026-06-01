@@ -4,12 +4,17 @@ RUN apk add --no-cache \
     bash \
     curl \
     git \
+    freetype-dev \
     icu-dev \
+    libjpeg-turbo-dev \
+    libpng-dev \
     libzip-dev \
+    font-noto-cjk \
     oniguruma-dev \
     postgresql-dev \
     unzip \
-  && docker-php-ext-install intl mbstring pcntl pdo_pgsql zip
+  && docker-php-ext-configure gd --with-freetype --with-jpeg \
+  && docker-php-ext-install gd intl mbstring pcntl pdo_pgsql zip
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 

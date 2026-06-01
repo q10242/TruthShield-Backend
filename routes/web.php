@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Http\Controllers\SharePreviewController;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Support\Facades\Auth;
@@ -10,6 +11,9 @@ use Illuminate\Session\Middleware\StartSession;
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::get('/share/events/{event}', [SharePreviewController::class, 'event']);
+Route::get('/share/events/{event}/image.png', [SharePreviewController::class, 'eventImage']);
 
 Route::get('/admin/local-login', function () {
     abort_unless(app()->environment('local'), 404);

@@ -42,6 +42,15 @@ class NewsEvent extends Model
         ];
     }
 
+    public function resolveRouteBinding($value, $field = null): ?self
+    {
+        $query = $this->newQuery();
+
+        return ctype_digit((string) $value)
+            ? $query->whereKey($value)->first()
+            : $query->where('slug', $value)->first();
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

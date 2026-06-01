@@ -72,6 +72,27 @@ class EventTaxonomyTest extends TestCase
             ->assertJsonValidationErrors(['primary_category', 'tags.1', 'progress_status']);
     }
 
+    public function test_event_routes_resolve_by_slug_for_public_sharing(): void
+    {
+        $event = NewsEvent::query()->create([
+            'name' => '事件分享測試',
+            'slug' => 'event-share-slug',
+            'summary' => '測試事件 slug 是否能提供公開 API 與社群預覽。',
+            'primary_category' => 'public_policy',
+            'progress_status' => 'tracking',
+            'last_activity_at' => now(),
+        ]);
+
+        $this->getJson('/api/events/event-share-slug')
+            ->assertOk()
+            ->assertJsonPath('data.id', $event->id);
+
+        $this->get('/share/events/event-share-slug')
+            ->assertOk()
+            ->assertSee('事件分享測試 | TruthShield 真相護盾', false)
+            ->assertSee('/events/'.$event->id, false);
+    }
+
     public function test_high_trust_user_can_update_event_taxonomy_and_logs_change(): void
     {
         $user = User::factory()->create(['trust_score' => 2.0]);

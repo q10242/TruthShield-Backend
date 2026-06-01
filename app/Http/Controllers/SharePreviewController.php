@@ -89,19 +89,19 @@ class SharePreviewController extends Controller
         imagefilledellipse($image, 1090, 520, 200, 200, $this->color($image, '#064e3b'));
 
         $font = $this->fontPath();
-        $this->text($image, 'TruthShield 真相護盾', 92, 132, 25, $cyan, $font);
-        $this->text($image, '事件脈絡', 92, 178, 20, $emerald, $font);
+        $this->text($image, 'TruthShield 真相護盾', 92, 134, 31, $cyan, $font);
+        $this->text($image, '事件脈絡', 92, 184, 24, $emerald, $font);
 
-        $y = 270;
-        foreach ($this->wrap($event->name, 18, 3) as $lineText) {
-            $this->text($image, $lineText, 92, $y, 43, $white, $font);
-            $y += 62;
+        $y = 280;
+        foreach ($this->wrap($event->name, 15, 2) as $lineText) {
+            $this->text($image, $lineText, 92, $y, 58, $white, $font);
+            $y += 78;
         }
 
         $summary = $this->eventDescription($event);
         $y += 14;
-        foreach ($this->wrap($summary, 34, 2) as $lineText) {
-            $this->text($image, $lineText, 92, $y, 22, $muted, $font);
+        foreach ($this->wrap($summary, 32, 2) as $lineText) {
+            $this->text($image, $lineText, 92, $y, 24, $muted, $font);
             $y += 34;
         }
 
@@ -173,6 +173,8 @@ class SharePreviewController extends Controller
     private function fontPath(): ?string
     {
         $candidates = [
+            '/usr/share/fonts/noto/NotoSansCJK-Regular.ttc',
+            '/usr/share/fonts/noto/NotoSansCJK-Bold.ttc',
             '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc',
             '/usr/share/fonts/noto-cjk/NotoSansCJKtc-Regular.otf',
             '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
@@ -191,12 +193,11 @@ class SharePreviewController extends Controller
 
     private function text($image, string $text, int $x, int $y, int $size, int $color, ?string $font): void
     {
-        if ($font && function_exists('imagettftext')) {
-            imagettftext($image, $size, 0, $x, $y, $color, $font, $text);
-            return;
+        if (! $font || ! function_exists('imagettftext')) {
+            throw new \RuntimeException('A TrueType CJK font is required to render share preview text.');
         }
 
-        imagestring($image, 5, $x, $y - 16, $text, $color);
+        imagettftext($image, $size, 0, $x, $y, $color, $font, $text);
     }
 
     /**

@@ -46,9 +46,12 @@ class NewsEvent extends Model
     {
         $query = $this->newQuery();
 
-        return ctype_digit((string) $value)
-            ? $query->whereKey($value)->first()
-            : $query->where('slug', $value)->first();
+        if (ctype_digit((string) $value)) {
+            return $query->whereKey($value)->first()
+                ?? $this->newQuery()->where('slug', $value)->first();
+        }
+
+        return $query->where('slug', $value)->first();
     }
 
     public function creator(): BelongsTo

@@ -102,6 +102,27 @@ class EventTaxonomyTest extends TestCase
             ->assertSee('/events/'.$event->id, false);
     }
 
+    public function test_event_routes_resolve_numeric_slug_when_no_id_matches(): void
+    {
+        $event = NewsEvent::query()->create([
+            'name' => '數字 slug 事件',
+            'slug' => '2026125',
+            'summary' => '測試數字 slug 不會被主鍵綁定吃掉。',
+            'primary_category' => 'public_policy',
+            'progress_status' => 'tracking',
+            'last_activity_at' => now(),
+        ]);
+
+        $this->getJson('/api/events/2026125')
+            ->assertOk()
+            ->assertJsonPath('data.id', $event->id);
+
+        $this->get('/share/events/2026125')
+            ->assertOk()
+            ->assertSee('數字 slug 事件 | TruthShield 真相護盾', false)
+            ->assertSee('/events/'.$event->id, false);
+    }
+
     public function test_high_trust_user_can_update_event_taxonomy_and_logs_change(): void
     {
         $user = User::factory()->create(['trust_score' => 2.0]);

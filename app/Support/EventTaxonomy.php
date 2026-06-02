@@ -33,6 +33,12 @@ class EventTaxonomy
         'education' => ['zh' => '教育', 'en' => 'Education'],
         'housing' => ['zh' => '居住', 'en' => 'Housing'],
         'environment' => ['zh' => '環境', 'en' => 'Environment'],
+        'corruption' => ['zh' => '貪腐廉政', 'en' => 'Corruption and integrity'],
+        'procurement' => ['zh' => '採購標案', 'en' => 'Procurement'],
+        'public_construction' => ['zh' => '公共工程', 'en' => 'Public construction'],
+        'local_politics' => ['zh' => '地方政治', 'en' => 'Local politics'],
+        'energy' => ['zh' => '能源', 'en' => 'Energy'],
+        'nuclear_safety' => ['zh' => '核能安全', 'en' => 'Nuclear safety'],
     ];
 
     public const PROGRESS_STATUSES = [

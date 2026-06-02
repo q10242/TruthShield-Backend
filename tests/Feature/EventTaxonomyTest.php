@@ -18,11 +18,18 @@ class EventTaxonomyTest extends TestCase
 
     public function test_event_options_endpoint_returns_fixed_taxonomy(): void
     {
-        $this->getJson('/api/events/options')
+        $this->withHeader('Accept-Language', 'zh-TW')
+            ->getJson('/api/events/options')
             ->assertOk()
             ->assertJsonPath('primary_categories.0.value', 'social_case')
             ->assertJsonPath('tags.0.value', 'children')
-            ->assertJsonPath('progress_statuses.0.value', 'collecting');
+            ->assertJsonPath('progress_statuses.0.value', 'collecting')
+            ->assertJsonFragment(['value' => 'corruption', 'label' => '貪腐廉政'])
+            ->assertJsonFragment(['value' => 'procurement', 'label' => '採購標案'])
+            ->assertJsonFragment(['value' => 'public_construction', 'label' => '公共工程'])
+            ->assertJsonFragment(['value' => 'local_politics', 'label' => '地方政治'])
+            ->assertJsonFragment(['value' => 'energy', 'label' => '能源'])
+            ->assertJsonFragment(['value' => 'nuclear_safety', 'label' => '核能安全']);
     }
 
     public function test_user_can_create_event_with_category_tags_and_progress_status(): void
@@ -36,7 +43,7 @@ class EventTaxonomyTest extends TestCase
                 'summary' => '整理事件前因後果與修法結果。',
                 'news_url' => 'https://news.example.test/kai-kai',
                 'primary_category' => 'social_case',
-                'tags' => ['children', 'law_reform'],
+                'tags' => ['children', 'law_reform', 'public_construction'],
                 'progress_status' => 'tracking',
             ])
             ->assertCreated()
@@ -44,6 +51,7 @@ class EventTaxonomyTest extends TestCase
             ->assertJsonPath('data.primary_category_label', '社會案件')
             ->assertJsonPath('data.tags.0', 'children')
             ->assertJsonPath('data.tag_labels.1', '修法')
+            ->assertJsonPath('data.tag_labels.2', '公共工程')
             ->assertJsonPath('data.progress_status', 'tracking')
             ->assertJsonPath('data.progress_status_label', '持續追蹤')
             ->json('data');

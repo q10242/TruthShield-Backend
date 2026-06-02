@@ -18,6 +18,7 @@ use App\Models\Vote;
 use App\Services\AlgorithmVersionService;
 use App\Services\CommunityAutomationService;
 use App\Services\EvidenceSyncService;
+use App\Services\EventMaintenanceService;
 use App\Services\NewsAggregationService;
 use App\Services\TrafficAnalyticsService;
 use App\Services\TransactionalEmailService;
@@ -121,6 +122,12 @@ Artisan::command('truthshield:run-community-automation', function (CommunityAuto
         $this->line("{$key}: {$value}");
     }
 })->purpose('Apply low-risk community consensus and refresh community task queues.');
+
+Artisan::command('truthshield:maintain-events {task} {--execute}', function (EventMaintenanceService $maintenance) {
+    $result = $maintenance->run((string) $this->argument('task'), (bool) $this->option('execute'));
+
+    $this->line(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+})->purpose('Run controlled TruthShield event maintenance tasks with public governance logs.');
 
 Artisan::command('truthshield:build-account-graph', function () {
     $edges = 0;

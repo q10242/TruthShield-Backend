@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\NewsEventResource;
 use App\Models\EventEditLog;
 use App\Models\ModerationEvent;
 use App\Models\NewsEvent;
@@ -123,6 +124,52 @@ class EventTaxonomyTest extends TestCase
         ]);
         $this->assertDatabaseHas((new ModerationEvent)->getTable(), [
             'event_type' => 'event.metadata_updated',
+            'subject_id' => $event->id,
+        ]);
+    }
+
+    public function test_admin_event_resource_records_public_governance_logs(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $event = NewsEvent::query()->create([
+            'name' => '後台治理紀錄',
+            'slug' => 'admin-governance-log',
+            'summary' => '後台更新前。',
+            'primary_category' => 'public_policy',
+            'tags' => ['law_reform'],
+            'progress_status' => 'tracking',
+            'status' => 'active',
+            'last_activity_at' => now(),
+        ]);
+
+        $before = $event->toArray();
+        $this->actingAs($admin);
+
+        $event->forceFill([
+            'tags' => ['law_reform', 'platform_governance'],
+            'progress_status' => 'disputed',
+            'is_disputed' => true,
+        ])->save();
+
+        NewsEventResource::recordAdminEventGovernance(
+            $event->fresh(),
+            $before,
+            'updated',
+            'event.admin_marked_disputed',
+            "管理台標記事件「{$event->name}」為需先求證。",
+            'Admin marked event as disputed while keeping it publicly visible.',
+        );
+
+        $this->assertDatabaseHas((new EventEditLog)->getTable(), [
+            'news_event_id' => $event->id,
+            'user_id' => $admin->id,
+            'action' => 'updated',
+            'subject_type' => 'NewsEvent',
+            'is_public' => true,
+        ]);
+        $this->assertDatabaseHas((new ModerationEvent)->getTable(), [
+            'user_id' => $admin->id,
+            'event_type' => 'event.admin_marked_disputed',
             'subject_id' => $event->id,
         ]);
     }

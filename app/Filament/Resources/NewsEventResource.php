@@ -3,6 +3,8 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\NewsEventResource\Pages;
+use App\Models\EventEditLog;
+use App\Models\ModerationEvent;
 use App\Models\NewsEvent;
 use App\Support\EventTaxonomy;
 use Filament\Forms;
@@ -75,19 +77,67 @@ class NewsEventResource extends Resource
                 Tables\Filters\TernaryFilter::make('is_disputed')->label('爭議'),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->using(function (NewsEvent $record, array $data): NewsEvent {
+                        $before = $record->toArray();
+
+                        $record->update($data);
+
+                        static::recordAdminEventGovernance(
+                            $record->fresh(),
+                            $before,
+                            'updated',
+                            'event.admin_updated',
+                            "管理台更新事件「{$record->name}」資料。",
+                            'Admin updated event metadata from Filament.',
+                        );
+
+                        return $record;
+                    }),
                 Tables\Actions\Action::make('markDisputed')
                     ->label('標記爭議')
                     ->color('warning')
                     ->icon('heroicon-o-exclamation-triangle')
                     ->visible(fn (NewsEvent $record): bool => ! $record->is_disputed)
-                    ->action(fn (NewsEvent $record): bool => $record->forceFill(['is_disputed' => true, 'status' => 'disputed'])->save()),
+                    ->action(function (NewsEvent $record): bool {
+                        $before = $record->toArray();
+                        $saved = $record->forceFill([
+                            'is_disputed' => true,
+                            'status' => 'active',
+                            'progress_status' => 'disputed',
+                        ])->save();
+
+                        static::recordAdminEventGovernance(
+                            $record->fresh(),
+                            $before,
+                            'updated',
+                            'event.admin_marked_disputed',
+                            "管理台標記事件「{$record->name}」為需先求證。",
+                            'Admin marked event as disputed while keeping it publicly visible.',
+                        );
+
+                        return $saved;
+                    }),
                 Tables\Actions\Action::make('restoreActive')
                     ->label('恢復公開')
                     ->color('success')
                     ->icon('heroicon-o-check-circle')
                     ->visible(fn (NewsEvent $record): bool => $record->status !== 'active' || $record->is_disputed)
-                    ->action(fn (NewsEvent $record): bool => $record->forceFill(['is_disputed' => false, 'status' => 'active'])->save()),
+                    ->action(function (NewsEvent $record): bool {
+                        $before = $record->toArray();
+                        $saved = $record->forceFill(['is_disputed' => false, 'status' => 'active'])->save();
+
+                        static::recordAdminEventGovernance(
+                            $record->fresh(),
+                            $before,
+                            'updated',
+                            'event.admin_restored_active',
+                            "管理台恢復事件「{$record->name}」為公開狀態。",
+                            'Admin restored event to public active status.',
+                        );
+
+                        return $saved;
+                    }),
             ])
             ->defaultSort('last_activity_at', 'desc');
     }
@@ -95,5 +145,66 @@ class NewsEventResource extends Resource
     public static function getPages(): array
     {
         return ['index' => Pages\ManageNewsEvents::route('/')];
+    }
+
+    public static function recordAdminEventGovernance(
+        NewsEvent $record,
+        array $before,
+        string $action,
+        string $eventType,
+        string $publicReason,
+        string $editReason,
+    ): void {
+        $after = $record->fresh()->toArray();
+
+        if (static::eventGovernanceComparableState($before) === static::eventGovernanceComparableState($after)) {
+            return;
+        }
+
+        EventEditLog::query()->create([
+            'news_event_id' => $record->id,
+            'user_id' => auth()->id(),
+            'action' => $action,
+            'subject_type' => 'NewsEvent',
+            'subject_id' => $record->id,
+            'before' => $before,
+            'after' => $after,
+            'reason' => $editReason,
+            'is_public' => true,
+        ]);
+
+        ModerationEvent::query()->create([
+            'user_id' => auth()->id(),
+            'event_type' => $eventType,
+            'subject_type' => NewsEvent::class,
+            'subject_id' => $record->id,
+            'public_reason' => $publicReason,
+            'metadata' => [
+                'primary_category' => $record->primary_category,
+                'tags' => $record->tags ?? [],
+                'progress_status' => $record->progress_status,
+                'status' => $record->status,
+                'is_disputed' => $record->is_disputed,
+            ],
+        ]);
+    }
+
+    private static function eventGovernanceComparableState(array $attributes): array
+    {
+        return collect($attributes)
+            ->only([
+                'name',
+                'slug',
+                'summary',
+                'primary_category',
+                'tags',
+                'progress_status',
+                'status',
+                'is_disputed',
+                'controversy_score',
+                'primary_news_url_id',
+                'last_activity_at',
+            ])
+            ->all();
     }
 }

@@ -6,6 +6,8 @@ $configuredOrigins = array_filter(array_map(
     explode(',', env('TRUTHSHIELD_ALLOWED_ORIGINS', '')),
 ));
 $defaultOrigins = array_filter([
+    'http://127.0.0.1:5173',
+    'http://localhost:5173',
     'http://127.0.0.1:15173',
     'http://localhost:15173',
     'https://truth-shield.otus.tw',

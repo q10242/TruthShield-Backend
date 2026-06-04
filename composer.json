@@ -1,9 +1,9 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "otus/truthshield-api",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "description": "TruthShield backend API for open-source news credibility review, evidence-first voting, trust weighting, moderation, and transparency.",
+    "keywords": ["truthshield", "news", "credibility", "open-source", "fact-checking", "laravel"],
     "license": "MIT",
     "require": {
         "php": "^8.2",

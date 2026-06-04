@@ -18,6 +18,30 @@ This repository contains the Laravel backend: API, admin panel, reputation engin
 - Provides a Filament admin panel for data review, moderation, trust adjustment, evidence reports, domain coverage, YouTube channels, donations, and operational health.
 - Publishes transparency, leaderboard, evidence-library, OpenAPI, export, and readiness endpoints.
 
+## Open Source Impact
+
+TruthShield is public-interest infrastructure for news credibility and civic context. It does not block articles, delete content, or decide truth by authority. It adds a transparent layer beside news pages so readers can inspect weighted community labels, evidence links, event timelines, reader reactions, and moderation history before forming their own judgment.
+
+The project is already deployed in production:
+
+- Public web app: <https://truth-shield.otus.tw>
+- API health endpoint: <https://truth-shield-api.otus.tw/api/system/health>
+- Public API documentation: <https://truth-shield.otus.tw/api-docs>
+
+This backend is the core of the open-source system. It contains the trust-weighted voting engine, evidence-first review flow, anti-abuse logic, event taxonomy and progress tracking, public moderation records, transparency endpoints, admin tooling, production health checks, and deployment scripts. The companion frontend repository provides the website, iframe panels, and Chrome extension UI.
+
+## Maintenance and Codex Use
+
+TruthShield is actively maintained as a small open-source project with production operations, queue workers, scheduled jobs, event status reviews, admin workflows, and extension releases. Recent maintenance includes event categorization, progress status governance, reader reactions, trust-score achievements, Open Graph previews, public documentation, donation flows, and production data sweeps.
+
+Codex and API credits would be used for core open-source maintenance work:
+
+- Review pull requests and high-risk backend changes before deployment.
+- Triage issues affecting production API, queues, scheduler, admin panel, and extension integrations.
+- Generate release notes, migration summaries, and deployment checklists.
+- Audit trust-weighting, moderation, anti-abuse, and evidence-settlement logic.
+- Automate public-interest maintenance tasks such as event-status review, source-quality checks, documentation updates, and API contract regression checks.
+
 ## Product Principles
 
 - **No censorship:** external news remains readable at the original site.
@@ -174,6 +198,10 @@ docker run --rm -p 8080:8080 \
 ```
 
 For dirty deployment, the container can boot before all integrations are configured. API routes that need PostgreSQL or Redis will fail until production environment variables are attached.
+
+## License
+
+TruthShield API is open source under the [MIT License](./LICENSE).
 
 ## Production Dependencies
 

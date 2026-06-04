@@ -23,6 +23,7 @@ class EventMaintenanceService
     {
         return match ($task) {
             'nuclear_restart_and_tag_backfill' => $this->nuclearRestartAndTagBackfill($execute),
+            'resource_circulation_law_event' => $this->resourceCirculationLawEvent($execute),
             default => throw new InvalidArgumentException("Unsupported maintenance task: {$task}"),
         };
     }
@@ -290,6 +291,191 @@ class EventMaintenanceService
                 'summary' => '公視報導，核安會在立法院說明核三再運轉計畫書審查進度，台電表示會整理公布說明會資料。',
                 'occurred_at' => '2026-05-25 00:00:00',
                 'url' => 'https://news.pts.org.tw/article/809859',
+            ],
+        ];
+    }
+
+    private function resourceCirculationLawEvent(bool $execute): array
+    {
+        $summary = [
+            'task' => 'resource_circulation_law_event',
+            'execute' => $execute,
+            'event' => null,
+            'items_created' => 0,
+            'timeline_created' => 0,
+        ];
+
+        if (! $execute) {
+            $summary['planned'] = [
+                'event_slug' => 'resource-circulation-law-2026',
+                'source_count' => count($this->resourceCirculationLawSources()),
+            ];
+
+            return $summary;
+        }
+
+        return DB::transaction(function () use ($summary): array {
+            $admin = $this->maintenanceUser();
+            $sources = $this->resourceCirculationLawSources();
+            $primaryNews = $this->ensureNewsUrl($sources[0]['url'], $sources[0]['title']);
+            $slug = 'resource-circulation-law-2026';
+            $event = NewsEvent::query()->where('slug', $slug)->first();
+            $created = false;
+
+            $attributes = [
+                'created_by' => $admin->id,
+                'primary_news_url_id' => $primaryNews->id,
+                'name' => '資源循環推動法三讀與循環治理制度建置',
+                'slug' => $slug,
+                'summary' => implode("\n", [
+                    '整理資源回收再利用法修正、更名為資源循環推動法的立法過程與後續治理制度。',
+                    '此事件聚焦全生命週期管理、國家資源循環計畫、跨部會推動會、綠色設計、循環採購與創新實驗沙盒等公開政策資訊。',
+                    '持續追蹤重點：子法與準則公告、中央/地方分工、產業轉型配套、非法棄置與廢棄物清理法銜接。',
+                ]),
+                'primary_category' => 'public_policy',
+                'tags' => ['environment', 'law_reform'],
+                'progress_status' => 'tracking',
+                'status' => 'active',
+                'is_disputed' => false,
+                'last_activity_at' => now(),
+            ];
+
+            if (! $event) {
+                $event = NewsEvent::query()->create($attributes);
+                $created = true;
+                $this->logEventChange(
+                    $event,
+                    $admin,
+                    'created',
+                    null,
+                    $event->toArray(),
+                    'TruthShield AI maintenance: created resource circulation law event from public sources.',
+                    'event.created',
+                    "營運 AI 建立事件「{$event->name}」，整理資源循環推動法三讀與後續治理制度公開來源。",
+                    ['source' => 'truthshield:maintain-events', 'task' => 'resource_circulation_law_event'],
+                );
+            } else {
+                $before = $event->toArray();
+                $event->forceFill($attributes)->save();
+                if ($this->changed($before, $event->fresh()->toArray())) {
+                    $this->logEventChange(
+                        $event->fresh(),
+                        $admin,
+                        'updated',
+                        $before,
+                        $event->fresh()->toArray(),
+                        'TruthShield AI maintenance: refreshed resource circulation law event metadata.',
+                        'event.metadata_updated',
+                        "營運 AI 更新事件「{$event->name}」分類、標籤與追蹤狀態。",
+                        ['source' => 'truthshield:maintain-events', 'task' => 'resource_circulation_law_event'],
+                    );
+                }
+            }
+
+            $itemsCreated = 0;
+            $timelineCreated = 0;
+
+            foreach ($sources as $source) {
+                $newsUrl = $this->ensureNewsUrl($source['url'], $source['title']);
+
+                $item = NewsEventItem::query()->firstOrCreate(
+                    ['news_event_id' => $event->id, 'news_url_id' => $newsUrl->id],
+                    [
+                        'created_by' => $admin->id,
+                        'item_type' => $source['item_type'] ?? 'news',
+                        'title' => $source['title'],
+                        'summary' => $source['summary'],
+                        'source_url' => $source['url'],
+                    ],
+                );
+
+                if ($item->wasRecentlyCreated) {
+                    $itemsCreated++;
+                    $this->logItemChange($event, $admin, $item, 'Attached resource circulation law source item to event.');
+                }
+
+                $timeline = NewsEventTimelineEntry::query()->firstOrCreate(
+                    [
+                        'news_event_id' => $event->id,
+                        'source_url' => $source['url'],
+                        'title' => $source['title'],
+                    ],
+                    [
+                        'news_url_id' => $newsUrl->id,
+                        'created_by' => $admin->id,
+                        'entry_type' => 'manual',
+                        'summary' => $source['summary'],
+                        'occurred_at' => $source['occurred_at'],
+                        'source_type' => $source['source_type'] ?? 'news',
+                    ],
+                );
+
+                if ($timeline->wasRecentlyCreated) {
+                    $timelineCreated++;
+                    $this->logItemChange($event, $admin, $timeline, 'Pinned resource circulation law public-source timeline entry.');
+                }
+            }
+
+            if ($itemsCreated > 0 || $timelineCreated > 0 || $created) {
+                ModerationEvent::query()->create([
+                    'user_id' => $admin->id,
+                    'event_type' => 'event.timeline_maintained',
+                    'subject_type' => NewsEvent::class,
+                    'subject_id' => $event->id,
+                    'public_reason' => "營運 AI 維護事件「{$event->name}」來源與時間線，保留公開來源 URL 與摘要。",
+                    'metadata' => [
+                        'source' => 'truthshield:maintain-events',
+                        'task' => 'resource_circulation_law_event',
+                        'items_created' => $itemsCreated,
+                        'timeline_created' => $timelineCreated,
+                    ],
+                ]);
+            }
+
+            $event->forceFill(['last_activity_at' => now()])->save();
+
+            $summary['event'] = [
+                'id' => $event->id,
+                'slug' => $event->slug,
+                'status' => $created ? 'created' : 'updated',
+            ];
+            $summary['items_created'] = $itemsCreated;
+            $summary['timeline_created'] = $timelineCreated;
+
+            return $summary;
+        });
+    }
+
+    private function resourceCirculationLawSources(): array
+    {
+        return [
+            [
+                'title' => '行政院通過環境雙法修正草案並函請立法院審議',
+                'summary' => '行政院國家永續發展委員會發布，行政院會通過資源回收再利用法修正草案與廢棄物清理法部分條文修正草案，並將法案名稱修正為資源循環推動法。',
+                'occurred_at' => '2026-04-09 00:00:00',
+                'url' => 'https://ncsd.ndc.gov.tw/Fore/News_detail/7d7b86b1-36d6-4697-b905-18df5777db54',
+                'source_type' => 'official',
+                'item_type' => 'official_record',
+            ],
+            [
+                'title' => '立法院三讀通過資源循環推動法',
+                'summary' => '中央社報導，立法院三讀通過資源循環推動法，修法重點包括全生命週期管理、國家資源循環計畫、跨部會分工、綠色設計、循環採購與創新實驗沙盒。',
+                'occurred_at' => '2026-06-02 00:00:00',
+                'url' => 'https://www.cna.com.tw/news/aipl/202606020060.aspx',
+            ],
+            [
+                'title' => '環境部說明循環法三讀後由廢棄物管理邁向資源循環',
+                'summary' => '中央社報導環境部說明，本法建立資源全生命週期管理制度，後續仍需追蹤子法、推動會與實際執行配套。',
+                'occurred_at' => '2026-06-02 00:00:00',
+                'url' => 'https://www.cna.com.tw/news/ahel/202606020134.aspx',
+            ],
+            [
+                'title' => '環境部發布資源循環推動法三讀通過新聞稿',
+                'summary' => '環境部新聞稿表示，資源循環推動法三讀通過，作為落實資源循環零廢棄及臺灣2050淨零排放路徑關鍵戰略的重要法制基礎。',
+                'occurred_at' => '2026-06-02 00:00:00',
+                'url' => 'https://enews.moenv.gov.tw/page/3b3c62c78849F32F/49f0b94e-1173-480e-a41f-b1578905c692',
+                'source_type' => 'official',
+                'item_type' => 'official_record',
             ],
         ];
     }

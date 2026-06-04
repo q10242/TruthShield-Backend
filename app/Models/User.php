@@ -34,6 +34,7 @@ class User extends Authenticatable implements FilamentUser
         'is_real_name_public',
         'profile_bio',
         'email_preferences',
+        'onboarding_state',
         'identity_multiplier',
         'abuse_multiplier',
         'password',
@@ -67,6 +68,7 @@ class User extends Authenticatable implements FilamentUser
             'is_admin' => 'boolean',
             'is_real_name_public' => 'boolean',
             'email_preferences' => 'array',
+            'onboarding_state' => 'array',
         ];
     }
 

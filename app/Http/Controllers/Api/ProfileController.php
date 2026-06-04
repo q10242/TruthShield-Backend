@@ -4,12 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\AchievementService;
+use App\Services\OnboardingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ProfileController extends Controller
 {
-    public function show(Request $request, AchievementService $achievements): JsonResponse
+    public function show(Request $request, AchievementService $achievements, OnboardingService $onboarding): JsonResponse
     {
         $user = $request->user();
         $achievementState = $achievements->sync($user);
@@ -43,6 +44,7 @@ class ProfileController extends Controller
                 'total_count' => count($achievements->definitions()),
             ],
             'community_roles' => $achievements->communityRolesFor($user, $achievementStats),
+            'onboarding_summary' => $onboarding->summaryFor($user),
             'achievements' => $achievements->achievementsFor($user),
             'recent_votes' => $user->votes()
                 ->with(['tag:id,name,slug,color,severity', 'newsUrl:id,normalized_url,title_snapshot,finalized_at,voting_closes_at'])

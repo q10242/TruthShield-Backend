@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\NewsSnapshotController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ModerationEventController;
 use App\Http\Controllers\Api\OpenApiController;
+use App\Http\Controllers\Api\OnboardingController;
 use App\Http\Controllers\Api\OfficialResponseController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ReadSessionController;
@@ -137,6 +138,8 @@ Route::post('/donations/ecpay/notify', [DonationController::class, 'notify'])->m
 Route::get('/donations/{tradeNo}', [DonationController::class, 'show'])->whereAlphaNumeric('tradeNo');
 Route::get('/me/profile', [ProfileController::class, 'show'])->middleware('auth:sanctum');
 Route::put('/me/profile', [ProfileController::class, 'update'])->middleware('auth:sanctum');
+Route::get('/me/onboarding', [OnboardingController::class, 'show'])->middleware('auth:sanctum');
+Route::patch('/me/onboarding', [OnboardingController::class, 'update'])->middleware(['auth:sanctum', 'throttle:30,1']);
 Route::post('/me/claimants', [OfficialResponseController::class, 'storeClaimant'])->middleware(['auth:sanctum', 'throttle:10,1']);
 Route::post('/official-responses', [OfficialResponseController::class, 'storeResponse'])->middleware(['auth:sanctum', 'throttle:10,1']);
 Route::post('/official-responses/{officialResponse}/reaction', [OfficialResponseController::class, 'react'])->middleware(['auth:sanctum', 'throttle:reaction']);

@@ -81,6 +81,40 @@ class EventTaxonomyTest extends TestCase
             ->assertJsonValidationErrors(['primary_category', 'tags.1', 'progress_status']);
     }
 
+    public function test_event_index_searches_event_title_and_description(): void
+    {
+        $titleMatch = NewsEvent::query()->create([
+            'name' => '愷愷案完整時間線',
+            'slug' => 'kai-kai-case-timeline',
+            'summary' => '整理兒少保護制度與後續修法。',
+            'last_activity_at' => now(),
+        ]);
+
+        $summaryMatch = NewsEvent::query()->create([
+            'name' => '資源循環政策追蹤',
+            'slug' => 'resource-circulation-policy-search',
+            'summary' => '包含資源回收再利用法更名與循環治理制度。',
+            'last_activity_at' => now()->subMinute(),
+        ]);
+
+        NewsEvent::query()->create([
+            'name' => '無關事件',
+            'slug' => 'unrelated-event-search',
+            'summary' => '不應該出現在搜尋結果。',
+            'last_activity_at' => now()->subMinutes(2),
+        ]);
+
+        $this->getJson('/api/events?q='.urlencode('愷愷案'))
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $titleMatch->id)
+            ->assertJsonCount(1, 'data');
+
+        $this->getJson('/api/events?q='.urlencode('循環治理'))
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $summaryMatch->id)
+            ->assertJsonCount(1, 'data');
+    }
+
     public function test_event_routes_resolve_by_slug_for_public_sharing(): void
     {
         $event = NewsEvent::query()->create([

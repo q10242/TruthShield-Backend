@@ -89,11 +89,14 @@ class EventController extends Controller
                 });
             })
             ->when($validated['q'] ?? null, function ($builder, string $q): void {
-                $builder->where(function ($inner) use ($q): void {
-                    $inner->where('name', 'ilike', "%{$q}%")
-                        ->orWhere('summary', 'ilike', "%{$q}%")
-                        ->orWhereHas('entities', fn ($entity) => $entity->where('name', 'ilike', "%{$q}%"))
-                        ->orWhereHas('items.newsUrl', fn ($news) => $news->where('title_snapshot', 'ilike', "%{$q}%"));
+                $operator = $this->textSearchOperator();
+                $term = "%{$q}%";
+
+                $builder->where(function ($inner) use ($operator, $term): void {
+                    $inner->where('name', $operator, $term)
+                        ->orWhere('summary', $operator, $term)
+                        ->orWhereHas('entities', fn ($entity) => $entity->where('name', $operator, $term))
+                        ->orWhereHas('items.newsUrl', fn ($news) => $news->where('title_snapshot', $operator, $term));
                 });
             })
             ->where('status', $validated['status'] ?? 'active')
@@ -949,6 +952,11 @@ class EventController extends Controller
 
         return in_array($type, self::HIGH_RISK_RELATIONSHIPS, true)
             || in_array($normalized, self::HIGH_RISK_RELATIONSHIPS, true);
+    }
+
+    private function textSearchOperator(): string
+    {
+        return DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
     }
 
     private function isTrustedSourceUrl(?string $url): bool

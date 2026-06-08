@@ -24,6 +24,7 @@ class EventMaintenanceService
         return match ($task) {
             'nuclear_restart_and_tag_backfill' => $this->nuclearRestartAndTagBackfill($execute),
             'resource_circulation_law_event' => $this->resourceCirculationLawEvent($execute),
+            'vasp_stablecoin_regulation_event' => $this->vaspStablecoinRegulationEvent($execute),
             default => throw new InvalidArgumentException("Unsupported maintenance task: {$task}"),
         };
     }
@@ -476,6 +477,183 @@ class EventMaintenanceService
                 'url' => 'https://enews.moenv.gov.tw/page/3b3c62c78849F32F/49f0b94e-1173-480e-a41f-b1578905c692',
                 'source_type' => 'official',
                 'item_type' => 'official_record',
+            ],
+        ];
+    }
+
+    private function vaspStablecoinRegulationEvent(bool $execute): array
+    {
+        $summary = [
+            'task' => 'vasp_stablecoin_regulation_event',
+            'execute' => $execute,
+            'event' => null,
+            'items_created' => 0,
+            'timeline_created' => 0,
+        ];
+
+        if (! $execute) {
+            $summary['planned'] = [
+                'event_slug' => 'vasp-stablecoin-regulation-2026',
+                'source_count' => count($this->vaspStablecoinRegulationSources()),
+            ];
+
+            return $summary;
+        }
+
+        return DB::transaction(function () use ($summary): array {
+            $admin = $this->maintenanceUser();
+            $sources = $this->vaspStablecoinRegulationSources();
+            $primaryNews = $this->ensureNewsUrl($sources[0]['url'], $sources[0]['title']);
+            $slug = 'vasp-stablecoin-regulation-2026';
+            $event = NewsEvent::query()->where('slug', $slug)->first();
+            $created = false;
+
+            $attributes = [
+                'created_by' => $admin->id,
+                'primary_news_url_id' => $primaryNews->id,
+                'name' => '虛擬資產服務法草案與穩定幣監理',
+                'slug' => $slug,
+                'summary' => implode("\n", [
+                    '整理虛擬資產服務法草案從行政院會通過到立法院初審的公開進度，聚焦 VASP 許可制、穩定幣發行準備資產、客戶資產分離保管、資安與反詐欺/市場操縱罰則。',
+                    '此事件不判定個別虛擬資產、交易所或穩定幣風險；重點是讓讀者追蹤法案文字、主管機關說明、立法院審查與後續子法配套。',
+                    '持續追蹤重點：三讀時程、金管會與央行配套、業者過渡期、海外業者落地規範、保管業務試辦與交易人保護。',
+                ]),
+                'primary_category' => 'finance',
+                'tags' => ['law_reform', 'platform_governance', 'fraud'],
+                'progress_status' => 'tracking',
+                'status' => 'active',
+                'is_disputed' => false,
+                'last_activity_at' => now(),
+            ];
+
+            if (! $event) {
+                $event = NewsEvent::query()->create($attributes);
+                $created = true;
+                $this->logEventChange(
+                    $event,
+                    $admin,
+                    'created',
+                    null,
+                    $event->toArray(),
+                    'TruthShield AI maintenance: created VASP and stablecoin regulation event from public sources.',
+                    'event.created',
+                    "營運 AI 建立事件「{$event->name}」，整理虛擬資產服務法草案與穩定幣監理公開來源。",
+                    ['source' => 'truthshield:maintain-events', 'task' => 'vasp_stablecoin_regulation_event'],
+                );
+            } else {
+                $before = $event->toArray();
+                $event->forceFill($attributes)->save();
+                if ($this->changed($before, $event->fresh()->toArray())) {
+                    $this->logEventChange(
+                        $event->fresh(),
+                        $admin,
+                        'updated',
+                        $before,
+                        $event->fresh()->toArray(),
+                        'TruthShield AI maintenance: refreshed VASP and stablecoin regulation event metadata.',
+                        'event.metadata_updated',
+                        "營運 AI 更新事件「{$event->name}」分類、標籤與追蹤狀態。",
+                        ['source' => 'truthshield:maintain-events', 'task' => 'vasp_stablecoin_regulation_event'],
+                    );
+                }
+            }
+
+            $itemsCreated = 0;
+            $timelineCreated = 0;
+
+            foreach ($sources as $source) {
+                $newsUrl = $this->ensureNewsUrl($source['url'], $source['title']);
+
+                $item = NewsEventItem::query()->firstOrCreate(
+                    ['news_event_id' => $event->id, 'news_url_id' => $newsUrl->id],
+                    [
+                        'created_by' => $admin->id,
+                        'item_type' => $source['item_type'] ?? 'news',
+                        'title' => $source['title'],
+                        'summary' => $source['summary'],
+                        'source_url' => $source['url'],
+                    ],
+                );
+
+                if ($item->wasRecentlyCreated) {
+                    $itemsCreated++;
+                    $this->logItemChange($event, $admin, $item, 'Attached VASP and stablecoin regulation source item to event.');
+                }
+
+                $timeline = NewsEventTimelineEntry::query()->firstOrCreate(
+                    [
+                        'news_event_id' => $event->id,
+                        'source_url' => $source['url'],
+                        'title' => $source['title'],
+                    ],
+                    [
+                        'news_url_id' => $newsUrl->id,
+                        'created_by' => $admin->id,
+                        'entry_type' => 'manual',
+                        'summary' => $source['summary'],
+                        'occurred_at' => $source['occurred_at'],
+                        'source_type' => $source['source_type'] ?? 'news',
+                    ],
+                );
+
+                if ($timeline->wasRecentlyCreated) {
+                    $timelineCreated++;
+                    $this->logItemChange($event, $admin, $timeline, 'Pinned VASP and stablecoin regulation public-source timeline entry.');
+                }
+            }
+
+            if ($itemsCreated > 0 || $timelineCreated > 0 || $created) {
+                ModerationEvent::query()->create([
+                    'user_id' => $admin->id,
+                    'event_type' => 'event.timeline_maintained',
+                    'subject_type' => NewsEvent::class,
+                    'subject_id' => $event->id,
+                    'public_reason' => "營運 AI 維護事件「{$event->name}」來源與時間線，保留公開來源 URL 與摘要。",
+                    'metadata' => [
+                        'source' => 'truthshield:maintain-events',
+                        'task' => 'vasp_stablecoin_regulation_event',
+                        'items_created' => $itemsCreated,
+                        'timeline_created' => $timelineCreated,
+                    ],
+                ]);
+            }
+
+            $event->forceFill(['last_activity_at' => now()])->save();
+
+            $summary['event'] = [
+                'id' => $event->id,
+                'slug' => $event->slug,
+                'status' => $created ? 'created' : 'updated',
+            ];
+            $summary['items_created'] = $itemsCreated;
+            $summary['timeline_created'] = $timelineCreated;
+
+            return $summary;
+        });
+    }
+
+    private function vaspStablecoinRegulationSources(): array
+    {
+        return [
+            [
+                'title' => '行政院會通過虛擬資產服務法草案',
+                'summary' => '中央社報導，行政院會通過虛擬資產服務法草案，明定穩定幣發行依據、加強虛擬資產交易安全、推動虛擬資產保管業務試辦，並對詐欺或操縱行為訂出罰則。',
+                'occurred_at' => '2026-04-02 16:53:00',
+                'url' => 'https://www.cna.com.tw/news/aipl/202604020237.aspx',
+            ],
+            [
+                'title' => '行政院發布虛擬資產服務法草案官方說明',
+                'summary' => '行政院國家永續發展委員會發布，草案對 VASP 與穩定幣發行人建立監理框架，規範財務健全度、資產分離保管、防止不公正交易等行為。',
+                'occurred_at' => '2026-04-02 00:00:00',
+                'url' => 'https://ncsd.ndc.gov.tw/Fore/News_detail/e4f3d9fe-8f88-4056-b738-92c56dc4996c',
+                'source_type' => 'official',
+                'item_type' => 'official_record',
+            ],
+            [
+                'title' => '立法院初審通過虛擬資產服務法草案',
+                'summary' => '中央社報導，立法院財政委員會初審通過草案，強化 VASP 監理，須取得主管機關許可始得營業；穩定幣發行人應設置並維持十足準備資產，並與自有財產分離。',
+                'occurred_at' => '2026-06-03 18:54:00',
+                'url' => 'https://www.cna.com.tw/news/aipl/202606030313.aspx',
             ],
         ];
     }

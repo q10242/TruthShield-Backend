@@ -64,6 +64,55 @@ class EventMaintenanceServiceTest extends TestCase
         $this->assertSame(3, NewsEventTimelineEntry::query()->where('news_event_id', $event->id)->count());
     }
 
+    public function test_east_coast_maritime_enforcement_task_dry_run_does_not_write_data(): void
+    {
+        User::factory()->create(['is_admin' => true, 'trust_score' => 1.5]);
+
+        $this->artisan('truthshield:maintain-events east_coast_maritime_enforcement_event')
+            ->assertSuccessful();
+
+        $this->assertDatabaseMissing((new NewsEvent)->getTable(), [
+            'slug' => 'east-coast-maritime-enforcement-2026',
+        ]);
+    }
+
+    public function test_east_coast_maritime_enforcement_task_creates_event_sources_timeline_and_governance_logs(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true, 'trust_score' => 1.5]);
+
+        $this->artisan('truthshield:maintain-events east_coast_maritime_enforcement_event --execute')
+            ->assertSuccessful();
+
+        $event = NewsEvent::query()->where('slug', 'east-coast-maritime-enforcement-2026')->firstOrFail();
+
+        $this->assertSame('中國宣稱台灣東部海域執法與海巡應處', $event->name);
+        $this->assertSame('international', $event->primary_category);
+        $this->assertSame(['national_security', 'cross_strait', 'media_ethics'], $event->tags);
+        $this->assertSame('tracking', $event->progress_status);
+        $this->assertSame($admin->id, $event->created_by);
+        $this->assertSame(4, NewsEventItem::query()->where('news_event_id', $event->id)->count());
+        $this->assertSame(4, NewsEventTimelineEntry::query()->where('news_event_id', $event->id)->count());
+
+        $this->assertDatabaseHas((new EventEditLog)->getTable(), [
+            'news_event_id' => $event->id,
+            'action' => 'created',
+            'subject_type' => 'NewsEvent',
+            'is_public' => true,
+        ]);
+        $this->assertDatabaseHas((new ModerationEvent)->getTable(), [
+            'user_id' => $admin->id,
+            'event_type' => 'event.timeline_maintained',
+            'subject_id' => $event->id,
+        ]);
+
+        $this->artisan('truthshield:maintain-events east_coast_maritime_enforcement_event --execute')
+            ->assertSuccessful();
+
+        $this->assertSame(1, NewsEvent::query()->where('slug', 'east-coast-maritime-enforcement-2026')->count());
+        $this->assertSame(4, NewsEventItem::query()->where('news_event_id', $event->id)->count());
+        $this->assertSame(4, NewsEventTimelineEntry::query()->where('news_event_id', $event->id)->count());
+    }
+
     public function test_resource_circulation_law_task_dry_run_does_not_write_data(): void
     {
         User::factory()->create(['is_admin' => true, 'trust_score' => 1.5]);

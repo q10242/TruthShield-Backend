@@ -39,6 +39,8 @@ class EventTaxonomy
         'local_politics' => ['zh' => '地方政治', 'en' => 'Local politics'],
         'energy' => ['zh' => '能源', 'en' => 'Energy'],
         'nuclear_safety' => ['zh' => '核能安全', 'en' => 'Nuclear safety'],
+        'national_security' => ['zh' => '國家安全', 'en' => 'National security'],
+        'cross_strait' => ['zh' => '兩岸', 'en' => 'Cross-strait'],
     ];
 
     public const PROGRESS_STATUSES = [

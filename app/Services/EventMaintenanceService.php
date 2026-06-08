@@ -25,6 +25,7 @@ class EventMaintenanceService
             'nuclear_restart_and_tag_backfill' => $this->nuclearRestartAndTagBackfill($execute),
             'resource_circulation_law_event' => $this->resourceCirculationLawEvent($execute),
             'vasp_stablecoin_regulation_event' => $this->vaspStablecoinRegulationEvent($execute),
+            'east_coast_maritime_enforcement_event' => $this->eastCoastMaritimeEnforcementEvent($execute),
             default => throw new InvalidArgumentException("Unsupported maintenance task: {$task}"),
         };
     }
@@ -654,6 +655,189 @@ class EventMaintenanceService
                 'summary' => '中央社報導，立法院財政委員會初審通過草案，強化 VASP 監理，須取得主管機關許可始得營業；穩定幣發行人應設置並維持十足準備資產，並與自有財產分離。',
                 'occurred_at' => '2026-06-03 18:54:00',
                 'url' => 'https://www.cna.com.tw/news/aipl/202606030313.aspx',
+            ],
+        ];
+    }
+
+    private function eastCoastMaritimeEnforcementEvent(bool $execute): array
+    {
+        $summary = [
+            'task' => 'east_coast_maritime_enforcement_event',
+            'execute' => $execute,
+            'event' => null,
+            'items_created' => 0,
+            'timeline_created' => 0,
+        ];
+
+        if (! $execute) {
+            $summary['planned'] = [
+                'event_slug' => 'east-coast-maritime-enforcement-2026',
+                'source_count' => count($this->eastCoastMaritimeEnforcementSources()),
+            ];
+
+            return $summary;
+        }
+
+        return DB::transaction(function () use ($summary): array {
+            $admin = $this->maintenanceUser();
+            $sources = $this->eastCoastMaritimeEnforcementSources();
+            $primaryNews = $this->ensureNewsUrl($sources[0]['url'], $sources[0]['title']);
+            $slug = 'east-coast-maritime-enforcement-2026';
+            $event = NewsEvent::query()->where('slug', $slug)->first();
+            $created = false;
+
+            $attributes = [
+                'created_by' => $admin->id,
+                'primary_news_url_id' => $primaryNews->id,
+                'name' => '中國宣稱台灣東部海域執法與海巡應處',
+                'slug' => $slug,
+                'summary' => implode("\n", [
+                    '整理中國海警與交通運輸部宣稱在台灣以東海域執法、台灣海巡署與國防部回應、以及日菲海域劃界敘事牽動的公開來源時間線。',
+                    '此事件不判定軍事或外交結果；重點是讓讀者核對各方聲明、官方應處、媒體轉述與可能的認知戰/法律戰敘事差異。',
+                    '持續追蹤重點：中國公務船後續航跡、海巡艦艇監控與驅離紀錄、國防部/陸委會/外交部說明、日菲官方談判進度與假圖求證。',
+                ]),
+                'primary_category' => 'international',
+                'tags' => ['national_security', 'cross_strait', 'media_ethics'],
+                'progress_status' => 'tracking',
+                'status' => 'active',
+                'is_disputed' => false,
+                'last_activity_at' => now(),
+            ];
+
+            if (! $event) {
+                $event = NewsEvent::query()->create($attributes);
+                $created = true;
+                $this->logEventChange(
+                    $event,
+                    $admin,
+                    'created',
+                    null,
+                    $event->toArray(),
+                    'TruthShield AI maintenance: created east coast maritime enforcement event from public sources.',
+                    'event.created',
+                    "營運 AI 建立事件「{$event->name}」，整理台灣東部海域執法宣稱與海巡應處公開來源。",
+                    ['source' => 'truthshield:maintain-events', 'task' => 'east_coast_maritime_enforcement_event'],
+                );
+            } else {
+                $before = $event->toArray();
+                $event->forceFill($attributes)->save();
+                if ($this->changed($before, $event->fresh()->toArray())) {
+                    $this->logEventChange(
+                        $event->fresh(),
+                        $admin,
+                        'updated',
+                        $before,
+                        $event->fresh()->toArray(),
+                        'TruthShield AI maintenance: refreshed east coast maritime enforcement event metadata.',
+                        'event.metadata_updated',
+                        "營運 AI 更新事件「{$event->name}」分類、標籤與追蹤狀態。",
+                        ['source' => 'truthshield:maintain-events', 'task' => 'east_coast_maritime_enforcement_event'],
+                    );
+                }
+            }
+
+            $itemsCreated = 0;
+            $timelineCreated = 0;
+
+            foreach ($sources as $source) {
+                $newsUrl = $this->ensureNewsUrl($source['url'], $source['title']);
+
+                $item = NewsEventItem::query()->firstOrCreate(
+                    ['news_event_id' => $event->id, 'news_url_id' => $newsUrl->id],
+                    [
+                        'created_by' => $admin->id,
+                        'item_type' => $source['item_type'] ?? 'news',
+                        'title' => $source['title'],
+                        'summary' => $source['summary'],
+                        'source_url' => $source['url'],
+                    ],
+                );
+
+                if ($item->wasRecentlyCreated) {
+                    $itemsCreated++;
+                    $this->logItemChange($event, $admin, $item, 'Attached east coast maritime enforcement source item to event.');
+                }
+
+                $timeline = NewsEventTimelineEntry::query()->firstOrCreate(
+                    [
+                        'news_event_id' => $event->id,
+                        'source_url' => $source['url'],
+                        'title' => $source['title'],
+                    ],
+                    [
+                        'news_url_id' => $newsUrl->id,
+                        'created_by' => $admin->id,
+                        'entry_type' => 'manual',
+                        'summary' => $source['summary'],
+                        'occurred_at' => $source['occurred_at'],
+                        'source_type' => $source['source_type'] ?? 'news',
+                    ],
+                );
+
+                if ($timeline->wasRecentlyCreated) {
+                    $timelineCreated++;
+                    $this->logItemChange($event, $admin, $timeline, 'Pinned east coast maritime enforcement public-source timeline entry.');
+                }
+            }
+
+            if ($itemsCreated > 0 || $timelineCreated > 0 || $created) {
+                ModerationEvent::query()->create([
+                    'user_id' => $admin->id,
+                    'event_type' => 'event.timeline_maintained',
+                    'subject_type' => NewsEvent::class,
+                    'subject_id' => $event->id,
+                    'public_reason' => "營運 AI 維護事件「{$event->name}」來源與時間線，保留公開來源 URL 與摘要。",
+                    'metadata' => [
+                        'source' => 'truthshield:maintain-events',
+                        'task' => 'east_coast_maritime_enforcement_event',
+                        'items_created' => $itemsCreated,
+                        'timeline_created' => $timelineCreated,
+                    ],
+                ]);
+            }
+
+            $event->forceFill(['last_activity_at' => now()])->save();
+
+            $summary['event'] = [
+                'id' => $event->id,
+                'slug' => $event->slug,
+                'status' => $created ? 'created' : 'updated',
+            ];
+            $summary['items_created'] = $itemsCreated;
+            $summary['timeline_created'] = $timelineCreated;
+
+            return $summary;
+        });
+    }
+
+    private function eastCoastMaritimeEnforcementSources(): array
+    {
+        return [
+            [
+                'title' => '中國海警稱在台灣以東海域執法巡查',
+                'summary' => '中央社報導中國海警局宣稱在台灣以東海域展開執法巡查，並稱行動與日本、菲律賓海域劃界談判有關；這是事件敘事的起點之一。',
+                'occurred_at' => '2026-06-01 10:49:00',
+                'url' => 'https://www.cna.com.tw/news/acn/202606010047.aspx',
+            ],
+            [
+                'title' => '海巡署駁斥中國交通運輸部東部海域專項執法宣稱',
+                'summary' => '海巡署發布新聞稿，表示中國在台灣東部海域不享有主權權利，所謂專項執法行動違反國際法且背離事實，並說明已部署艦艇應處。',
+                'occurred_at' => '2026-06-07 00:00:00',
+                'url' => 'https://www.cga.gov.tw/GipOpen/wSite/ct?ctNode=650&mp=999%2F&xItem=168064',
+                'source_type' => 'official',
+                'item_type' => 'official_record',
+            ],
+            [
+                'title' => '公視整理中國稱將在台灣東部海域執法與台灣應處',
+                'summary' => '公視報導整理中國交通運輸部宣稱東部海域執法、海巡署部署艦艇與行政院海洋政策說法，適合作為公開敘事差異與時間線來源。',
+                'occurred_at' => '2026-06-07 00:00:00',
+                'url' => 'https://news.pts.org.tw/article/811866',
+            ],
+            [
+                'title' => '顧立雄稱中國宣稱東部海域執法是挑釁與認知戰',
+                'summary' => '中央社轉載報導，國防部長顧立雄在立法院受訪時表示，中國宣稱台灣東部海域為執法區域是挑釁與認知戰，國防部與海巡會協調分工維護海域安全。',
+                'occurred_at' => '2026-06-08 10:19:56',
+                'url' => 'https://news.pchome.com.tw/politics/cna/20260608/index-17808851960442618001.html',
             ],
         ];
     }

@@ -75,35 +75,41 @@ class AuthController extends Controller
                 'oauth_error' => 'OAuth provider callback could not be verified.',
             ]));
         }
-        $email = $socialiteUser->getEmail();
+        try {
+            $email = $socialiteUser->getEmail();
 
-        if (! $email) {
+            if (! $email) {
+                return redirect()->away($this->frontendLoginUrl($redirectUrl, [
+                    'oauth_error' => 'OAuth provider did not return a verified email.',
+                ]));
+            }
+
+            $synthetic = Request::create('/internal/oauth-callback', 'POST', [
+                'provider_user_id' => (string) $socialiteUser->getId(),
+                'email' => $email,
+                'name' => $socialiteUser->getName() ?: $socialiteUser->getNickname(),
+                'state' => $request->query('state'),
+            ]);
+
+            $response = $this->oauthCallback($synthetic, $provider);
+            $payload = $response->getData(true);
+
+            if ($response->getStatusCode() >= 400) {
+                return redirect()->away($this->frontendLoginUrl($redirectUrl, [
+                    'oauth_error' => $payload['message'] ?? 'OAuth sign-in failed.',
+                ]));
+            }
+
             return redirect()->away($this->frontendLoginUrl($redirectUrl, [
-                'oauth_error' => 'OAuth provider did not return a verified email.',
+                'truthshield_oauth' => '1',
+                'token' => $payload['token'],
+                'user' => $this->base64UrlEncode(json_encode($payload['user'])),
+            ]));
+        } catch (Throwable) {
+            return redirect()->away($this->frontendLoginUrl($redirectUrl, [
+                'oauth_error' => 'OAuth sign-in failed.',
             ]));
         }
-
-        $synthetic = Request::create('/internal/oauth-callback', 'POST', [
-            'provider_user_id' => (string) $socialiteUser->getId(),
-            'email' => $email,
-            'name' => $socialiteUser->getName() ?: $socialiteUser->getNickname(),
-            'state' => $request->query('state'),
-        ]);
-
-        $response = $this->oauthCallback($synthetic, $provider);
-        $payload = $response->getData(true);
-
-        if ($response->getStatusCode() >= 400) {
-            return redirect()->away($this->frontendLoginUrl($redirectUrl, [
-                'oauth_error' => $payload['message'] ?? 'OAuth sign-in failed.',
-            ]));
-        }
-
-        return redirect()->away($this->frontendLoginUrl($redirectUrl, [
-            'truthshield_oauth' => '1',
-            'token' => $payload['token'],
-            'user' => $this->base64UrlEncode(json_encode($payload['user'])),
-        ]));
     }
 
     public function devLogin(Request $request, BotProtectionService $botProtection): JsonResponse

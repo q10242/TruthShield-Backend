@@ -2623,6 +2623,31 @@ class TruthShieldApiTest extends TestCase
         $this->assertStringContainsString('oauth_error=OAuth%20provider%20callback%20could%20not%20be%20verified.', $response->headers->get('Location'));
     }
 
+    public function test_socialite_callback_redirects_unexpected_user_payload_exceptions_to_login(): void
+    {
+        config(['app.frontend_url' => 'https://truthshield.test']);
+
+        $state = $this->postJson('/api/auth/google/begin', [
+            'redirect_url' => 'https://truthshield.test/login',
+        ])
+            ->assertOk()
+            ->json('state');
+
+        $socialiteUser = \Mockery::mock();
+        $socialiteUser->shouldReceive('getEmail')->once()->andThrow(new \RuntimeException('Malformed OAuth payload.'));
+
+        $provider = \Mockery::mock();
+        $provider->shouldReceive('stateless')->once()->andReturnSelf();
+        $provider->shouldReceive('user')->once()->andReturn($socialiteUser);
+        Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
+
+        $response = $this->get("/api/auth/google/socialite-callback?code=odd-code&state={$state}");
+
+        $response->assertRedirect();
+        $this->assertStringStartsWith('https://truthshield.test/login#', $response->headers->get('Location'));
+        $this->assertStringContainsString('oauth_error=OAuth%20sign-in%20failed.', $response->headers->get('Location'));
+    }
+
     public function test_launch_ops_sources_rate_limits_and_selector_checks(): void
     {
         NewsDomain::query()->create([

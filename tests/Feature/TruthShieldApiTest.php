@@ -62,6 +62,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Laravel\Socialite\Facades\Socialite;
 use Tests\TestCase;
 
 class TruthShieldApiTest extends TestCase
@@ -2598,6 +2599,28 @@ class TruthShieldApiTest extends TestCase
         $response->assertRedirect();
         $this->assertStringStartsWith('https://truthshield.test/login#', $response->headers->get('Location'));
         $this->assertStringContainsString('oauth_error=OAuth%20sign-in%20was%20cancelled.', $response->headers->get('Location'));
+    }
+
+    public function test_socialite_callback_redirects_provider_exceptions_to_login(): void
+    {
+        config(['app.frontend_url' => 'https://truthshield.test']);
+
+        $state = $this->postJson('/api/auth/google/begin', [
+            'redirect_url' => 'https://truthshield.test/login',
+        ])
+            ->assertOk()
+            ->json('state');
+
+        $provider = \Mockery::mock();
+        $provider->shouldReceive('stateless')->once()->andReturnSelf();
+        $provider->shouldReceive('user')->once()->andThrow(new \RuntimeException('Invalid OAuth code.'));
+        Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
+
+        $response = $this->get("/api/auth/google/socialite-callback?code=bad-code&state={$state}");
+
+        $response->assertRedirect();
+        $this->assertStringStartsWith('https://truthshield.test/login#', $response->headers->get('Location'));
+        $this->assertStringContainsString('oauth_error=OAuth%20provider%20callback%20could%20not%20be%20verified.', $response->headers->get('Location'));
     }
 
     public function test_launch_ops_sources_rate_limits_and_selector_checks(): void

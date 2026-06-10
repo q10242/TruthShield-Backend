@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Support\Str;
+use Throwable;
 
 class AuthController extends Controller
 {
@@ -67,7 +68,13 @@ class AuthController extends Controller
             ]));
         }
 
-        $socialiteUser = Socialite::driver($provider)->stateless()->user();
+        try {
+            $socialiteUser = Socialite::driver($provider)->stateless()->user();
+        } catch (Throwable) {
+            return redirect()->away($this->frontendLoginUrl($redirectUrl, [
+                'oauth_error' => 'OAuth provider callback could not be verified.',
+            ]));
+        }
         $email = $socialiteUser->getEmail();
 
         if (! $email) {

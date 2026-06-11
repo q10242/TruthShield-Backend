@@ -42,8 +42,10 @@ class TransparencyController extends Controller
     {
         return response()->json(Cache::store(config('truthshield.status_cache_store'))->remember('transparency:summary:v6', now()->addSeconds(30), function () use ($traffic): array {
             $trafficSummary = $traffic->publicSummary();
+            $communityMetrics = app(PublicCommunityMetricsController::class)->metrics();
 
             return [
+                'community_metrics' => $communityMetrics,
                 'users' => User::query()->count(),
                 'news_urls' => NewsUrl::query()->count(),
                 'votes' => Vote::query()->count(),

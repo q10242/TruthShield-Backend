@@ -19,6 +19,7 @@ use App\Models\Donation;
 use App\Models\EventEditLog;
 use App\Models\EventRelationship;
 use App\Models\Evidence;
+use App\Models\EvidenceReaction;
 use App\Models\EvidenceReport;
 use App\Models\EvidenceSnapshot;
 use App\Models\ExtensionEvent;
@@ -1401,6 +1402,122 @@ class TruthShieldApiTest extends TestCase
         $this->getJson('/api/transparency')
             ->assertOk()
             ->assertJsonStructure(['users', 'news_urls', 'votes', 'pending_domain_reports', 'open_abuse_events', 'open_bug_reports']);
+    }
+
+    public function test_public_community_metrics_are_aggregate_only(): void
+    {
+        $this->seed(TagSeeder::class);
+        $users = User::factory()->count(3)->create(['trust_score' => 2]);
+        $tag = Tag::query()->where('slug', 'accurate-reporting')->firstOrFail();
+
+        $this->actingAs($users[0], 'sanctum')
+            ->postJson('/api/vote', [
+                'url' => 'https://www.cna.com.tw/news/aipl/202606110001.aspx',
+                'tag_id' => $tag->id,
+                'evidence_url' => 'https://example.com/public-source',
+                'evidence_note' => '公開來源補充完整脈絡。',
+            ])
+            ->assertCreated();
+
+        $vote = Vote::query()->firstOrFail();
+        $newsUrl = NewsUrl::query()->firstOrFail();
+
+        Evidence::query()->updateOrCreate(
+            ['vote_id' => $vote->id],
+            [
+                'news_url_id' => $newsUrl->id,
+                'user_id' => $users[0]->id,
+                'url' => 'https://example.com/public-source',
+                'host' => 'example.com',
+                'type' => 'link',
+                'safety' => 'unverified',
+                'snapshot_status' => 'external',
+            ],
+        );
+
+        EvidenceReaction::query()->create([
+            'vote_id' => $vote->id,
+            'user_id' => $users[1]->id,
+            'helpful' => true,
+            'credibility' => 4,
+            'relevance' => 5,
+            'direction' => 'supports',
+            'weight_score' => 1.5,
+        ]);
+
+        CommunitySignal::query()->create([
+            'user_id' => $users[2]->id,
+            'signal_type' => 'evidence_quality_review',
+            'subject_type' => Vote::class,
+            'subject_id' => $vote->id,
+            'subject_key' => "vote:{$vote->id}",
+            'value' => 'useful',
+            'weight_score' => 1.0,
+        ]);
+
+        CommunityTask::query()->create([
+            'type' => 'official_source_request',
+            'subject_type' => NewsUrl::class,
+            'subject_id' => $newsUrl->id,
+            'subject_key' => "news:{$newsUrl->id}:official-source",
+            'title' => '補官方來源',
+            'status' => 'open',
+        ]);
+
+        CommunityTask::query()->create([
+            'type' => 'evidence_quality_review',
+            'subject_type' => Vote::class,
+            'subject_id' => $vote->id,
+            'subject_key' => "vote:{$vote->id}:quality",
+            'title' => '評價證據品質',
+            'status' => 'resolved',
+            'resolved_at' => now(),
+        ]);
+
+        TrafficEvent::query()->create([
+            'event_type' => 'popup_open',
+            'source' => 'extension',
+            'feature' => 'popup',
+            'session_hash' => 'extension-client-a',
+            'success' => true,
+        ]);
+        TrafficEvent::query()->create([
+            'event_type' => 'banner_view',
+            'source' => 'extension',
+            'feature' => 'banner',
+            'session_hash' => 'extension-client-a',
+            'success' => true,
+        ]);
+        TrafficEvent::query()->create([
+            'event_type' => 'popup_open',
+            'source' => 'extension',
+            'feature' => 'popup',
+            'session_hash' => 'extension-client-b',
+            'success' => true,
+        ]);
+
+        $this->getJson('/api/public/community-metrics')
+            ->assertOk()
+            ->assertJsonPath('registered_users_total', 3)
+            ->assertJsonPath('active_registered_users_7d', 3)
+            ->assertJsonPath('active_extension_clients_7d', 2)
+            ->assertJsonPath('contributors_total.voters', 1)
+            ->assertJsonPath('contributors_total.evidence_submitters', 1)
+            ->assertJsonPath('contributors_total.evidence_reviewers', 1)
+            ->assertJsonPath('contributors_total.community_signal_users', 1)
+            ->assertJsonPath('activity_30d.votes', 1)
+            ->assertJsonPath('activity_30d.evidence_submissions', 1)
+            ->assertJsonPath('activity_30d.evidence_reactions', 1)
+            ->assertJsonPath('activity_30d.community_signals', 1)
+            ->assertJsonPath('activity_30d.resolved_community_tasks', 1)
+            ->assertJsonPath('task_totals.open', 1)
+            ->assertJsonMissingPath('email')
+            ->assertJsonMissingPath('users.0.email');
+
+        $this->getJson('/api/transparency')
+            ->assertOk()
+            ->assertJsonPath('community_metrics.active_extension_clients_7d', 2)
+            ->assertJsonPath('community_metrics.registered_users_total', 3);
     }
 
     public function test_profile_logout_health_search_media_and_report_reason_endpoints(): void

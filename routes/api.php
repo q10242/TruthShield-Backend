@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\OpenApiController;
 use App\Http\Controllers\Api\OnboardingController;
 use App\Http\Controllers\Api\OfficialResponseController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\PublicCommunityMetricsController;
 use App\Http\Controllers\Api\ReadSessionController;
 use App\Http\Controllers\Api\ReaderReactionController;
 use App\Http\Controllers\Api\SystemHealthController;
@@ -79,6 +80,7 @@ Route::get('/extension/coverage', [ExtensionEventController::class, 'coverage'])
 Route::post('/traffic/events', [TrafficEventController::class, 'store'])->middleware('throttle:120,1');
 Route::post('/traffic/events/batch', [TrafficEventController::class, 'storeBatch'])->middleware('throttle:30,1');
 Route::get('/traffic/summary', [TrafficEventController::class, 'summary']);
+Route::get('/public/community-metrics', [PublicCommunityMetricsController::class, 'show']);
 Route::get('/news-domains', [LookupController::class, 'newsDomains']);
 Route::get('/youtube-channels', [YoutubeChannelController::class, 'index']);
 Route::post('/youtube-channel-reports', [YoutubeChannelController::class, 'report'])->middleware('throttle:20,1');

@@ -66,20 +66,13 @@ class EvidenceController extends Controller
 
         $validated = $request->validate([
             'helpful' => ['required', 'boolean'],
+            'credibility' => ['nullable', 'integer', 'min:1', 'max:5'],
+            'relevance' => ['nullable', 'integer', 'min:1', 'max:5'],
+            'direction' => ['nullable', 'string', 'in:supports,refutes,contextual'],
             'challenge_token' => ['nullable', 'string', 'max:2048'],
         ]);
 
         $vote->loadMissing('newsUrl');
-
-        if (! $newsAggregation->isOpen($vote->newsUrl)) {
-            return response()->json([
-                'message' => 'Evidence rating window has closed for this news URL.',
-                'status' => $newsAggregation->statusForFingerprint([
-                    'hash' => $vote->newsUrl->hash,
-                    'normalized_url' => $vote->newsUrl->normalized_url,
-                ]),
-            ], 409);
-        }
 
         if (! $trustScores->canReactToEvidence($request->user())) {
             return response()->json([
@@ -96,12 +89,18 @@ class EvidenceController extends Controller
             ],
             [
                 'helpful' => $validated['helpful'],
+                'credibility' => $validated['credibility'] ?? null,
+                'relevance' => $validated['relevance'] ?? null,
+                'direction' => $validated['direction'] ?? 'contextual',
                 'weight_score' => $trustScores->voteWeightFor($request->user()),
             ],
         );
         $auditLog->record($request, 'evidence.reacted', $reaction, [
             'vote_id' => $vote->id,
             'helpful' => $validated['helpful'],
+            'credibility' => $validated['credibility'] ?? null,
+            'relevance' => $validated['relevance'] ?? null,
+            'direction' => $validated['direction'] ?? 'contextual',
         ]);
         $accountSignals->record($request, $request->user(), $vote->newsUrl, 'evidence_reaction');
         $communitySignals->record(
@@ -110,10 +109,16 @@ class EvidenceController extends Controller
             $vote,
             "vote:{$vote->id}",
             $validated['helpful'] ? 'helpful' : 'unhelpful',
-            ['news_url_id' => $vote->news_url_id],
+            [
+                'news_url_id' => $vote->news_url_id,
+                'credibility' => $validated['credibility'] ?? null,
+                'relevance' => $validated['relevance'] ?? null,
+                'direction' => $validated['direction'] ?? 'contextual',
+            ],
         );
         InspectAbuseSignalsJob::dispatch($request->user()->id, $vote->newsUrl->id, $vote->id, 'reaction');
         $evidenceSync->syncFromVote($vote->refresh());
+        $newsAggregation->forgetStatusCache($vote->newsUrl);
 
         return response()->json([
             'message' => 'Evidence reaction recorded.',

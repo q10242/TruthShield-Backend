@@ -22,13 +22,13 @@ class AlgorithmController extends Controller
                 'TruthShield does not remove news articles.',
                 'Votes are weighted by user trust score, identity multiplier, and abuse multiplier.',
                 'Evidence usefulness can affect future trust score.',
-                'Results are finalized after the voting window closes.',
+                'The initial vote consensus is snapshotted after the voting window closes; later evidence ratings can still update the evidence verdict.',
             ],
             'rules' => [
                 [
                     'key' => 'voting_window',
-                    'title' => '72 hour finalization window',
-                    'description' => 'A URL stays open for weighted voting and evidence reactions for 72 hours after first collection. After closing, the result is frozen as a snapshot.',
+                    'title' => '72 hour initial consensus snapshot',
+                    'description' => 'A URL stays open for weighted voting for 72 hours after first collection. After closing, the vote consensus is frozen as an initial snapshot while later evidence ratings can keep updating the evidence verdict.',
                 ],
                 [
                     'key' => 'vote_weight',
@@ -37,8 +37,8 @@ class AlgorithmController extends Controller
                 ],
                 [
                     'key' => 'evidence_quality',
-                    'title' => 'Evidence usefulness',
-                    'description' => 'Helpful and unhelpful evidence reactions are weighted. Evidence quality can affect future trust score settlement.',
+                    'title' => 'Evidence-first verdict',
+                    'description' => 'Helpfulness, credibility, relevance, and supports/refutes/contextual direction are weighted. Evidence quality can affect future trust score settlement and the evidence verdict shown beside the vote consensus.',
                 ],
                 [
                     'key' => 'anti_abuse',

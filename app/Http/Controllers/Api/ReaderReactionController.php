@@ -23,6 +23,7 @@ class ReaderReactionController extends Controller
     private const FEELINGS = [
         'confused' => ['emoji' => '😕', 'label' => '資訊混亂'],
         'worried' => ['emoji' => '😟', 'label' => '擔心'],
+        'absurd' => ['emoji' => '🙄', 'label' => '很瞎'],
         'angry' => ['emoji' => '😠', 'label' => '憤怒'],
         'sad' => ['emoji' => '😔', 'label' => '難過'],
         'powerless' => ['emoji' => '😮‍💨', 'label' => '無力'],

@@ -25,6 +25,7 @@ use App\Models\ExtensionEvent;
 use App\Models\ExtensionSelectorCheck;
 use App\Models\MediaOutlet;
 use App\Models\NewsChangeReport;
+use App\Models\NewsCluster;
 use App\Models\NewsDomain;
 use App\Models\NewsDomainReport;
 use App\Models\NewsEvent;
@@ -425,12 +426,12 @@ class TruthShieldApiTest extends TestCase
             ->postJson('/api/reactions', [
                 'news_url' => 'https://news.example.test/b',
                 'event_id' => $event['id'],
-                'feelings' => ['relieved'],
+                'feelings' => ['absurd'],
                 'needs' => ['official_info'],
             ])
             ->assertOk()
             ->assertJsonPath('summary.total_users', 1)
-            ->assertJsonPath('summary.feelings.0.key', 'relieved')
+            ->assertJsonPath('summary.feelings.0.key', 'absurd')
             ->assertJsonPath('summary.needs.0.key', 'official_info');
 
         $this->assertSame(1, ReaderReaction::query()
@@ -441,9 +442,10 @@ class TruthShieldApiTest extends TestCase
         $this->getJson("/api/reactions/summary?event_id={$event['id']}")
             ->assertOk()
             ->assertJsonPath('summary.total_users', 1)
-            ->assertJsonPath('summary.feelings.0.key', 'relieved')
+            ->assertJsonPath('summary.feelings.0.key', 'absurd')
             ->assertJsonPath('summary.needs.0.key', 'official_info')
-            ->assertJsonFragment(['emoji' => '😌'])
+            ->assertJsonFragment(['emoji' => '🙄'])
+            ->assertJsonFragment(['key' => 'absurd', 'emoji' => '🙄', 'label' => '很瞎'])
             ->assertJsonFragment(['key' => 'happy', 'emoji' => '😊', 'label' => '看了開心'])
             ->assertJsonFragment(['key' => 'indifferent', 'emoji' => '😐', 'label' => '無所謂']);
 
@@ -786,6 +788,75 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonPath('snapshot.latest_snapshot.snapshot_type', 'changed');
     }
 
+    public function test_news_snapshot_clusters_same_article_by_canonical_content_and_source_title(): void
+    {
+        $canonical = 'https://www.cna.com.tw/news/aipl/202605060001.aspx';
+        $contentHash = hash('sha256', 'same article body');
+
+        $this->postJson('/api/news/snapshot', [
+            'url' => 'https://portal.example.com/share?id=1',
+            'title_snapshot' => '公共政策新聞完整整理',
+            'canonical_url' => $canonical,
+            'content_hash' => $contentHash,
+        ])->assertCreated();
+
+        $this->postJson('/api/news/snapshot', [
+            'url' => 'https://another-portal.example.com/story/1?utm_source=test',
+            'title_snapshot' => '入口網站轉載標題',
+            'canonical_url' => $canonical,
+        ])->assertCreated();
+
+        $this->postJson('/api/news/snapshot', [
+            'url' => 'https://archive.example.com/story/a',
+            'title_snapshot' => '另一篇相同內容',
+            'content_hash' => $contentHash,
+        ])->assertCreated();
+
+        $this->postJson('/api/news/snapshot', [
+            'url' => 'https://news.example.com/local/one',
+            'title_snapshot' => '同來源同標題',
+        ])->assertCreated();
+
+        $this->postJson('/api/news/snapshot', [
+            'url' => 'https://news.example.com/local/two',
+            'title_snapshot' => '同來源 同標題！',
+        ])->assertCreated();
+
+        $cluster = NewsCluster::query()->where('canonical_hash', hash('sha256', $canonical))->firstOrFail();
+        $this->assertSame(3, $cluster->refresh()->url_count);
+
+        $titleCluster = NewsCluster::query()
+            ->where('source_host', 'news.example.com')
+            ->where('canonical_title', '同來源同標題')
+            ->firstOrFail();
+        $this->assertSame(2, $titleCluster->refresh()->url_count);
+
+        $this->getJson('/api/news/status?url='.urlencode('https://portal.example.com/share?id=1'))
+            ->assertOk()
+            ->assertJsonPath('cluster_id', $cluster->id)
+            ->assertJsonPath('cluster_url_count', 3)
+            ->assertJsonPath('canonical_title', '公共政策新聞完整整理');
+    }
+
+    public function test_news_cluster_creates_review_task_for_low_confidence_cross_host_title_match(): void
+    {
+        $this->postJson('/api/news/snapshot', [
+            'url' => 'https://news-a.example.com/story/1',
+            'title_snapshot' => '同一個公共事件標題',
+        ])->assertCreated();
+
+        $this->postJson('/api/news/snapshot', [
+            'url' => 'https://news-b.example.com/story/2',
+            'title_snapshot' => '同一個公共事件標題',
+        ])->assertCreated();
+
+        $this->assertSame(2, NewsCluster::query()->count());
+        $this->assertDatabaseHas((new CommunityTask)->getTable(), [
+            'type' => 'news_cluster_review',
+            'status' => 'open',
+        ]);
+    }
+
     public function test_news_change_report_can_mark_deleted_article_for_review(): void
     {
         $url = 'https://www.cna.com.tw/news/aipl/202605060001.aspx';
@@ -932,9 +1003,17 @@ class TruthShieldApiTest extends TestCase
         $vote = NewsUrl::query()->firstOrFail()->votes()->firstOrFail();
 
         $this->actingAs($reviewer, 'sanctum')
-            ->postJson("/api/evidence/{$vote->id}/reaction", ['helpful' => true])
+            ->postJson("/api/evidence/{$vote->id}/reaction", [
+                'helpful' => true,
+                'credibility' => 5,
+                'relevance' => 4,
+                'direction' => 'supports',
+            ])
             ->assertOk()
-            ->assertJsonPath('reaction.weight_score', 2.2);
+            ->assertJsonPath('reaction.weight_score', 2.2)
+            ->assertJsonPath('reaction.credibility', 5)
+            ->assertJsonPath('reaction.relevance', 4)
+            ->assertJsonPath('reaction.direction', 'supports');
 
         $this->getJson('/api/news/evidence?url='.urlencode($url))
             ->assertOk()
@@ -942,11 +1021,17 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonPath('data.0.helpful_weight', 2.2)
             ->assertJsonPath('data.0.evidence_host', 'example.com')
             ->assertJsonPath('data.0.evidence_safety', 'unverified')
+            ->assertJsonPath('data.0.direction_summary.supports_weight', 3.3)
             ->assertJsonStructure([
                 'data' => [
                     ['evidence_host', 'evidence_safety', 'is_trusted_evidence', 'preview_url'],
                 ],
             ]);
+
+        $this->getJson('/api/news/status?url='.urlencode($url))
+            ->assertOk()
+            ->assertJsonPath('evidence_verdict.direction', 'supports')
+            ->assertJsonPath('evidence_verdict.supports_weight', 3.3);
     }
 
     public function test_evidence_url_blocks_private_hosts_and_marks_trusted_hosts(): void
@@ -1138,7 +1223,7 @@ class TruthShieldApiTest extends TestCase
             ->assertOk();
     }
 
-    public function test_evidence_reaction_is_rejected_after_voting_window_closes(): void
+    public function test_evidence_reaction_can_update_verdict_after_initial_voting_window_closes(): void
     {
         $this->seed(TagSeeder::class);
         $author = User::factory()->create();
@@ -1160,9 +1245,19 @@ class TruthShieldApiTest extends TestCase
         $newsUrl->forceFill(['voting_closes_at' => now()->subMinute()])->save();
 
         $this->actingAs($reviewer, 'sanctum')
-            ->postJson("/api/evidence/{$vote->id}/reaction", ['helpful' => true])
-            ->assertStatus(409)
-            ->assertJsonPath('status.is_open', false);
+            ->postJson("/api/evidence/{$vote->id}/reaction", [
+                'helpful' => true,
+                'credibility' => 5,
+                'relevance' => 5,
+                'direction' => 'supports',
+            ])
+            ->assertOk()
+            ->assertJsonPath('reaction.direction', 'supports');
+
+        $this->getJson('/api/news/status?url='.urlencode($url))
+            ->assertOk()
+            ->assertJsonPath('is_open', false)
+            ->assertJsonPath('evidence_verdict.direction', 'supports');
     }
 
     public function test_authenticated_user_can_fetch_their_vote_for_url(): void
@@ -1674,6 +1769,13 @@ class TruthShieldApiTest extends TestCase
 
     public function test_settlement_is_idempotent_and_snapshot_command_updates_evidence(): void
     {
+        Http::fake([
+            'i.imgur.com/settle.png' => Http::response('', 200, [
+                'content-type' => 'image/png',
+                'content-length' => '1024',
+            ]),
+        ]);
+
         $this->seed(TagSeeder::class);
         $user = User::factory()->create(['trust_score' => 2]);
         $tag = Tag::query()->where('slug', 'clickbait-title')->firstOrFail();

@@ -16,8 +16,16 @@ class EvidenceSyncService
 
         $helpful = (float) $vote->reactions()->where('helpful', true)->sum('weight_score');
         $unhelpful = (float) $vote->reactions()->where('helpful', false)->sum('weight_score');
+        $credibility = (float) $vote->reactions()->whereNotNull('credibility')->avg('credibility');
+        $relevance = (float) $vote->reactions()->whereNotNull('relevance')->avg('relevance');
+        $directionWeights = [
+            'supports' => (float) $vote->reactions()->where('direction', 'supports')->sum('weight_score'),
+            'refutes' => (float) $vote->reactions()->where('direction', 'refutes')->sum('weight_score'),
+            'contextual' => (float) $vote->reactions()->where('direction', 'contextual')->sum('weight_score'),
+        ];
+        $ratingBonus = (($credibility ?: 3.0) - 3.0) * 4 + (($relevance ?: 3.0) - 3.0) * 4;
         $trustedBonus = $vote->evidence_safety === 'trusted' ? 10 : 0;
-        $quality = round(max(0, min(100, 50 + (($helpful - $unhelpful) * 5) + $trustedBonus + ((float) $vote->weight_score * 2))), 2);
+        $quality = round(max(0, min(100, 50 + (($helpful - $unhelpful) * 5) + $ratingBonus + $trustedBonus + ((float) $vote->weight_score * 2))), 2);
 
         return Evidence::query()->updateOrCreate(
             ['vote_id' => $vote->id],
@@ -36,6 +44,9 @@ class EvidenceSyncService
                     'source' => 'vote_sync',
                     'helpful_weight' => $helpful,
                     'unhelpful_weight' => $unhelpful,
+                    'avg_credibility' => $credibility ?: null,
+                    'avg_relevance' => $relevance ?: null,
+                    'direction_weights' => $directionWeights,
                 ],
             ],
         );

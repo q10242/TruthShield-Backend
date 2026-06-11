@@ -785,6 +785,10 @@ class CommunityAutomationService
             'needs_official_response' => 'official_response_request',
             'fact_check_request' => 'fact_check_request',
             'event_creation_request' => 'event_creation_request',
+            'timeline_source_review' => 'event_timeline_review',
+            'official_source_request' => 'official_source_request',
+            'entity_relationship_review' => 'event_entity_review',
+            'news_cluster_review' => 'news_cluster_review',
             default => null,
         };
     }
@@ -800,6 +804,10 @@ class CommunityAutomationService
             'needs_official_response' => 'official_response_request',
             'fact_check_request' => 'fact_check_request',
             'event_creation_request' => 'event_creation_request',
+            'timeline_source_review' => 'event_timeline_review',
+            'official_source_request' => 'official_source_request',
+            'entity_relationship_review' => 'event_entity_review',
+            'news_cluster_review' => 'news_cluster_review',
             default => null,
         };
     }
@@ -841,6 +849,22 @@ class CommunityAutomationService
             'event_creation_request' => [
                 ['value' => 'submit_event_created', 'label' => '我已建立事件脈絡'],
                 ['value' => 'reject_event_creation_request', 'label' => '目前不需要建立事件'],
+            ],
+            'timeline_source_review' => [
+                ['value' => 'confirm_timeline_source', 'label' => '我已補上可追溯時間線來源'],
+                ['value' => 'reject_timeline_source', 'label' => '這筆時間線不適合收錄'],
+            ],
+            'official_source_request' => [
+                ['value' => 'needs_official_source', 'label' => '我確認需要官方或原始來源'],
+                ['value' => 'submit_official_source', 'label' => '我已補上官方或原始來源'],
+            ],
+            'entity_relationship_review' => [
+                ['value' => 'confirm_entity_relationship', 'label' => '我確認人物/組織關係有來源支撐'],
+                ['value' => 'reject_entity_relationship', 'label' => '這個關係需要修正或移除'],
+            ],
+            'news_cluster_review' => [
+                ['value' => 'confirm_news_cluster', 'label' => '我確認這些是同篇新聞'],
+                ['value' => 'reject_news_cluster', 'label' => '我認為不應合併'],
             ],
             default => [],
         };

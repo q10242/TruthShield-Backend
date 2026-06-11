@@ -19,7 +19,7 @@ class OpenApiController extends Controller
             'paths' => [
                 '/api/news/status' => [
                     'get' => [
-                        'summary' => 'Get weighted status for a URL',
+                        'summary' => 'Get weighted status, same-article cluster, and evidence verdict for a URL',
                         'parameters' => [
                             ['name' => 'url', 'in' => 'query', 'required' => true, 'schema' => ['type' => 'string', 'format' => 'uri']],
                         ],
@@ -61,11 +61,31 @@ class OpenApiController extends Controller
                         ],
                     ],
                 ],
-                '/api/news/snapshot' => ['post' => ['summary' => 'Record article metadata snapshot and detect changes']],
+                '/api/news/snapshot' => ['post' => ['summary' => 'Record article metadata snapshot, detect changes, and feed conservative article clustering']],
                 '/api/news/change-reports' => ['post' => ['summary' => 'Report deleted or modified article state']],
                 '/api/news/read-session' => ['post' => ['summary' => 'Record authenticated reading time']],
                 '/api/vote' => ['post' => ['summary' => 'Create or update one authenticated vote']],
-                '/api/evidence/{vote}/reaction' => ['post' => ['summary' => 'Rate evidence helpfulness']],
+                '/api/evidence/{vote}/reaction' => [
+                    'post' => [
+                        'summary' => 'Rate evidence helpfulness, credibility, relevance, and direction',
+                        'requestBody' => [
+                            'content' => [
+                                'application/json' => [
+                                    'schema' => [
+                                        'type' => 'object',
+                                        'required' => ['helpful'],
+                                        'properties' => [
+                                            'helpful' => ['type' => 'boolean'],
+                                            'credibility' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 5],
+                                            'relevance' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 5],
+                                            'direction' => ['type' => 'string', 'enum' => ['supports', 'refutes', 'contextual']],
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
                 '/api/evidence/{vote}/report' => ['post' => ['summary' => 'Report evidence for moderation']],
                 '/api/evidence-library' => [
                     'get' => [

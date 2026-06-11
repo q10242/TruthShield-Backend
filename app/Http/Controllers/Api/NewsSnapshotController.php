@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\NewsUrl;
 use App\Services\MediaOutletService;
 use App\Services\NewsAggregationService;
+use App\Services\NewsClusterService;
 use App\Services\NewsSnapshotService;
 use App\Services\UrlFingerprintService;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +21,7 @@ class NewsSnapshotController extends Controller
         NewsAggregationService $aggregation,
         NewsSnapshotService $snapshots,
         MediaOutletService $mediaOutlets,
+        NewsClusterService $clusters,
     ): JsonResponse {
         $validated = $request->validate([
             'url' => ['required', 'url', 'max:4096'],
@@ -56,6 +58,10 @@ class NewsSnapshotController extends Controller
             ...$validated,
             'source' => 'api',
             'user_agent' => substr((string) $request->userAgent(), 0, 240),
+        ]);
+        $clusters->attach($newsUrl->refresh(), [
+            ...$validated,
+            'source' => 'api_snapshot',
         ]);
 
         $aggregation->forgetStatusCache($newsUrl);

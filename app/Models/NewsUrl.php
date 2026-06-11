@@ -11,6 +11,7 @@ class NewsUrl extends Model
     protected $fillable = [
         'hash',
         'media_outlet_id',
+        'news_cluster_id',
         'original_url',
         'normalized_url',
         'canonical_url',
@@ -79,5 +80,10 @@ class NewsUrl extends Model
     public function mediaOutlet(): BelongsTo
     {
         return $this->belongsTo(MediaOutlet::class);
+    }
+
+    public function cluster(): BelongsTo
+    {
+        return $this->belongsTo(NewsCluster::class, 'news_cluster_id');
     }
 }

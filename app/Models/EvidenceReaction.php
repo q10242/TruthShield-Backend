@@ -11,6 +11,9 @@ class EvidenceReaction extends Model
         'vote_id',
         'user_id',
         'helpful',
+        'credibility',
+        'relevance',
+        'direction',
         'weight_score',
     ];
 
@@ -18,6 +21,8 @@ class EvidenceReaction extends Model
     {
         return [
             'helpful' => 'boolean',
+            'credibility' => 'integer',
+            'relevance' => 'integer',
             'weight_score' => 'float',
         ];
     }

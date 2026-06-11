@@ -157,7 +157,14 @@ class NewsAggregationService
 
     private function withCurrentSnapshot(NewsUrl $newsUrl, array $status): array
     {
+        $newsUrl->loadMissing('cluster');
+
         $status['snapshot'] = $this->snapshots->statusPayload($newsUrl);
+        $status['cluster'] = $this->clusterPayload($newsUrl);
+        $status['cluster_id'] = $newsUrl->news_cluster_id;
+        $status['cluster_url_count'] = $newsUrl->cluster?->url_count ?? ($newsUrl->news_cluster_id ? 1 : 0);
+        $status['canonical_title'] = $newsUrl->cluster?->canonical_title ?: $newsUrl->title_snapshot;
+        $status['evidence_verdict'] = $this->evidenceVerdictPayload($newsUrl);
 
         return $status;
     }
@@ -180,13 +187,19 @@ class NewsAggregationService
             'percentage' => $totalWeight > 0 ? round(((float) $row->total_weight / $totalWeight) * 100, 2) : 0.0,
         ])->values()->all();
         $secondaryDistribution = $this->secondaryTagDistribution($newsUrl);
+        $newsUrl->loadMissing('cluster');
 
         return [
             'url_hash' => $newsUrl->hash,
             'normalized_url' => $newsUrl->normalized_url,
+            'cluster' => $this->clusterPayload($newsUrl),
+            'cluster_id' => $newsUrl->news_cluster_id,
+            'cluster_url_count' => $newsUrl->cluster?->url_count ?? ($newsUrl->news_cluster_id ? 1 : 0),
+            'canonical_title' => $newsUrl->cluster?->canonical_title ?: $newsUrl->title_snapshot,
             'top_tag' => $top?->tag,
             'distribution' => $distribution,
             'secondary_distribution' => $secondaryDistribution,
+            'evidence_verdict' => $this->evidenceVerdictPayload($newsUrl),
             'display_text' => $this->displayText($top?->tag?->severity, $percentage, $top?->tag?->name),
             'tone' => $this->toneFor($top?->tag?->severity),
             'percentage' => $percentage,
@@ -204,7 +217,12 @@ class NewsAggregationService
         return $newsUrl->votes()
             ->where('hidden', false)
             ->whereNotNull('evidence_url')
-            ->with(['tag:id,name,slug,color,severity,description,translations', 'user:id,name,trust_score', 'evidence:id,vote_id,archive_url,preview_url,quality_score,snapshot_status'])
+            ->with([
+                'tag:id,name,slug,color,severity,description,translations',
+                'user:id,name,trust_score',
+                'evidence:id,vote_id,archive_url,preview_url,quality_score,snapshot_status',
+                'reactions:id,vote_id,helpful,credibility,relevance,direction,weight_score',
+            ])
             ->withSum(['reactions as helpful_weight' => fn ($query) => $query->where('helpful', true)], 'weight_score')
             ->withSum(['reactions as unhelpful_weight' => fn ($query) => $query->where('helpful', false)], 'weight_score')
             ->withCount(['reactions as helpful_count' => fn ($query) => $query->where('helpful', true)])
@@ -241,9 +259,110 @@ class NewsAggregationService
                 'helpful_weight' => round((float) ($vote->helpful_weight ?? 0), 4),
                 'unhelpful_weight' => round((float) ($vote->unhelpful_weight ?? 0), 4),
                 'net_helpful_weight' => round((float) ($vote->helpful_weight ?? 0) - (float) ($vote->unhelpful_weight ?? 0), 4),
+                'direction_summary' => $this->evidenceDirectionForVote($vote),
             ])
             ->values()
             ->all();
+    }
+
+    private function clusterPayload(NewsUrl $newsUrl): ?array
+    {
+        $cluster = $newsUrl->cluster;
+
+        if (! $cluster) {
+            return null;
+        }
+
+        return [
+            'id' => $cluster->id,
+            'url_count' => (int) $cluster->url_count,
+            'canonical_title' => $cluster->canonical_title,
+            'source_host' => $cluster->source_host,
+            'title_key' => $cluster->title_key,
+            'last_matched_at' => $cluster->last_matched_at?->toJSON(),
+        ];
+    }
+
+    private function evidenceVerdictPayload(NewsUrl $newsUrl): array
+    {
+        $rows = DB::table('evidence_reactions')
+            ->join('votes', 'votes.id', '=', 'evidence_reactions.vote_id')
+            ->where('votes.news_url_id', $newsUrl->id)
+            ->where('votes.hidden', false)
+            ->whereNotNull('votes.evidence_url')
+            ->get([
+                'evidence_reactions.direction',
+                'evidence_reactions.credibility',
+                'evidence_reactions.relevance',
+                'evidence_reactions.weight_score',
+            ]);
+
+        $weights = [
+            'supports' => 0.0,
+            'refutes' => 0.0,
+            'contextual' => 0.0,
+        ];
+
+        foreach ($rows as $row) {
+            $direction = in_array($row->direction, ['supports', 'refutes', 'contextual'], true)
+                ? $row->direction
+                : 'contextual';
+            $credibility = $row->credibility ? max(1, min(5, (int) $row->credibility)) : 3;
+            $relevance = $row->relevance ? max(1, min(5, (int) $row->relevance)) : 3;
+            $qualityFactor = (($credibility + $relevance) / 2) / 3;
+
+            $weights[$direction] += ((float) $row->weight_score) * $qualityFactor;
+        }
+
+        $supports = round($weights['supports'], 4);
+        $refutes = round($weights['refutes'], 4);
+        $contextual = round($weights['contextual'], 4);
+        $net = round($supports - $refutes, 4);
+        $direction = match (true) {
+            $supports > 0 && $supports >= ($refutes * 1.2) => 'supports',
+            $refutes > 0 && $refutes >= ($supports * 1.2) => 'refutes',
+            ($supports + $refutes + $contextual) > 0 => 'mixed_or_contextual',
+            default => 'insufficient_evidence',
+        };
+
+        return [
+            'direction' => $direction,
+            'label' => match ($direction) {
+                'supports' => '證據目前較支持新聞內容',
+                'refutes' => '證據目前較反駁新聞內容',
+                'mixed_or_contextual' => '證據目前以脈絡補充或分歧為主',
+                default => '尚無足夠證據評價',
+            },
+            'supports_weight' => $supports,
+            'refutes_weight' => $refutes,
+            'contextual_weight' => $contextual,
+            'net_support_weight' => $net,
+            'rating_count' => $rows->count(),
+        ];
+    }
+
+    private function evidenceDirectionForVote(Vote $vote): array
+    {
+        $weights = [
+            'supports' => 0.0,
+            'refutes' => 0.0,
+            'contextual' => 0.0,
+        ];
+
+        foreach ($vote->reactions as $reaction) {
+            $direction = in_array($reaction->direction, ['supports', 'refutes', 'contextual'], true)
+                ? $reaction->direction
+                : 'contextual';
+            $credibility = $reaction->credibility ? max(1, min(5, (int) $reaction->credibility)) : 3;
+            $relevance = $reaction->relevance ? max(1, min(5, (int) $reaction->relevance)) : 3;
+            $weights[$direction] += ((float) $reaction->weight_score) * ((($credibility + $relevance) / 2) / 3);
+        }
+
+        return [
+            'supports_weight' => round($weights['supports'], 4),
+            'refutes_weight' => round($weights['refutes'], 4),
+            'contextual_weight' => round($weights['contextual'], 4),
+        ];
     }
 
     private function hostForUrl(?string $url): ?string
@@ -283,9 +402,22 @@ class NewsAggregationService
         return [
             'url_hash' => $hash,
             'normalized_url' => $normalizedUrl,
+            'cluster' => null,
+            'cluster_id' => null,
+            'cluster_url_count' => 0,
+            'canonical_title' => null,
             'top_tag' => null,
             'distribution' => [],
             'secondary_distribution' => [],
+            'evidence_verdict' => [
+                'direction' => 'insufficient_evidence',
+                'label' => '尚無足夠證據評價',
+                'supports_weight' => 0.0,
+                'refutes_weight' => 0.0,
+                'contextual_weight' => 0.0,
+                'net_support_weight' => 0.0,
+                'rating_count' => 0,
+            ],
             'display_text' => '尚無足夠投票資料',
             'tone' => 'neutral',
             'percentage' => 0.0,

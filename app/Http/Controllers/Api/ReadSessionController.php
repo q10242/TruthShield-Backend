@@ -7,6 +7,7 @@ use App\Models\NewsUrl;
 use App\Models\ReadSession;
 use App\Services\MediaOutletService;
 use App\Services\NewsAggregationService;
+use App\Services\NewsClusterService;
 use App\Services\NewsSnapshotService;
 use App\Services\UrlFingerprintService;
 use Illuminate\Http\JsonResponse;
@@ -21,6 +22,7 @@ class ReadSessionController extends Controller
         NewsAggregationService $newsAggregation,
         NewsSnapshotService $snapshots,
         MediaOutletService $mediaOutlets,
+        NewsClusterService $clusters,
     ): JsonResponse {
         $validated = $request->validate([
             'url' => ['required', 'url', 'max:4096'],
@@ -64,6 +66,10 @@ class ReadSessionController extends Controller
                 'user_agent' => substr((string) $request->userAgent(), 0, 240),
             ]);
         }
+        $clusters->attach($newsUrl->refresh(), [
+            ...$validated,
+            'source' => 'read_session',
+        ]);
 
         $existing = ReadSession::query()
             ->where('user_id', $request->user()->id)

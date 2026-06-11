@@ -19,7 +19,6 @@ use App\Models\RateLimitPolicy;
 use App\Models\TrafficEvent;
 use App\Models\TrustedEvidenceSource;
 use App\Models\UserDataRequest;
-use App\Services\TrafficAnalyticsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +26,7 @@ use Illuminate\Support\Facades\Log;
 
 class SystemHealthController extends Controller
 {
-    public function show(TrafficAnalyticsService $traffic): JsonResponse
+    public function show(): JsonResponse
     {
         $database = true;
         $cache = true;
@@ -60,7 +59,7 @@ class SystemHealthController extends Controller
 
         $trafficAvailable = true;
         try {
-            $trafficSummary = $traffic->publicSummary();
+            $trafficSummary = $this->healthTrafficSummary();
         } catch (\Throwable $exception) {
             $trafficAvailable = false;
             $trafficSummary = ['available' => false];
@@ -216,6 +215,27 @@ class SystemHealthController extends Controller
                 'critical_bug_reports' => 0,
                 'traffic_events_24h' => 0,
             ],
+        ];
+    }
+
+    private function healthTrafficSummary(): array
+    {
+        if (! DB::getSchemaBuilder()->hasTable('traffic_events')) {
+            return [
+                'available' => true,
+                'traffic_events_24h' => 0,
+                'current_hour_events' => 0,
+            ];
+        }
+
+        return [
+            'available' => true,
+            'traffic_events_24h' => TrafficEvent::query()
+                ->where('created_at', '>=', now()->subDay())
+                ->count(),
+            'current_hour_events' => TrafficEvent::query()
+                ->where('created_at', '>=', now()->startOfHour())
+                ->count(),
         ];
     }
 

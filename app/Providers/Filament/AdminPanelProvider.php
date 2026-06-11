@@ -109,6 +109,37 @@ class AdminPanelProvider extends PanelProvider
                             color: #67e8f9;
                         }
                     </style>
+                    <script>
+                        (() => {
+                            const removeLivewireErrorDialog = () => {
+                                document.getElementById('livewire-error')?.remove();
+                                document.body.style.overflow = '';
+                            };
+
+                            document.addEventListener('livewire:init', () => {
+                                window.Livewire?.hook?.('request', ({ fail }) => {
+                                    fail(({ status, preventDefault }) => {
+                                        if (![500, 502, 503, 504].includes(Number(status))) {
+                                            return;
+                                        }
+
+                                        preventDefault();
+                                        removeLivewireErrorDialog();
+
+                                        if (window.FilamentNotification) {
+                                            new window.FilamentNotification()
+                                                .title('後台資料更新失敗')
+                                                .body('Livewire 自動更新暫時失敗，請重新整理或稍後再試。')
+                                                .danger()
+                                                .send();
+                                        }
+                                    });
+                                });
+                            });
+
+                            document.addEventListener('DOMContentLoaded', removeLivewireErrorDialog);
+                        })();
+                    </script>
                 HTML),
             )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')

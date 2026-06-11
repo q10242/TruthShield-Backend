@@ -123,6 +123,8 @@ Route::get('/moderation-events', [ModerationEventController::class, 'index']);
 Route::get('/leaderboard/media', [LeaderboardController::class, 'media']);
 Route::get('/leaderboard/domains', [LeaderboardController::class, 'domains']);
 Route::get('/leaderboard/trust', [TrustLeaderboardController::class, 'index']);
+Route::get('/stats/media', [MediaOutletController::class, 'aggregateStats']);
+Route::get('/stats/journalists', [JournalistController::class, 'aggregateStats']);
 Route::get('/media-outlets', [MediaOutletController::class, 'index']);
 Route::get('/media-outlets/{mediaOutlet}/stats', [MediaOutletController::class, 'stats']);
 Route::get('/exports/media.csv', [ExportController::class, 'mediaCsv']);

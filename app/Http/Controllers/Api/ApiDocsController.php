@@ -58,6 +58,8 @@ class ApiDocsController extends Controller
                 ['method' => 'POST', 'path' => '/api/admin/abuse-events/{event}/review', 'description' => 'Admin review abuse event and optionally adjust risk.'],
                 ['method' => 'POST', 'path' => '/api/admin/users/{user}/trust-adjustment', 'description' => 'Admin trust score adjustment with required reason.'],
                 ['method' => 'GET', 'path' => '/api/leaderboard/media', 'description' => 'Media leaderboard.'],
+                ['method' => 'GET', 'path' => '/api/stats/media', 'description' => 'Neutral report-label statistics for active media outlets; small samples are marked instead of ranked.'],
+                ['method' => 'GET', 'path' => '/api/stats/journalists', 'description' => 'Neutral report-label statistics for active journalists; formal stats include confirmed matches only.'],
                 ['method' => 'GET', 'path' => '/api/exports/news.csv', 'description' => 'Tracked news CSV export.'],
                 ['method' => 'GET', 'path' => '/api/exports/evidence.csv', 'description' => 'Evidence CSV export.'],
                 ['method' => 'GET', 'path' => '/api/exports/news-snapshots.csv', 'description' => 'Article metadata snapshot CSV export.'],

@@ -43,6 +43,39 @@ class MediaOutletController extends Controller
         return response()->json($outlets);
     }
 
+    public function aggregateStats(Request $request, ReportLabelStatsService $stats): JsonResponse
+    {
+        $limit = min(100, max(1, (int) $request->query('per_page', 30)));
+
+        $outlets = MediaOutlet::query()
+            ->withCount('newsUrls')
+            ->where('is_active', true)
+            ->orderByDesc('news_urls_count')
+            ->orderBy('name')
+            ->limit($limit)
+            ->get()
+            ->map(fn (MediaOutlet $outlet) => [
+                'id' => $outlet->id,
+                'name' => $outlet->name,
+                'slug' => $outlet->slug,
+                'type' => $outlet->type,
+                'region' => $outlet->region,
+                'news_urls_count' => $outlet->news_urls_count,
+                'stats' => $stats->mediaStats($outlet, 0),
+                'updated_at' => $outlet->updated_at?->toJSON(),
+            ])
+            ->values();
+
+        return response()->json([
+            'data' => $outlets,
+            'meta' => [
+                'per_page' => $limit,
+                'total' => MediaOutlet::query()->where('is_active', true)->count(),
+                'tracked_tag' => ReportLabelStatsService::TRACKED_TAG_SLUG,
+            ],
+        ]);
+    }
+
     public function show(MediaOutlet $mediaOutlet): JsonResponse
     {
         $weights = Vote::query()

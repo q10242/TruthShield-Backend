@@ -104,6 +104,8 @@ class OpenApiController extends Controller
                 '/api/news-domain-reports' => ['post' => ['summary' => 'Report an untracked news domain']],
                 '/api/leaderboard/media' => ['get' => ['summary' => 'Media leaderboard']],
                 '/api/leaderboard/trust' => ['get' => ['summary' => 'Trust leaderboard']],
+                '/api/stats/media' => ['get' => ['summary' => 'Aggregate neutral report-label statistics for active media outlets']],
+                '/api/stats/journalists' => ['get' => ['summary' => 'Aggregate neutral report-label statistics for active journalists using confirmed matches only']],
                 '/api/exports/media.csv' => ['get' => ['summary' => 'Export media outlet CSV']],
                 '/api/exports/news.csv' => ['get' => ['summary' => 'Export tracked news CSV']],
                 '/api/exports/evidence.csv' => ['get' => ['summary' => 'Export evidence CSV']],

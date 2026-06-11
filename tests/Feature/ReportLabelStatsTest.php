@@ -37,6 +37,28 @@ class ReportLabelStatsTest extends TestCase
             ->assertJsonPath('data.tracked_tag_ratio', 80);
     }
 
+    public function test_media_stats_endpoint_lists_active_outlets(): void
+    {
+        [$media, $clickbait] = $this->seedBasics();
+        $this->createNewsWithVotes($media, $clickbait, 1);
+
+        MediaOutlet::query()->create([
+            'name' => '停用媒體',
+            'slug' => 'inactive-media',
+            'type' => 'news',
+            'region' => 'TW',
+            'is_active' => false,
+        ]);
+
+        $response = $this->getJson('/api/stats/media');
+
+        $response->assertOk()
+            ->assertJsonPath('meta.tracked_tag', 'clickbait-title')
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $media->id)
+            ->assertJsonPath('data.0.stats.article_count', 1);
+    }
+
     public function test_journalist_stats_exclude_suspected_matches(): void
     {
         [$media, $clickbait, $accurate] = $this->seedBasics();
@@ -72,6 +94,46 @@ class ReportLabelStatsTest extends TestCase
             ->assertJsonPath('data.article_count', 1)
             ->assertJsonPath('data.tracked_tag_count', 1)
             ->assertJsonPath('data.tracked_tag_ratio', null);
+    }
+
+    public function test_journalist_stats_endpoint_uses_confirmed_matches_only(): void
+    {
+        [$media, $clickbait, $accurate] = $this->seedBasics();
+        $journalist = Journalist::query()->create([
+            'media_outlet_id' => $media->id,
+            'display_name' => '王小明',
+            'canonical_name' => '王小明',
+            'status' => 'active',
+        ]);
+
+        $confirmed = $this->createNewsWithVotes($media, $clickbait, 1);
+        $suspected = $this->createNewsWithVotes($media, $accurate, 1);
+
+        JournalistNewsUrl::query()->create([
+            'journalist_id' => $journalist->id,
+            'news_url_id' => $confirmed->id,
+            'match_source' => 'selector',
+            'confidence' => 'high',
+            'review_status' => 'confirmed',
+            'confirmed_at' => now(),
+        ]);
+        JournalistNewsUrl::query()->create([
+            'journalist_id' => $journalist->id,
+            'news_url_id' => $suspected->id,
+            'match_source' => 'full_text',
+            'confidence' => 'low',
+            'review_status' => 'suspected',
+        ]);
+
+        $response = $this->getJson('/api/stats/journalists');
+
+        $response->assertOk()
+            ->assertJsonPath('meta.formal_stats_review_status', 'confirmed')
+            ->assertJsonPath('data.0.id', $journalist->id)
+            ->assertJsonPath('data.0.confirmed_news_count', 1)
+            ->assertJsonPath('data.0.suspected_news_count', 1)
+            ->assertJsonPath('data.0.stats.article_count', 1)
+            ->assertJsonPath('data.0.stats.tracked_tag_count', 1);
     }
 
     public function test_journalist_cache_contains_aliases_and_exclusions_shape(): void

@@ -58,6 +58,44 @@ class JournalistController extends Controller
         return response()->json($journalists);
     }
 
+    public function aggregateStats(Request $request, ReportLabelStatsService $stats): JsonResponse
+    {
+        $limit = min(100, max(1, (int) $request->query('per_page', 30)));
+
+        $journalists = Journalist::query()
+            ->with('mediaOutlet:id,name,slug')
+            ->withCount([
+                'matches as confirmed_news_count' => fn (Builder $query) => $query->where('review_status', 'confirmed'),
+                'matches as suspected_news_count' => fn (Builder $query) => $query->where('review_status', 'suspected'),
+            ])
+            ->where('status', 'active')
+            ->orderByDesc('confirmed_news_count')
+            ->orderBy('display_name')
+            ->limit($limit)
+            ->get()
+            ->map(fn (Journalist $journalist) => [
+                'id' => $journalist->id,
+                'display_name' => $journalist->display_name,
+                'canonical_name' => $journalist->canonical_name,
+                'media_outlet' => $journalist->mediaOutlet,
+                'confirmed_news_count' => $journalist->confirmed_news_count,
+                'suspected_news_count' => $journalist->suspected_news_count,
+                'stats' => $stats->journalistStats($journalist, 0),
+                'updated_at' => $journalist->updated_at?->toJSON(),
+            ])
+            ->values();
+
+        return response()->json([
+            'data' => $journalists,
+            'meta' => [
+                'per_page' => $limit,
+                'total' => Journalist::query()->where('status', 'active')->count(),
+                'tracked_tag' => ReportLabelStatsService::TRACKED_TAG_SLUG,
+                'formal_stats_review_status' => 'confirmed',
+            ],
+        ]);
+    }
+
     public function show(Journalist $journalist, ReportLabelStatsService $stats): JsonResponse
     {
         abort_unless($journalist->status === 'active', 404);

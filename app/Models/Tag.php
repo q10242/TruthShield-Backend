@@ -100,7 +100,7 @@ class Tag extends Model
 
     public function requiresEvidenceNote(): bool
     {
-        return (bool) $this->requires_evidence;
+        return false;
     }
 
     public function votes(): HasMany

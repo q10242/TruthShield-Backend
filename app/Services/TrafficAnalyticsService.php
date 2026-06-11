@@ -119,9 +119,9 @@ class TrafficAnalyticsService
                 ->filter($filter)
                 ->sum(fn ($row) => (int) ($row->estimated_count ?? round(1 / max(0.0001, (float) ($row->sample_rate ?? 1)))));
 
-            $statusEvents = $events->filter(fn ($row) => ($row->feature ?? null) === 'news_status');
-            $hits = $statusEvents->filter(fn ($row) => ($row->cache_status ?? null) === 'hit')->sum(fn ($row) => (int) ($row->estimated_count ?? 1));
-            $misses = $statusEvents->filter(fn ($row) => ($row->cache_status ?? null) === 'miss')->sum(fn ($row) => (int) ($row->estimated_count ?? 1));
+            $statusEvents = $rawToday->filter(fn ($row) => ($row->feature ?? null) === 'news_status');
+            $hits = $this->sumEstimated($statusEvents->filter(fn ($row) => ($row->cache_status ?? null) === 'hit'));
+            $misses = $this->sumEstimated($statusEvents->filter(fn ($row) => ($row->cache_status ?? null) === 'miss'));
             $statusTotal = $hits + $misses;
 
             return [
@@ -290,16 +290,21 @@ class TrafficAnalyticsService
             ->count('session_hash');
     }
 
+    private function sumEstimated($events): int
+    {
+        return (int) $events->sum(
+            fn ($row) => (int) ($row->estimated_count ?? round(1 / max(0.0001, (float) ($row->sample_rate ?? 1))))
+        );
+    }
+
     private function errorRateForToday($events): ?float
     {
-        $total = (int) $events->sum(fn ($row) => (int) ($row->estimated_count ?? 1));
+        $total = $this->sumEstimated($events);
         if ($total <= 0) {
             return null;
         }
 
-        $errors = (int) $events
-            ->filter(fn ($row) => ! (bool) ($row->success ?? true))
-            ->sum(fn ($row) => (int) ($row->estimated_count ?? 1));
+        $errors = $this->sumEstimated($events->filter(fn ($row) => ! (bool) ($row->success ?? true)));
 
         return round(($errors / $total) * 100, 2);
     }

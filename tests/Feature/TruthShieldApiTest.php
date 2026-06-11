@@ -232,7 +232,7 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonValidationErrors('evidence_url');
     }
 
-    public function test_negative_vote_requires_evidence_note(): void
+    public function test_negative_vote_accepts_evidence_url_without_note(): void
     {
         $this->seed(TagSeeder::class);
         $user = User::factory()->create();
@@ -244,8 +244,8 @@ class TruthShieldApiTest extends TestCase
                 'tag_id' => $tag->id,
                 'evidence_url' => 'https://example.com/source',
             ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('evidence_note');
+            ->assertCreated()
+            ->assertJsonPath('vote.evidence_note', null);
     }
 
     public function test_context_negative_vote_accepts_note_without_evidence_url(): void
@@ -263,6 +263,22 @@ class TruthShieldApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('vote.evidence_url', null)
             ->assertJsonPath('vote.evidence_note', '全文只引用單一官方說法，未見受影響方、第二來源或文件補強。');
+    }
+
+    public function test_context_negative_vote_accepts_structured_label_without_note(): void
+    {
+        $this->seed(TagSeeder::class);
+        $user = User::factory()->create();
+        $tag = Tag::query()->where('slug', 'lack-of-balance')->firstOrFail();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/vote', [
+                'url' => 'https://www.cna.com.tw/news/aipl/202605060011.aspx',
+                'tag_id' => $tag->id,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('vote.evidence_url', null)
+            ->assertJsonPath('vote.evidence_note', null);
     }
 
     public function test_valid_token_vote_records_weight_and_clears_status_cache(): void
@@ -3116,9 +3132,15 @@ class TruthShieldApiTest extends TestCase
             'metadata' => ['button' => 'hero', 'full_url' => 'https://example.test/private?token=secret'],
         ])->assertAccepted();
 
-        $this->getJson('/api/news/status?url='.urlencode('https://www.cna.com.tw/news/aipl/202605090001.aspx'))
+        $statusUrl = '/api/news/status?url='.urlencode('https://www.cna.com.tw/news/aipl/202605090001.aspx');
+
+        $this->getJson($statusUrl)
             ->assertOk()
-            ->assertHeader('X-TruthShield-Cache');
+            ->assertHeader('X-TruthShield-Cache', 'miss');
+
+        $this->getJson($statusUrl)
+            ->assertOk()
+            ->assertHeader('X-TruthShield-Cache', 'hit');
 
         $this->assertGreaterThanOrEqual(2, TrafficEvent::query()->count());
         $this->assertDatabaseHas('traffic_events', [
@@ -3139,6 +3161,7 @@ class TruthShieldApiTest extends TestCase
 
         $this->getJson('/api/traffic/summary')
             ->assertOk()
+            ->assertJsonPath('cache_hit_rate', 50)
             ->assertJsonStructure([
                 'today_api_requests',
                 'today_status_queries',

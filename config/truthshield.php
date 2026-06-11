@@ -41,6 +41,12 @@ return [
 
     'algorithm_version' => env('TRUTHSHIELD_ALGORITHM_VERSION', 'truthshield-v1'),
 
+    'report_stats' => [
+        'min_sample_size' => (int) env('TRUTHSHIELD_REPORT_STATS_MIN_SAMPLE_SIZE', 10),
+        'min_tag_weight' => (float) env('TRUTHSHIELD_REPORT_STATS_MIN_TAG_WEIGHT', 1.0),
+        'min_tag_ratio' => (float) env('TRUTHSHIELD_REPORT_STATS_MIN_TAG_RATIO', 0.5),
+    ],
+
     'identity_multipliers' => [
         'dev' => 0.8,
         'oauth' => 1.0,

@@ -82,6 +82,19 @@ class NewsUrl extends Model
         return $this->belongsTo(MediaOutlet::class);
     }
 
+    public function journalistMatches(): HasMany
+    {
+        return $this->hasMany(JournalistNewsUrl::class);
+    }
+
+    public function journalists()
+    {
+        return $this->belongsToMany(Journalist::class, 'journalist_news_url')
+            ->using(JournalistNewsUrl::class)
+            ->withPivot(['match_source', 'matched_text', 'confidence', 'review_status', 'confirmed_by', 'confirmed_at', 'rejected_reason', 'metadata'])
+            ->withTimestamps();
+    }
+
     public function cluster(): BelongsTo
     {
         return $this->belongsTo(NewsCluster::class, 'news_cluster_id');

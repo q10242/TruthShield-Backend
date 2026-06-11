@@ -67,7 +67,7 @@ class LookupController extends Controller
                             ->where('is_active', true)
                             ->orderBy('priority')
                             ->orderBy('domain')
-                            ->get(['domain', 'article_selector', 'title_selector', 'content_selector', 'blocked_path_pattern', 'article_url_pattern', 'list_url_pattern', 'priority']);
+                            ->get(['domain', 'article_selector', 'title_selector', 'content_selector', 'author_selector', 'author_regex', 'blocked_path_pattern', 'article_url_pattern', 'list_url_pattern', 'priority']);
 
                         if ($domains->isEmpty()) {
                             $domains = collect(config('truthshield.news_domains'))
@@ -76,6 +76,8 @@ class LookupController extends Controller
                                     'article_selector' => null,
                                     'title_selector' => null,
                                     'content_selector' => null,
+                                    'author_selector' => null,
+                                    'author_regex' => null,
                                     'blocked_path_pattern' => null,
                                     'article_url_pattern' => null,
                                     'list_url_pattern' => null,
@@ -93,6 +95,8 @@ class LookupController extends Controller
                                     'article_selector' => $domain->article_selector ?: ($fixture['article_selector'] ?? null),
                                     'title_selector' => $domain->title_selector ?: ($fixture['title_selector'] ?? null),
                                     'content_selector' => $domain->content_selector ?: ($fixture['content_selector'] ?? null),
+                                    'author_selector' => $domain->author_selector ?: ($fixture['author_selector'] ?? null),
+                                    'author_regex' => $domain->author_regex ?: ($fixture['author_regex'] ?? null),
                                     'blocked_path_pattern' => $domain->blocked_path_pattern,
                                     'article_url_pattern' => $domain->article_url_pattern,
                                     'list_url_pattern' => $domain->list_url_pattern,

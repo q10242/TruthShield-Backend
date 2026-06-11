@@ -17,6 +17,8 @@ class NewsDomain extends Model
         'article_selector',
         'title_selector',
         'content_selector',
+        'author_selector',
+        'author_regex',
         'blocked_path_pattern',
         'article_url_pattern',
         'list_url_pattern',

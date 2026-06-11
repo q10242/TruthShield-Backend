@@ -55,6 +55,16 @@ class NewsDomainResource extends Resource
                 ->maxLength(500)
                 ->helperText('Optional CSS selector used by the extension to detect article body.')
                 ->columnSpanFull(),
+            Forms\Components\TextInput::make('author_selector')
+                ->label('作者欄 selector')
+                ->maxLength(500)
+                ->helperText('Optional CSS selector used by the extension to detect byline / journalist names.')
+                ->columnSpanFull(),
+            Forms\Components\TextInput::make('author_regex')
+                ->label('作者欄 regex')
+                ->maxLength(500)
+                ->helperText('Optional regular expression for extracting journalist names from byline text.')
+                ->columnSpanFull(),
             Forms\Components\TextInput::make('blocked_path_pattern')
                 ->maxLength(500)
                 ->helperText('Optional regular expression for paths where the extension should not inject.')
@@ -88,6 +98,9 @@ class NewsDomainResource extends Resource
                 Tables\Columns\TextColumn::make('mediaOutlet.name')
                     ->label('媒體')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('author_selector')
+                    ->label('作者 selector')
+                    ->limit(24),
                 Tables\Columns\IconColumn::make('is_active')
                     ->boolean()
                     ->sortable(),

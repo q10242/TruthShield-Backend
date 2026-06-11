@@ -73,6 +73,7 @@ class CommunityTaskResource extends Resource
                     'event_timeline_review' => '時間線確認',
                     'event_relationship_review' => '人物/組織關係',
                     'event_relationship_report' => '被檢舉關係',
+                    'journalist_match_review' => '記者對應審核',
                 ]),
             ])
             ->actions([

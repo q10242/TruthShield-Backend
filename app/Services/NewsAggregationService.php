@@ -12,7 +12,10 @@ use Illuminate\Support\Facades\DB;
 
 class NewsAggregationService
 {
-    public function __construct(private readonly NewsSnapshotService $snapshots) {}
+    public function __construct(
+        private readonly NewsSnapshotService $snapshots,
+        private readonly ReportLabelStatsService $reportStats,
+    ) {}
 
     public function statusForFingerprint(array $fingerprint, string $locale = 'zh-TW'): array
     {
@@ -165,6 +168,8 @@ class NewsAggregationService
         $status['cluster_url_count'] = $newsUrl->cluster?->url_count ?? ($newsUrl->news_cluster_id ? 1 : 0);
         $status['canonical_title'] = $newsUrl->cluster?->canonical_title ?: $newsUrl->title_snapshot;
         $status['evidence_verdict'] = $this->evidenceVerdictPayload($newsUrl);
+        $status['media_context'] = $newsUrl->mediaOutlet ? $this->reportStats->mediaContext($newsUrl->mediaOutlet) : null;
+        $status['journalist_context'] = $this->reportStats->journalistContextForNews($newsUrl);
 
         return $status;
     }
@@ -188,6 +193,7 @@ class NewsAggregationService
         ])->values()->all();
         $secondaryDistribution = $this->secondaryTagDistribution($newsUrl);
         $newsUrl->loadMissing('cluster');
+        $newsUrl->loadMissing('mediaOutlet');
 
         return [
             'url_hash' => $newsUrl->hash,
@@ -200,6 +206,8 @@ class NewsAggregationService
             'distribution' => $distribution,
             'secondary_distribution' => $secondaryDistribution,
             'evidence_verdict' => $this->evidenceVerdictPayload($newsUrl),
+            'media_context' => $newsUrl->mediaOutlet ? $this->reportStats->mediaContext($newsUrl->mediaOutlet) : null,
+            'journalist_context' => $this->reportStats->journalistContextForNews($newsUrl),
             'display_text' => $this->displayText($top?->tag?->severity, $percentage, $top?->tag?->name),
             'tone' => $this->toneFor($top?->tag?->severity),
             'percentage' => $percentage,
@@ -418,6 +426,8 @@ class NewsAggregationService
                 'net_support_weight' => 0.0,
                 'rating_count' => 0,
             ],
+            'media_context' => null,
+            'journalist_context' => [],
             'display_text' => '尚無足夠投票資料',
             'tone' => 'neutral',
             'percentage' => 0.0,

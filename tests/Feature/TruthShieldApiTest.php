@@ -3065,6 +3065,11 @@ class TruthShieldApiTest extends TestCase
 
         $this->artisan('truthshield:import-selector-fixtures')->assertExitCode(0);
         $this->assertGreaterThanOrEqual(30, NewsDomain::query()->count());
+        $this->assertSame('#main_content', NewsDomain::query()->where('domain', 'cava.tw')->value('article_selector'));
+        $this->assertSame(
+            '^/(?:topic|lifestyle|money|fashion|beauty|fitness|entertainment|coverstory|survey)(?:/[^/]+)?/\\d+',
+            NewsDomain::query()->where('domain', 'cava.tw')->value('article_url_pattern'),
+        );
 
         $this->artisan('truthshield:stress-status --requests=5')->assertExitCode(0);
     }
@@ -3077,6 +3082,7 @@ class TruthShieldApiTest extends TestCase
         $wwwCnaDomain = NewsDomain::query()->where('domain', 'www.cna.com.tw')->firstOrFail();
         $artLtnDomain = NewsDomain::query()->where('domain', 'art.ltn.com.tw')->firstOrFail();
         $defLtnDomain = NewsDomain::query()->where('domain', 'def.ltn.com.tw')->firstOrFail();
+        $cavaDomain = NewsDomain::query()->where('domain', 'cava.tw')->firstOrFail();
 
         $this->assertSame('article', $cnaDomain->article_selector);
         $this->assertSame('h1', $cnaDomain->title_selector);
@@ -3090,6 +3096,10 @@ class TruthShieldApiTest extends TestCase
         $this->assertSame('.whitecon.article', $defLtnDomain->article_selector);
         $this->assertSame('.whitecon.article h1', $defLtnDomain->title_selector);
         $this->assertSame('.whitecon.article .text', $defLtnDomain->content_selector);
+        $this->assertSame('#main_content', $cavaDomain->article_selector);
+        $this->assertSame('.article-head h1', $cavaDomain->title_selector);
+        $this->assertSame('.article-block', $cavaDomain->content_selector);
+        $this->assertStringContainsString('topic|lifestyle', $cavaDomain->article_url_pattern);
     }
 
     public function test_privacy_first_traffic_events_and_summary_flow(): void

@@ -490,6 +490,9 @@ Artisan::command('truthshield:import-selector-fixtures {path=database/fixtures/e
                 'article_selector' => $row['article_selector'] ?? null,
                 'title_selector' => $row['title_selector'] ?? null,
                 'content_selector' => $row['content_selector'] ?? null,
+                'blocked_path_pattern' => $row['blocked_path_pattern'] ?? null,
+                'article_url_pattern' => $row['article_url_pattern'] ?? null,
+                'list_url_pattern' => $row['list_url_pattern'] ?? null,
                 'priority' => $row['priority'] ?? 0,
             ],
         );

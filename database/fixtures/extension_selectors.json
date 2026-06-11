@@ -30,6 +30,7 @@
   {"domain":"www.ftvnews.com.tw","article_selector":"article","title_selector":"h1","content_selector":"article"},
   {"domain":"news.tvbs.com.tw","article_selector":"article","title_selector":"h1","content_selector":"article"},
   {"domain":"news.ebc.net.tw","article_selector":"article","title_selector":"h1","content_selector":"article"},
+  {"domain":"cava.tw","article_selector":"#main_content","title_selector":".article-head h1","content_selector":".article-block","article_url_pattern":"^/(?:topic|lifestyle|money|fashion|beauty|fitness|entertainment|coverstory|survey)(?:/[^/]+)?/\\d+","blocked_path_pattern":"^/(?:$|search|tag|tags|tagging|category|categories|cat|cate|topics|author|authors|member|login|register|privacy|about|rss|(?:list|lists|latest|realtime|realtimenews|breaking|breaknews|hot|popular|archive|archives|video|videos|photo|photos|live)/?$)"},
   {"domain":"www.nexttv.com.tw","article_selector":"article","title_selector":"h1","content_selector":"article"},
   {"domain":"www.taiwannews.com.tw","article_selector":"article","title_selector":"h1","content_selector":"article"},
   {"domain":"english.cw.com.tw","article_selector":"article","title_selector":"h1","content_selector":"article"},

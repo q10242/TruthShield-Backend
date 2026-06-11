@@ -3136,7 +3136,7 @@ class TruthShieldApiTest extends TestCase
     {
         config(['truthshield_traffic.enabled' => true]);
         config(['truthshield_traffic.record_api_requests' => true]);
-        config(['truthshield_traffic.status_sample_rate' => 1.0]);
+        config(['truthshield_traffic.status_sample_rate' => 0.01]);
 
         $this->postJson('/api/traffic/events', [
             'event_type' => 'extension_zip_download',
@@ -3156,7 +3156,8 @@ class TruthShieldApiTest extends TestCase
             ->assertOk()
             ->assertHeader('X-TruthShield-Cache', 'hit');
 
-        $this->assertGreaterThanOrEqual(2, TrafficEvent::query()->count());
+        $this->assertGreaterThanOrEqual(3, TrafficEvent::query()->count());
+        $this->assertSame(2, TrafficEvent::query()->where('event_type', 'api_request')->where('feature', 'news_status')->count());
         $this->assertDatabaseHas('traffic_events', [
             'event_type' => 'extension_zip_download',
             'source' => 'web',

@@ -189,7 +189,7 @@ class TrafficAnalyticsService
         $path = '/'.ltrim((string) $path, '/');
 
         return match (true) {
-            str_starts_with($path, '/api/news/status') => (float) config('truthshield_traffic.status_sample_rate', 0.1),
+            str_starts_with($path, '/api/news/status') => 1.0,
             str_starts_with($path, '/api/system/health') => 0.05,
             str_starts_with($path, '/api/transparency') => 0.2,
             default => 1.0,

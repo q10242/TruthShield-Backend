@@ -2755,6 +2755,20 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonStructure(['active_api_clients', 'operational_events_24h', 'status_cache_version']);
     }
 
+    public function test_health_endpoint_returns_degraded_json_when_cache_store_is_unavailable(): void
+    {
+        config(['truthshield.status_cache_store' => 'missing-store']);
+
+        $response = $this->getJson('/api/system/health')
+            ->assertStatus(503)
+            ->assertJsonPath('ok', false)
+            ->assertJsonPath('cache', false)
+            ->assertJsonStructure(['degraded_reasons', 'queue', 'scheduler', 'counts', 'traffic']);
+
+        $this->assertContains('cache', $response->json('degraded_reasons'));
+        $this->assertContains('metrics', $response->json('degraded_reasons'));
+    }
+
     public function test_bootstrap_admin_command_creates_production_admin_user(): void
     {
         $this->artisan('truthshield:bootstrap-admin', [

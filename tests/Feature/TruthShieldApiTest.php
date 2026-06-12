@@ -1003,7 +1003,10 @@ class TruthShieldApiTest extends TestCase
     public function test_evidence_can_be_listed_and_reacted_to_with_weight(): void
     {
         $this->seed(TagSeeder::class);
-        $author = User::factory()->create(['trust_score' => 1.7]);
+        $badge = Badge::query()->create(['name' => '證據新星', 'slug' => 'evidence-rising', 'color' => '#67e8f9']);
+        $author = User::factory()->create(['trust_score' => 1.7, 'display_name' => '證據作者']);
+        $author->badges()->attach($badge->id, ['reason' => '測試']);
+        $author->forceFill(['selected_badge_id' => $badge->id])->save();
         $reviewer = User::factory()->create(['trust_score' => 2.2]);
         $tag = Tag::query()->where('slug', 'out-of-context')->firstOrFail();
         $url = 'https://www.cna.com.tw/news/aipl/202605060001.aspx';
@@ -1038,10 +1041,12 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonPath('data.0.helpful_weight', 2.2)
             ->assertJsonPath('data.0.evidence_host', 'example.com')
             ->assertJsonPath('data.0.evidence_safety', 'unverified')
+            ->assertJsonPath('data.0.author.name', '證據作者')
+            ->assertJsonPath('data.0.author.selected_badge.slug', 'evidence-rising')
             ->assertJsonPath('data.0.direction_summary.supports_weight', 3.3)
             ->assertJsonStructure([
                 'data' => [
-                    ['evidence_host', 'evidence_safety', 'is_trusted_evidence', 'preview_url'],
+                    ['evidence_host', 'evidence_safety', 'is_trusted_evidence', 'preview_url', 'author' => ['selected_badge']],
                 ],
             ]);
 
@@ -1789,6 +1794,30 @@ class TruthShieldApiTest extends TestCase
             ->assertJsonPath('user.display_name', '新聞當事人')
             ->assertJsonPath('user.is_real_name_public', false);
 
+        $badge = Badge::query()->create(['name' => '脈絡整理者', 'slug' => 'context-curator', 'color' => '#86efac']);
+        $lockedBadge = Badge::query()->create(['name' => '未解鎖徽章', 'slug' => 'locked-badge']);
+        $user->badges()->attach($badge->id, ['reason' => '測試']);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/me/profile', [
+                'display_name' => '新聞當事人',
+                'is_real_name_public' => false,
+                'profile_bio' => '我會在必要時提供澄清。',
+                'selected_badge_id' => $lockedBadge->id,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('selected_badge_id');
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/me/profile', [
+                'display_name' => '新聞當事人',
+                'is_real_name_public' => false,
+                'profile_bio' => '我會在必要時提供澄清。',
+                'selected_badge_id' => $badge->id,
+            ])
+            ->assertOk()
+            ->assertJsonPath('selected_badge.slug', 'context-curator');
+
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/me/claimants', [
                 'claim_type' => 'subject',
@@ -1845,6 +1874,7 @@ class TruthShieldApiTest extends TestCase
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/me/profile')
             ->assertOk()
+            ->assertJsonPath('selected_badge.slug', 'context-curator')
             ->assertJsonPath('verified_claimants.0.status', 'approved')
             ->assertJsonPath('official_responses.0.status', 'published');
     }
@@ -3282,12 +3312,14 @@ class TruthShieldApiTest extends TestCase
 
         $checkout = $this->postJson('/api/donations/ecpay', [
             'amount' => 300,
+            'purpose' => 'safari_listing',
             'donor_name' => '測試捐款者',
             'donor_email' => 'donor@example.com',
             'message' => '支持真相護盾。',
         ])
             ->assertCreated()
             ->assertJsonPath('donation.amount', 300)
+            ->assertJsonPath('donation.purpose', 'safari_listing')
             ->assertJsonPath('checkout.method', 'POST')
             ->assertJsonPath('checkout.url', 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5')
             ->assertJsonStructure([
@@ -3314,6 +3346,7 @@ class TruthShieldApiTest extends TestCase
         $donation = Donation::query()->where('merchant_trade_no', $tradeNo)->firstOrFail();
 
         $this->assertSame('pending', $donation->status);
+        $this->assertSame('safari_listing', $donation->purpose);
         $this->assertSame($checkout['CheckMacValue'], data_get($donation->request_payload, 'CheckMacValue'));
 
         $callback = [
@@ -3343,7 +3376,14 @@ class TruthShieldApiTest extends TestCase
 
         $this->getJson('/api/donations/'.$tradeNo)
             ->assertOk()
-            ->assertJsonPath('donation.status', 'paid');
+            ->assertJsonPath('donation.status', 'paid')
+            ->assertJsonPath('donation.purpose', 'safari_listing');
+
+        $this->getJson('/api/donations/summary')
+            ->assertOk()
+            ->assertJsonPath('purpose_breakdown.1.purpose', 'safari_listing')
+            ->assertJsonPath('purpose_breakdown.1.amount', 300)
+            ->assertJsonPath('purpose_breakdown.1.count', 1);
     }
 
     public function test_ecpay_donation_checkout_uses_english_language_for_english_locale(): void
@@ -3400,14 +3440,21 @@ class TruthShieldApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('amounts.0', 120)
             ->assertJsonPath('amounts.1', 360)
-            ->assertJsonPath('provider', 'ecpay');
+            ->assertJsonPath('provider', 'ecpay')
+            ->assertJsonPath('purposes.0.key', 'operations_ai')
+            ->assertJsonPath('purposes.0.target_amount', 8000);
 
         $this->postJson('/api/donations/ecpay', ['amount' => 300])
             ->assertStatus(422)
             ->assertJsonValidationErrors('amount');
 
-        $this->postJson('/api/donations/ecpay', ['amount' => 360])
-            ->assertCreated();
+        $this->postJson('/api/donations/ecpay', ['amount' => 360, 'purpose' => 'not_real'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('purpose');
+
+        $this->postJson('/api/donations/ecpay', ['amount' => 360, 'purpose' => 'operations_ai'])
+            ->assertCreated()
+            ->assertJsonPath('donation.purpose', 'operations_ai');
     }
 
     public function test_user_data_request_can_be_submitted(): void

@@ -20,6 +20,7 @@ class Donation extends Model
         'provider',
         'merchant_trade_no',
         'amount',
+        'purpose',
         'status',
         'donor_name',
         'donor_email',

@@ -196,10 +196,17 @@ Route::post('/admin/appeals/{appeal}/review', [AdminGovernanceController::class,
 Route::post('/admin/trusted-evidence-sources', [AdminGovernanceController::class, 'storeTrustedSource'])->middleware('auth:sanctum');
 
 Route::get('/user', function (Request $request, TrustScoreService $trustScores) {
-    $user = $request->user();
+    $user = $request->user()->loadMissing('selectedBadge');
 
     return [
         ...$user->toArray(),
+        'selected_badge' => $user->selectedBadge ? [
+            'id' => $user->selectedBadge->id,
+            'name' => $user->selectedBadge->name,
+            'slug' => $user->selectedBadge->slug,
+            'description' => $user->selectedBadge->description,
+            'color' => $user->selectedBadge->color,
+        ] : null,
         'can_react_to_evidence' => $trustScores->canReactToEvidence($user),
         'evidence_reaction_min_trust_score' => $trustScores->evidenceReactionMinTrustScore(),
         'can_use_event_system' => $user->is_admin || (float) ($user->trust_score ?? 1.0) >= (float) config('truthshield.event_system_min_trust_score', 1.0),

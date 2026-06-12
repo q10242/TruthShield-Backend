@@ -7,6 +7,7 @@ use App\Services\AchievementService;
 use App\Services\OnboardingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class ProfileController extends Controller
 {
@@ -14,7 +15,7 @@ class ProfileController extends Controller
     {
         $user = $request->user();
         $achievementState = $achievements->sync($user);
-        $user->load('badges');
+        $user->load(['badges', 'selectedBadge']);
         $achievementStats = $achievements->statsFor($user);
 
         return response()->json([
@@ -46,6 +47,7 @@ class ProfileController extends Controller
             'community_roles' => $achievements->communityRolesFor($user, $achievementStats),
             'onboarding_summary' => $onboarding->summaryFor($user),
             'achievements' => $achievements->achievementsFor($user),
+            'selected_badge' => $this->badgePayload($user->selectedBadge),
             'recent_votes' => $user->votes()
                 ->with(['tag:id,name,slug,color,severity', 'newsUrl:id,normalized_url,title_snapshot,finalized_at,voting_closes_at'])
                 ->latest()
@@ -80,6 +82,7 @@ class ProfileController extends Controller
             'display_name' => ['required', 'string', 'max:80'],
             'is_real_name_public' => ['required', 'boolean'],
             'profile_bio' => ['nullable', 'string', 'max:500'],
+            'selected_badge_id' => ['nullable', 'integer', 'exists:badges,id'],
             'email_preferences' => ['nullable', 'array'],
             'email_preferences.account' => ['boolean'],
             'email_preferences.moderation' => ['boolean'],
@@ -94,19 +97,44 @@ class ProfileController extends Controller
             config('truthshield.email_preferences', []),
         );
 
+        if (! empty($validated['selected_badge_id']) && ! $request->user()->badges()->whereKey($validated['selected_badge_id'])->exists()) {
+            throw ValidationException::withMessages([
+                'selected_badge_id' => ['The selected badge must already be unlocked.'],
+            ]);
+        }
+
         $request->user()->forceFill([
             'display_name' => $validated['display_name'],
             'is_real_name_public' => $validated['is_real_name_public'],
             'profile_bio' => $validated['profile_bio'] ?? null,
+            'selected_badge_id' => array_key_exists('selected_badge_id', $validated) ? $validated['selected_badge_id'] : $request->user()->selected_badge_id,
             'email_preferences' => array_replace(
                 config('truthshield.email_preferences', []),
                 $emailPreferences,
             ),
         ])->save();
 
+        $user = $request->user()->fresh(['selectedBadge']);
+
         return response()->json([
             'message' => 'Profile updated.',
-            'user' => $request->user()->fresh(),
+            'user' => $user,
+            'selected_badge' => $this->badgePayload($user->selectedBadge),
         ]);
+    }
+
+    private function badgePayload($badge): ?array
+    {
+        if (! $badge) {
+            return null;
+        }
+
+        return [
+            'id' => $badge->id,
+            'name' => $badge->name,
+            'slug' => $badge->slug,
+            'description' => $badge->description,
+            'color' => $badge->color,
+        ];
     }
 }

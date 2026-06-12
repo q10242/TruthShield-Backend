@@ -29,6 +29,7 @@ class DonationResource extends Resource
         return $form->schema([
             Forms\Components\TextInput::make('merchant_trade_no')->label('綠界訂單編號')->disabled(),
             Forms\Components\TextInput::make('amount')->label('金額')->numeric()->disabled(),
+            Forms\Components\TextInput::make('purpose')->label('用途')->disabled(),
             Forms\Components\TextInput::make('status')->label('狀態')->disabled(),
             Forms\Components\TextInput::make('donor_name')->label('顯示名稱')->disabled(),
             Forms\Components\TextInput::make('donor_email')->label('Email')->disabled(),
@@ -45,6 +46,7 @@ class DonationResource extends Resource
         return $table->columns([
             Tables\Columns\TextColumn::make('merchant_trade_no')->label('綠界訂單編號')->searchable()->copyable(),
             Tables\Columns\TextColumn::make('amount')->label('金額')->money('TWD')->sortable(),
+            Tables\Columns\TextColumn::make('purpose')->label('用途')->badge()->sortable()->toggleable(),
             Tables\Columns\TextColumn::make('status')->label('狀態')->badge()->sortable(),
             Tables\Columns\TextColumn::make('donor_name')->label('顯示名稱')->searchable()->placeholder('匿名'),
             Tables\Columns\TextColumn::make('donor_email')->label('Email')->searchable()->toggleable(),
@@ -58,6 +60,11 @@ class DonationResource extends Resource
                 'failed' => '付款失敗',
                 'expired' => '已過期',
             ]),
+            Tables\Filters\SelectFilter::make('purpose')->label('用途')->options(
+                collect(config('truthshield.donation_purposes', []))
+                    ->mapWithKeys(fn (array $purpose, string $key): array => [$key => $purpose['label'] ?? $key])
+                    ->all(),
+            ),
         ])->actions([
             Tables\Actions\ViewAction::make(),
         ])->defaultSort('created_at', 'desc');

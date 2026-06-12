@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Laravel\Sanctum\PersonalAccessToken;
 
 class DonationController extends Controller
@@ -18,8 +19,10 @@ class DonationController extends Controller
     public function store(Request $request, EcpayDonationService $ecpay): JsonResponse
     {
         $allowedAmounts = implode(',', config('truthshield.donation_amounts', [100, 300, 500, 1000, 2000, 5000]));
+        $purposeKeys = array_keys(config('truthshield.donation_purposes', []));
         $validated = $request->validate([
             'amount' => ['required', 'integer', 'in:'.$allowedAmounts],
+            'purpose' => ['nullable', 'string', Rule::in($purposeKeys)],
             'donor_name' => ['nullable', 'string', 'max:80'],
             'donor_email' => ['nullable', 'email', 'max:160'],
             'message' => ['nullable', 'string', 'max:120'],
@@ -33,6 +36,7 @@ class DonationController extends Controller
             'provider' => 'ecpay',
             'merchant_trade_no' => $ecpay->nextTradeNo(),
             'amount' => $validated['amount'],
+            'purpose' => $validated['purpose'] ?? 'operations_ai',
             'donor_name' => $validated['donor_name'] ?? null,
             'donor_email' => $validated['donor_email'] ?? null,
             'message' => $validated['message'] ?? null,
@@ -47,6 +51,7 @@ class DonationController extends Controller
                 'id' => $donation->id,
                 'merchant_trade_no' => $donation->merchant_trade_no,
                 'amount' => $donation->amount,
+                'purpose' => $donation->purpose,
                 'status' => $donation->status,
             ],
             'checkout' => [
@@ -59,11 +64,12 @@ class DonationController extends Controller
 
     public function config(): JsonResponse
     {
-        return response()->json(Cache::store(config('truthshield.status_cache_store'))->remember('donations:config:v1', now()->addMinutes(10), fn () => [
+        return response()->json(Cache::store(config('truthshield.status_cache_store'))->remember('donations:config:v2', now()->addMinutes(10), fn () => [
             'amounts' => config('truthshield.donation_amounts', [100, 300, 500, 1000, 2000, 5000]),
             'currency' => 'TWD',
             'provider' => 'ecpay',
             'monthly_goal' => (int) config('truthshield.donation_monthly_goal', 15000),
+            'purposes' => $this->donationPurposes(),
         ]));
     }
 
@@ -77,6 +83,7 @@ class DonationController extends Controller
             'donation' => [
                 'merchant_trade_no' => $donation->merchant_trade_no,
                 'amount' => $donation->amount,
+                'purpose' => $donation->purpose,
                 'status' => $donation->status,
                 'paid_at' => $donation->paid_at?->toISOString(),
             ],
@@ -85,7 +92,7 @@ class DonationController extends Controller
 
     public function summary(): JsonResponse
     {
-        return response()->json(Cache::store(config('truthshield.status_cache_store'))->remember('donations:summary:v1', now()->addSeconds(30), function (): array {
+        return response()->json(Cache::store(config('truthshield.status_cache_store'))->remember('donations:summary:v2', now()->addSeconds(30), function (): array {
             $monthStart = now()->startOfMonth();
             $row = Donation::query()
                 ->selectRaw('
@@ -111,13 +118,14 @@ class DonationController extends Controller
                 'month_amount' => (int) $row->month_amount,
                 'month_count' => (int) $row->month_count,
                 'pending_count' => (int) $row->pending_count,
+                'purpose_breakdown' => $this->purposeBreakdown($monthStart),
             ];
         }));
     }
 
     public function supporters(): JsonResponse
     {
-        $supporters = Cache::store(config('truthshield.status_cache_store'))->remember('donations:supporters:v1', now()->addSeconds(30), fn () => Donation::query()
+        $supporters = Cache::store(config('truthshield.status_cache_store'))->remember('donations:supporters:v2', now()->addSeconds(30), fn () => Donation::query()
             ->where('status', Donation::STATUS_PAID)
             ->latest('paid_at')
             ->limit(24)
@@ -125,6 +133,7 @@ class DonationController extends Controller
             ->map(fn (Donation $donation) => [
                 'name' => $donation->donor_name ?: '匿名支持者',
                 'amount' => $donation->amount,
+                'purpose' => $donation->purpose,
                 'message' => $donation->message,
                 'paid_at' => $donation->paid_at?->toISOString(),
             ]));
@@ -217,8 +226,55 @@ class DonationController extends Controller
     private function forgetDonationCaches(): void
     {
         $cache = Cache::store(config('truthshield.status_cache_store'));
-        foreach (['donations:summary:v1', 'donations:supporters:v1', 'donations:monthly:v1', 'transparency:summary:v1', 'system:health:metrics:v1'] as $key) {
+        foreach (['donations:summary:v1', 'donations:summary:v2', 'donations:supporters:v1', 'donations:supporters:v2', 'donations:monthly:v1', 'transparency:summary:v1', 'system:health:metrics:v1'] as $key) {
             $cache->forget($key);
         }
+    }
+
+    private function donationPurposes(): array
+    {
+        return collect(config('truthshield.donation_purposes', []))
+            ->map(fn (array $purpose, string $key): array => [
+                'key' => $key,
+                'label' => $purpose['label'] ?? $key,
+                'label_en' => $purpose['label_en'] ?? ($purpose['label'] ?? $key),
+                'description' => $purpose['description'] ?? '',
+                'description_en' => $purpose['description_en'] ?? ($purpose['description'] ?? ''),
+                'target_amount' => (int) ($purpose['target_amount'] ?? 0),
+                'period' => $purpose['period'] ?? 'one_time',
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function purposeBreakdown($monthStart): array
+    {
+        $rows = Donation::query()
+            ->where('status', Donation::STATUS_PAID)
+            ->selectRaw("
+                COALESCE(purpose, 'operations_ai') as purpose,
+                COALESCE(SUM(amount), 0) as amount,
+                COUNT(*) as count,
+                COALESCE(SUM(CASE WHEN paid_at >= ? THEN amount ELSE 0 END), 0) as month_amount,
+                SUM(CASE WHEN paid_at >= ? THEN 1 ELSE 0 END) as month_count
+            ", [$monthStart, $monthStart])
+            ->groupByRaw("COALESCE(purpose, 'operations_ai')")
+            ->get()
+            ->keyBy('purpose');
+
+        return collect($this->donationPurposes())
+            ->map(function (array $purpose) use ($rows): array {
+                $row = $rows->get($purpose['key']);
+
+                return [
+                    'purpose' => $purpose['key'],
+                    'amount' => (int) ($row->amount ?? 0),
+                    'count' => (int) ($row->count ?? 0),
+                    'month_amount' => (int) ($row->month_amount ?? 0),
+                    'month_count' => (int) ($row->month_count ?? 0),
+                ];
+            })
+            ->values()
+            ->all();
     }
 }

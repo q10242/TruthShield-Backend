@@ -116,6 +116,40 @@ return [
         explode(',', env('TRUTHSHIELD_DONATION_AMOUNTS', '100,300,500,1000,2000,5000')),
     ))),
     'donation_monthly_goal' => (int) env('TRUTHSHIELD_DONATION_MONTHLY_GOAL', 15000),
+    'donation_purposes' => [
+        'operations_ai' => [
+            'label' => '伺服器與 AI 營運',
+            'label_en' => 'Server and AI operations',
+            'description' => '含金流手續費；達標代表這期雲端服務、備份、監控與 AI 輔助整理有社群支持。',
+            'description_en' => 'Includes payment processing fees; reaching this goal means the current round of cloud services, backups, monitoring, and AI-assisted curation is community-supported.',
+            'target_amount' => 8000,
+            'period' => 'monthly',
+        ],
+        'safari_listing' => [
+            'label' => 'Safari 上架基金',
+            'label_en' => 'Safari listing fund',
+            'description' => 'Apple Developer Program 年費、Safari App Extension 封裝、TestFlight 與審核準備。',
+            'description_en' => 'Apple Developer Program fee, Safari App Extension packaging, TestFlight, and review preparation.',
+            'target_amount' => 4000,
+            'period' => 'one_time',
+        ],
+        'store_assets' => [
+            'label' => '商店頁素材與截圖',
+            'label_en' => 'Store listing assets',
+            'description' => 'Chrome、Firefox、Safari 商店截圖、說明圖與審核補件素材。',
+            'description_en' => 'Screenshots, explainer images, and review assets for Chrome, Firefox, and Safari stores.',
+            'target_amount' => 3000,
+            'period' => 'one_time',
+        ],
+        'event_curation' => [
+            'label' => '公共事件頁整理',
+            'label_en' => 'Public event page curation',
+            'description' => '整理高公共性事件時間線、官方來源、關係圖與社群求證任務。',
+            'description_en' => 'Curating public event timelines, official sources, relationship graphs, and verification tasks.',
+            'target_amount' => 5000,
+            'period' => 'monthly',
+        ],
+    ],
 
     'email_enabled' => (bool) env('TRUTHSHIELD_EMAIL_ENABLED', true),
     'email_preferences' => [

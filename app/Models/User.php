@@ -8,6 +8,7 @@ use Filament\Panel;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Notifications\Notifiable;
@@ -33,6 +34,7 @@ class User extends Authenticatable implements FilamentUser
         'public_identity_label',
         'is_real_name_public',
         'profile_bio',
+        'selected_badge_id',
         'email_preferences',
         'onboarding_state',
         'identity_multiplier',
@@ -115,6 +117,11 @@ class User extends Authenticatable implements FilamentUser
     public function badges(): BelongsToMany
     {
         return $this->belongsToMany(Badge::class)->withPivot('reason')->withTimestamps();
+    }
+
+    public function selectedBadge(): BelongsTo
+    {
+        return $this->belongsTo(Badge::class, 'selected_badge_id');
     }
 
     public function verifiedClaimants(): HasMany

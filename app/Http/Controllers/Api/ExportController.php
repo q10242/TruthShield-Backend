@@ -125,7 +125,7 @@ class ExportController extends Controller
     {
         return response()->streamDownload(function (): void {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['id', 'trade_no', 'amount', 'status', 'donor_name', 'donor_email', 'paid_at', 'created_at']);
+            fputcsv($handle, ['id', 'trade_no', 'amount', 'purpose', 'status', 'donor_name', 'donor_email', 'paid_at', 'created_at']);
 
             Donation::query()
                 ->latest()
@@ -135,6 +135,7 @@ class ExportController extends Controller
                             $row->id,
                             $row->merchant_trade_no,
                             $row->amount,
+                            $row->purpose,
                             $row->status,
                             $row->donor_name,
                             $row->donor_email,

@@ -227,7 +227,8 @@ class NewsAggregationService
             ->whereNotNull('evidence_url')
             ->with([
                 'tag:id,name,slug,color,severity,description,translations',
-                'user:id,name,trust_score',
+                'user:id,name,display_name,is_real_name_public,public_identity_label,trust_score,selected_badge_id',
+                'user.selectedBadge:id,name,slug,description,color',
                 'evidence:id,vote_id,archive_url,preview_url,quality_score,snapshot_status',
                 'reactions:id,vote_id,helpful,credibility,relevance,direction,weight_score',
             ])
@@ -258,8 +259,16 @@ class NewsAggregationService
                 'quality_score' => round((float) ($vote->evidence?->quality_score ?? 0), 2),
                 'evidence_note' => $vote->evidence_note,
                 'author' => [
-                    'name' => $vote->user?->name,
+                    'name' => $vote->user?->publicName(),
+                    'identity_label' => $vote->user?->public_identity_label,
                     'trust_score' => round((float) $vote->user?->trust_score, 2),
+                    'selected_badge' => $vote->user?->selectedBadge ? [
+                        'id' => $vote->user->selectedBadge->id,
+                        'name' => $vote->user->selectedBadge->name,
+                        'slug' => $vote->user->selectedBadge->slug,
+                        'description' => $vote->user->selectedBadge->description,
+                        'color' => $vote->user->selectedBadge->color,
+                    ] : null,
                 ],
                 'vote_weight' => round((float) $vote->weight_score, 4),
                 'helpful_count' => $vote->helpful_count,

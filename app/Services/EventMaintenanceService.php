@@ -15,9 +15,7 @@ use InvalidArgumentException;
 
 class EventMaintenanceService
 {
-    public function __construct(private readonly UrlFingerprintService $fingerprints)
-    {
-    }
+    public function __construct(private readonly UrlFingerprintService $fingerprints) {}
 
     public function run(string $task, bool $execute = false): array
     {
@@ -26,8 +24,160 @@ class EventMaintenanceService
             'resource_circulation_law_event' => $this->resourceCirculationLawEvent($execute),
             'vasp_stablecoin_regulation_event' => $this->vaspStablecoinRegulationEvent($execute),
             'east_coast_maritime_enforcement_event' => $this->eastCoastMaritimeEnforcementEvent($execute),
+            'ops_20260614_event_copy_and_growth' => $this->ops20260614EventCopyAndGrowth($execute),
             default => throw new InvalidArgumentException("Unsupported maintenance task: {$task}"),
         };
+    }
+
+    private function ops20260614EventCopyAndGrowth(bool $execute): array
+    {
+        $summary = [
+            'task' => 'ops_20260614_event_copy_and_growth',
+            'execute' => $execute,
+            'existing_event_updates' => [],
+            'created_or_updated_events' => [],
+            'items_created' => 0,
+            'timeline_created' => 0,
+        ];
+
+        if (! $execute) {
+            $summary['planned'] = [
+                'existing_event_ids' => array_keys($this->ops20260614ExistingEventUpdates()),
+                'event_slugs' => [
+                    'foreign-student-hospitality-internship-rights-2026',
+                    'etomidate-drugged-driving-law-reform-2026',
+                ],
+            ];
+
+            return $summary;
+        }
+
+        return DB::transaction(function () use ($summary): array {
+            $admin = $this->maintenanceUser();
+
+            foreach ($this->ops20260614ExistingEventUpdates() as $eventId => $attributes) {
+                $event = NewsEvent::query()->find($eventId);
+                if (! $event) {
+                    $summary['existing_event_updates'][] = ['id' => $eventId, 'status' => 'missing'];
+
+                    continue;
+                }
+
+                $before = $event->toArray();
+                $event->forceFill([
+                    ...$attributes,
+                    'last_activity_at' => now(),
+                ])->save();
+
+                if ($this->changed($before, $event->fresh()->toArray())) {
+                    $this->logEventChange(
+                        $event->fresh(),
+                        $admin,
+                        'updated',
+                        $before,
+                        $event->fresh()->toArray(),
+                        'TruthShield AI maintenance: rewrote event summary and status for neutral public context.',
+                        'event.metadata_updated',
+                        "營運 AI 更新事件「{$event->name}」摘要、分類或進度狀態，移除示範字樣並改為中性公開脈絡。",
+                        ['source' => 'truthshield:maintain-events', 'task' => 'ops_20260614_event_copy_and_growth'],
+                    );
+                    $summary['existing_event_updates'][] = ['id' => $event->id, 'status' => 'updated'];
+                } else {
+                    $summary['existing_event_updates'][] = ['id' => $event->id, 'status' => 'unchanged'];
+                }
+            }
+
+            foreach ($this->ops20260614EventDefinitions() as $definition) {
+                $result = $this->upsertDefinedEvent($admin, $definition);
+                $summary['created_or_updated_events'][] = $result['event'];
+                $summary['items_created'] += $result['items_created'];
+                $summary['timeline_created'] += $result['timeline_created'];
+            }
+
+            return $summary;
+        });
+    }
+
+    private function ops20260614ExistingEventUpdates(): array
+    {
+        return [
+            1 => [
+                'summary' => implode("\n", [
+                    '整理 2026 年國防特別預算案與立法院審議、行政部門說明、在野黨質疑及後續預算執行監督的公開來源。',
+                    '此事件不判定預算規模是否適當；重點是把法案版本、審查時程、國防部/行政院說明、立法院攻防與可驗證數字放在同一條時間線。',
+                    '持續追蹤重點：三讀進度、預算科目、採購與交付期程、追加/凍結決議、監督報告與相關官方文件。',
+                ]),
+                'primary_category' => 'public_policy',
+                'tags' => ['national_security', 'law_reform', 'procurement'],
+                'progress_status' => 'tracking',
+                'status' => 'active',
+                'is_disputed' => false,
+            ],
+            2 => [
+                'summary' => implode("\n", [
+                    '整理政府提出 0 至 18 歲成長津貼、托育、產假陪產假、友善職場、婚育宅與財源安排等家庭支持政策的公開來源。',
+                    '此事件不判定政策效果；重點是讓讀者追蹤政策承諾、預算來源、修法時程、適用對象、地方/中央分工與不同利害關係人的回應。',
+                    '持續追蹤重點：行政院版本、立法院審議、預算編列、實施日期、資格條件、地方配套與政策成效指標。',
+                ]),
+                'primary_category' => 'public_policy',
+                'tags' => ['children', 'housing', 'labor'],
+                'progress_status' => 'tracking',
+                'status' => 'active',
+                'is_disputed' => false,
+            ],
+            3 => [
+                'summary' => implode("\n", [
+                    '整理花蓮馬太鞍溪堰塞湖溢流與光復鄉災損、疏散安置、災後重建、國賠或責任歸屬討論的公開來源。',
+                    '此事件不預設責任結論；重點是整理災前監測、預警與撤離、災後搶修、補助與賠償程序、中央地方分工及居民需求。',
+                    '持續追蹤重點：官方調查、國賠申請進度、復原工程、災民安置、環境監測與後續防災檢討。',
+                ]),
+                'primary_category' => 'disaster_accident',
+                'tags' => ['environment', 'rescue'],
+                'progress_status' => 'tracking',
+                'status' => 'active',
+                'is_disputed' => false,
+            ],
+        ];
+    }
+
+    private function ops20260614EventDefinitions(): array
+    {
+        return [
+            [
+                'slug' => 'foreign-student-hospitality-internship-rights-2026',
+                'name' => '外籍生旅宿業6+6實習勞權與社會保險爭議',
+                'summary' => implode("\n", [
+                    '整理外籍學生來台旅宿業 6+6 實習方案的制度調整、監察院調查、主管機關回應與後續勞權/保險配套討論。',
+                    '此事件不判定個別旅館、學校或學生責任；重點是讓讀者核對實習制度本質、是否替代正職勞力、社會保險密度、護照扣留與代辦費用等公開資訊。',
+                    '持續追蹤重點：行政院與交通部檢討、觀光署要點修正、保險/勞健保制度、實地訪查結果、學生申訴管道與三方契約設計。',
+                ]),
+                'primary_category' => 'public_policy',
+                'tags' => ['labor', 'education', 'law_reform'],
+                'progress_status' => 'tracking',
+                'sources' => $this->foreignStudentHospitalityInternshipSources(),
+                'created_reason' => 'TruthShield AI maintenance: created foreign-student hospitality internship rights event from public sources.',
+                'updated_reason' => 'TruthShield AI maintenance: refreshed foreign-student hospitality internship rights event metadata.',
+                'public_created_reason' => '營運 AI 建立外籍生旅宿業 6+6 實習勞權事件，整理監察院調查、媒體報導與主管機關回應。',
+                'public_updated_reason' => '營運 AI 更新外籍生旅宿業 6+6 實習勞權事件，補充分類、標籤、來源與追蹤狀態。',
+            ],
+            [
+                'slug' => 'etomidate-drugged-driving-law-reform-2026',
+                'name' => '依托咪酯電子煙與毒駕管制爭議',
+                'summary' => implode("\n", [
+                    '整理依托咪酯類電子煙、毒駕事故與政府提出源頭嚇阻、查緝、刑責及駕照管理修法的公開來源。',
+                    '此事件不判定個案責任；重點是追蹤行政院 14 項因應策略、法務部毒品分級審議、刑法/道交條例修法、唾液快篩與校園/邊境防制作法。',
+                    '持續追蹤重點：6 月修法草案送審、毒品審議委員會結論、立法院審查、執法數據、檢驗量能與比例原則討論。',
+                ]),
+                'primary_category' => 'public_policy',
+                'tags' => ['traffic', 'law_reform'],
+                'progress_status' => 'tracking',
+                'sources' => $this->etomidateDruggedDrivingSources(),
+                'created_reason' => 'TruthShield AI maintenance: created etomidate and drugged-driving law reform event from public sources.',
+                'updated_reason' => 'TruthShield AI maintenance: refreshed etomidate and drugged-driving law reform event metadata.',
+                'public_created_reason' => '營運 AI 建立依托咪酯電子煙與毒駕管制事件，整理行政院、法務部與媒體公開來源。',
+                'public_updated_reason' => '營運 AI 更新依托咪酯電子煙與毒駕管制事件，補充最新修法來源與追蹤重點。',
+            ],
+        ];
     }
 
     private function nuclearRestartAndTagBackfill(bool $execute): array
@@ -57,6 +207,7 @@ class EventMaintenanceService
                 $event = NewsEvent::query()->find($eventId);
                 if (! $event) {
                     $summary['tag_updates'][] = ['id' => $eventId, 'status' => 'missing'];
+
                     continue;
                 }
 
@@ -838,6 +989,185 @@ class EventMaintenanceService
                 'summary' => '中央社轉載報導，國防部長顧立雄在立法院受訪時表示，中國宣稱台灣東部海域為執法區域是挑釁與認知戰，國防部與海巡會協調分工維護海域安全。',
                 'occurred_at' => '2026-06-08 10:19:56',
                 'url' => 'https://news.pchome.com.tw/politics/cna/20260608/index-17808851960442618001.html',
+            ],
+        ];
+    }
+
+    private function upsertDefinedEvent(User $admin, array $definition): array
+    {
+        $sources = $definition['sources'];
+        $primaryNews = $this->ensureNewsUrl($sources[0]['url'], $sources[0]['title']);
+        $event = NewsEvent::query()
+            ->where('slug', $definition['slug'])
+            ->orWhere('name', $definition['name'])
+            ->first();
+        $created = false;
+
+        $attributes = [
+            'created_by' => $admin->id,
+            'primary_news_url_id' => $primaryNews->id,
+            'name' => $definition['name'],
+            'slug' => $definition['slug'],
+            'summary' => $definition['summary'],
+            'primary_category' => $definition['primary_category'],
+            'tags' => $definition['tags'],
+            'progress_status' => $definition['progress_status'],
+            'status' => 'active',
+            'is_disputed' => false,
+            'last_activity_at' => now(),
+        ];
+
+        if (! $event) {
+            $event = NewsEvent::query()->create($attributes);
+            $created = true;
+            $this->logEventChange(
+                $event,
+                $admin,
+                'created',
+                null,
+                $event->toArray(),
+                $definition['created_reason'],
+                'event.created',
+                $definition['public_created_reason'],
+                ['source' => 'truthshield:maintain-events', 'task' => 'ops_20260614_event_copy_and_growth'],
+            );
+        } else {
+            $before = $event->toArray();
+            $event->forceFill($attributes)->save();
+            if ($this->changed($before, $event->fresh()->toArray())) {
+                $this->logEventChange(
+                    $event->fresh(),
+                    $admin,
+                    'updated',
+                    $before,
+                    $event->fresh()->toArray(),
+                    $definition['updated_reason'],
+                    'event.metadata_updated',
+                    $definition['public_updated_reason'],
+                    ['source' => 'truthshield:maintain-events', 'task' => 'ops_20260614_event_copy_and_growth'],
+                );
+            }
+        }
+
+        $itemsCreated = 0;
+        $timelineCreated = 0;
+
+        foreach ($sources as $source) {
+            $newsUrl = $this->ensureNewsUrl($source['url'], $source['title']);
+
+            $item = NewsEventItem::query()->firstOrCreate(
+                ['news_event_id' => $event->id, 'news_url_id' => $newsUrl->id],
+                [
+                    'created_by' => $admin->id,
+                    'item_type' => $source['item_type'] ?? 'news',
+                    'title' => $source['title'],
+                    'summary' => $source['summary'],
+                    'source_url' => $source['url'],
+                ],
+            );
+
+            if ($item->wasRecentlyCreated) {
+                $itemsCreated++;
+                $this->logItemChange($event, $admin, $item, 'Attached ops 2026-06-14 public source item to event.');
+            }
+
+            $timeline = NewsEventTimelineEntry::query()->firstOrCreate(
+                [
+                    'news_event_id' => $event->id,
+                    'source_url' => $source['url'],
+                    'title' => $source['title'],
+                ],
+                [
+                    'news_url_id' => $newsUrl->id,
+                    'created_by' => $admin->id,
+                    'entry_type' => 'manual',
+                    'summary' => $source['summary'],
+                    'occurred_at' => $source['occurred_at'],
+                    'source_type' => $source['source_type'] ?? 'news',
+                ],
+            );
+
+            if ($timeline->wasRecentlyCreated) {
+                $timelineCreated++;
+                $this->logItemChange($event, $admin, $timeline, 'Pinned ops 2026-06-14 public-source timeline entry.');
+            }
+        }
+
+        if ($itemsCreated > 0 || $timelineCreated > 0 || $created) {
+            ModerationEvent::query()->create([
+                'user_id' => $admin->id,
+                'event_type' => 'event.timeline_maintained',
+                'subject_type' => NewsEvent::class,
+                'subject_id' => $event->id,
+                'public_reason' => "營運 AI 維護事件「{$event->name}」來源與時間線，保留公開來源 URL 與摘要。",
+                'metadata' => [
+                    'source' => 'truthshield:maintain-events',
+                    'task' => 'ops_20260614_event_copy_and_growth',
+                    'items_created' => $itemsCreated,
+                    'timeline_created' => $timelineCreated,
+                ],
+            ]);
+        }
+
+        $event->forceFill(['last_activity_at' => now()])->save();
+
+        return [
+            'event' => [
+                'id' => $event->id,
+                'slug' => $event->slug,
+                'status' => $created ? 'created' : 'updated',
+            ],
+            'items_created' => $itemsCreated,
+            'timeline_created' => $timelineCreated,
+        ];
+    }
+
+    private function foreignStudentHospitalityInternshipSources(): array
+    {
+        return [
+            [
+                'title' => '監察院調查外籍學生來臺實習 6+6 方案勞動權益爭議',
+                'summary' => '監察院公布調查，指出外籍學生來臺旅宿業 6+6 實習涉及保障密度、訪視稽核、護照扣留與代辦費用等問題，促請行政院督同相關部會檢討。',
+                'occurred_at' => '2026-06-12 00:00:00',
+                'url' => 'https://www.cy.gov.tw/News_Content.aspx?n=792&s=34642',
+                'source_type' => 'official',
+                'item_type' => 'official_record',
+            ],
+            [
+                'title' => '中央社報導監委調查外籍生旅宿業 6+6 實習爭議',
+                'summary' => '中央社報導，監察委員調查發現實習要點雖修正，但未能強制加入社會保險，且實務上仍有護照遭扣與代辦費用等情事。',
+                'occurred_at' => '2026-06-12 11:22:00',
+                'url' => 'https://www.cna.com.tw/news/aipl/202606120091.aspx',
+            ],
+            [
+                'title' => '觀光署回應外籍生旅宿實習社會保險與團保安排',
+                'summary' => '中央社報導，觀光署表示因外籍實習生與旅館無僱傭關係而無法參加勞健保，現行要求旅館投保團體保險並函報備查。',
+                'occurred_at' => '2026-06-12 19:42:00',
+                'url' => 'https://www.cna.com.tw/news/ahel/202606120355.aspx',
+            ],
+        ];
+    }
+
+    private function etomidateDruggedDrivingSources(): array
+    {
+        return [
+            [
+                'title' => '行政院提出毒品及毒駕防制 14 項策略',
+                'summary' => '中央社報導，行政院會通過毒品及毒駕防制專題，提出源頭嚇阻、強化查緝、重懲毒駕等策略，包含依托咪酯分級、電子煙罰則與毒駕刑責方向。',
+                'occurred_at' => '2026-06-04 16:33:00',
+                'url' => 'https://www.cna.com.tw/news/aipl/202606040182.aspx',
+            ],
+            [
+                'title' => '法務部研議依托咪酯改列一級毒品',
+                'summary' => '中央社報導，法務部表示將於 6 月 17 日召開毒品審議委員會，審議依托咪酯是否提升為第一級毒品，並說明毒駕查緝專案與電子煙吸食型態。',
+                'occurred_at' => '2026-06-08 11:49:00',
+                'url' => 'https://www.cna.com.tw/news/aipl/202606080115.aspx',
+            ],
+            [
+                'title' => '政院將提出刑法與軍刑法修正草案加重毒駕罰責',
+                'summary' => '中央社報導，行政院將提出刑法與陸海空軍刑法修正草案，全面提高毒駕、毒駕致重傷、毒駕致死與再犯相關刑責。',
+                'occurred_at' => '2026-06-10 20:46:00',
+                'url' => 'https://www.cna.com.tw/news/aipl/202606100354.aspx',
             ],
         ];
     }

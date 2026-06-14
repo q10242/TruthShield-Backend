@@ -161,4 +161,83 @@ class EventMaintenanceServiceTest extends TestCase
         $this->assertSame(4, NewsEventItem::query()->where('news_event_id', $event->id)->count());
         $this->assertSame(4, NewsEventTimelineEntry::query()->where('news_event_id', $event->id)->count());
     }
+
+    public function test_ops_20260614_task_updates_existing_events_and_creates_growth_events_with_governance_logs(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true, 'trust_score' => 1.5]);
+        foreach ([1, 2, 3] as $id) {
+            NewsEvent::query()->create([
+                'id' => $id,
+                'created_by' => $admin->id,
+                'name' => "測試事件 {$id}",
+                'slug' => "test-event-{$id}",
+                'summary' => 'Demo 事件資料，僅供測試。',
+                'primary_category' => 'other',
+                'tags' => [],
+                'progress_status' => 'collecting',
+                'status' => 'active',
+                'last_activity_at' => now()->subDay(),
+            ]);
+        }
+        $existingToxicDriving = NewsEvent::query()->create([
+            'id' => 14,
+            'created_by' => $admin->id,
+            'name' => '依托咪酯電子煙與毒駕管制爭議',
+            'slug' => 'old-etomidate-slug',
+            'summary' => '既有事件摘要。',
+            'primary_category' => 'other',
+            'tags' => [],
+            'progress_status' => 'collecting',
+            'status' => 'active',
+            'last_activity_at' => now()->subDay(),
+        ]);
+
+        $this->artisan('truthshield:maintain-events ops_20260614_event_copy_and_growth')
+            ->assertSuccessful();
+
+        $this->assertDatabaseMissing((new NewsEvent)->getTable(), [
+            'slug' => 'foreign-student-hospitality-internship-rights-2026',
+        ]);
+
+        $this->artisan('truthshield:maintain-events ops_20260614_event_copy_and_growth --execute')
+            ->assertSuccessful();
+
+        $this->assertStringNotContainsString('Demo', NewsEvent::query()->findOrFail(2)->summary);
+        $this->assertSame('public_policy', NewsEvent::query()->findOrFail(1)->primary_category);
+        $this->assertSame(['environment', 'rescue'], NewsEvent::query()->findOrFail(3)->tags);
+
+        $foreignStudent = NewsEvent::query()
+            ->where('slug', 'foreign-student-hospitality-internship-rights-2026')
+            ->firstOrFail();
+        $toxicDriving = NewsEvent::query()
+            ->where('slug', 'etomidate-drugged-driving-law-reform-2026')
+            ->firstOrFail();
+
+        $this->assertSame('public_policy', $foreignStudent->primary_category);
+        $this->assertSame(['labor', 'education', 'law_reform'], $foreignStudent->tags);
+        $this->assertSame(3, NewsEventItem::query()->where('news_event_id', $foreignStudent->id)->count());
+        $this->assertSame(3, NewsEventTimelineEntry::query()->where('news_event_id', $foreignStudent->id)->count());
+        $this->assertSame(['traffic', 'law_reform'], $toxicDriving->tags);
+        $this->assertSame($existingToxicDriving->id, $toxicDriving->id);
+        $this->assertSame(3, NewsEventItem::query()->where('news_event_id', $toxicDriving->id)->count());
+
+        foreach ([1, 2, 3, $foreignStudent->id, $toxicDriving->id] as $eventId) {
+            $this->assertDatabaseHas((new EventEditLog)->getTable(), [
+                'news_event_id' => $eventId,
+                'is_public' => true,
+            ]);
+            $this->assertDatabaseHas((new ModerationEvent)->getTable(), [
+                'user_id' => $admin->id,
+                'subject_id' => $eventId,
+            ]);
+        }
+
+        $this->artisan('truthshield:maintain-events ops_20260614_event_copy_and_growth --execute')
+            ->assertSuccessful();
+
+        $this->assertSame(1, NewsEvent::query()->where('slug', 'foreign-student-hospitality-internship-rights-2026')->count());
+        $this->assertSame(1, NewsEvent::query()->where('name', '依托咪酯電子煙與毒駕管制爭議')->count());
+        $this->assertSame(3, NewsEventItem::query()->where('news_event_id', $foreignStudent->id)->count());
+        $this->assertSame(3, NewsEventTimelineEntry::query()->where('news_event_id', $foreignStudent->id)->count());
+    }
 }

@@ -3,10 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\EventEditLog;
+use App\Models\MediaOutlet;
 use App\Models\ModerationEvent;
+use App\Models\NewsDomain;
 use App\Models\NewsEvent;
 use App\Models\NewsEventItem;
 use App\Models\NewsEventTimelineEntry;
+use App\Models\NewsUrl;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -165,6 +168,23 @@ class EventMaintenanceServiceTest extends TestCase
     public function test_ops_20260614_task_updates_existing_events_and_creates_growth_events_with_governance_logs(): void
     {
         $admin = User::factory()->create(['is_admin' => true, 'trust_score' => 1.5]);
+        $cna = MediaOutlet::query()->updateOrCreate(
+            ['slug' => 'cna'],
+            [
+                'name' => '中央社',
+                'type' => 'news',
+                'region' => 'TW',
+                'is_active' => true,
+            ],
+        );
+        NewsDomain::query()->updateOrCreate(
+            ['domain' => 'cna.com.tw'],
+            [
+                'media_outlet_id' => $cna->id,
+                'name' => '中央社',
+                'is_active' => true,
+            ],
+        );
         foreach ([1, 2, 3] as $id) {
             NewsEvent::query()->create([
                 'id' => $id,
@@ -233,6 +253,13 @@ class EventMaintenanceServiceTest extends TestCase
         $this->assertSame($canonicalToxicDriving->id, $toxicDriving->id);
         $this->assertSame(3, NewsEventItem::query()->where('news_event_id', $toxicDriving->id)->count());
         $this->assertSame('archived', $duplicateToxicDriving->fresh()->progress_status);
+        $this->assertSame(
+            $cna->id,
+            NewsUrl::query()
+                ->where('normalized_url', 'https://www.cna.com.tw/news/aipl/202606120091.aspx')
+                ->firstOrFail()
+                ->media_outlet_id,
+        );
 
         foreach ([1, 2, 3, $foreignStudent->id, $toxicDriving->id] as $eventId) {
             $this->assertDatabaseHas((new EventEditLog)->getTable(), [

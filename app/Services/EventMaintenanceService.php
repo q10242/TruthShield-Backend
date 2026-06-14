@@ -15,7 +15,11 @@ use InvalidArgumentException;
 
 class EventMaintenanceService
 {
-    public function __construct(private readonly UrlFingerprintService $fingerprints) {}
+    public function __construct(
+        private readonly UrlFingerprintService $fingerprints,
+        private readonly MediaOutletService $mediaOutlets,
+        private readonly NewsAggregationService $aggregation,
+    ) {}
 
     public function run(string $task, bool $execute = false): array
     {
@@ -1220,7 +1224,7 @@ class EventMaintenanceService
     {
         $fingerprint = $this->fingerprints->fingerprint($url);
 
-        return NewsUrl::query()->firstOrCreate(
+        $newsUrl = NewsUrl::query()->firstOrCreate(
             ['hash' => $fingerprint['hash']],
             [
                 'original_url' => $fingerprint['original_url'],
@@ -1229,6 +1233,16 @@ class EventMaintenanceService
                 'voting_closes_at' => now()->addHours(72),
             ],
         );
+
+        $previousMediaOutletId = $newsUrl->media_outlet_id;
+        $this->mediaOutlets->attachOutlet($newsUrl);
+        $freshNewsUrl = $newsUrl->fresh();
+
+        if ($freshNewsUrl && $freshNewsUrl->media_outlet_id !== $previousMediaOutletId) {
+            $this->aggregation->forgetStatusCache($freshNewsUrl);
+        }
+
+        return $freshNewsUrl ?? $newsUrl;
     }
 
     private function maintenanceUser(): User

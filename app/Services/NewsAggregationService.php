@@ -15,6 +15,7 @@ class NewsAggregationService
     public function __construct(
         private readonly NewsSnapshotService $snapshots,
         private readonly ReportLabelStatsService $reportStats,
+        private readonly MediaOutletService $mediaOutlets,
     ) {}
 
     public function statusForFingerprint(array $fingerprint, string $locale = 'zh-TW'): array
@@ -416,6 +417,8 @@ class NewsAggregationService
 
     private function emptyStatus(string $hash, string $normalizedUrl): array
     {
+        $mediaOutlet = $this->mediaOutlets->findOutletForUrl($normalizedUrl);
+
         return [
             'url_hash' => $hash,
             'normalized_url' => $normalizedUrl,
@@ -435,7 +438,7 @@ class NewsAggregationService
                 'net_support_weight' => 0.0,
                 'rating_count' => 0,
             ],
-            'media_context' => null,
+            'media_context' => $mediaOutlet ? $this->reportStats->mediaContext($mediaOutlet) : null,
             'journalist_context' => [],
             'display_text' => '尚無足夠投票資料',
             'tone' => 'neutral',

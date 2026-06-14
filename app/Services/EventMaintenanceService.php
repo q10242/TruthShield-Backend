@@ -38,6 +38,7 @@ class EventMaintenanceService
             'created_or_updated_events' => [],
             'items_created' => 0,
             'timeline_created' => 0,
+            'duplicates_archived' => 0,
         ];
 
         if (! $execute) {
@@ -92,6 +93,7 @@ class EventMaintenanceService
                 $summary['created_or_updated_events'][] = $result['event'];
                 $summary['items_created'] += $result['items_created'];
                 $summary['timeline_created'] += $result['timeline_created'];
+                $summary['duplicates_archived'] += $result['duplicates_archived'];
             }
 
             return $summary;
@@ -997,10 +999,8 @@ class EventMaintenanceService
     {
         $sources = $definition['sources'];
         $primaryNews = $this->ensureNewsUrl($sources[0]['url'], $sources[0]['title']);
-        $event = NewsEvent::query()
-            ->where('slug', $definition['slug'])
-            ->orWhere('name', $definition['name'])
-            ->first();
+        $event = NewsEvent::query()->where('slug', $definition['slug'])->first()
+            ?? NewsEvent::query()->where('name', $definition['name'])->first();
         $created = false;
 
         $attributes = [
@@ -1048,6 +1048,12 @@ class EventMaintenanceService
                 );
             }
         }
+
+        $duplicatesArchived = $this->archiveDuplicateNamedEvents(
+            $admin,
+            $event->fresh(),
+            'ops_20260614_event_copy_and_growth',
+        );
 
         $itemsCreated = 0;
         $timelineCreated = 0;
@@ -1119,7 +1125,45 @@ class EventMaintenanceService
             ],
             'items_created' => $itemsCreated,
             'timeline_created' => $timelineCreated,
+            'duplicates_archived' => $duplicatesArchived,
         ];
+    }
+
+    private function archiveDuplicateNamedEvents(User $admin, NewsEvent $canonical, string $task): int
+    {
+        $archived = 0;
+
+        NewsEvent::query()
+            ->where('name', $canonical->name)
+            ->whereKeyNot($canonical->id)
+            ->where('progress_status', '!=', 'archived')
+            ->get()
+            ->each(function (NewsEvent $duplicate) use ($admin, $canonical, $task, &$archived): void {
+                $before = $duplicate->toArray();
+                $duplicate->forceFill([
+                    'progress_status' => 'archived',
+                    'last_activity_at' => now(),
+                ])->save();
+                $archived++;
+
+                $this->logEventChange(
+                    $duplicate->fresh(),
+                    $admin,
+                    'updated',
+                    $before,
+                    $duplicate->fresh()->toArray(),
+                    "TruthShield AI maintenance: archived duplicate event tracking; canonical event id {$canonical->id}.",
+                    'event.duplicate_archived',
+                    "營運 AI 將重複事件「{$duplicate->name}」改為 archived，保留資料但停止主動追蹤；主要事件 ID：{$canonical->id}。",
+                    [
+                        'source' => 'truthshield:maintain-events',
+                        'task' => $task,
+                        'canonical_event_id' => $canonical->id,
+                    ],
+                );
+            });
+
+        return $archived;
     }
 
     private function foreignStudentHospitalityInternshipSources(): array

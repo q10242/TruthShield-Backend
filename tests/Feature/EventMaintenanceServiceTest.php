@@ -179,7 +179,7 @@ class EventMaintenanceServiceTest extends TestCase
                 'last_activity_at' => now()->subDay(),
             ]);
         }
-        $existingToxicDriving = NewsEvent::query()->create([
+        $duplicateToxicDriving = NewsEvent::query()->create([
             'id' => 14,
             'created_by' => $admin->id,
             'name' => '依托咪酯電子煙與毒駕管制爭議',
@@ -197,6 +197,18 @@ class EventMaintenanceServiceTest extends TestCase
 
         $this->assertDatabaseMissing((new NewsEvent)->getTable(), [
             'slug' => 'foreign-student-hospitality-internship-rights-2026',
+        ]);
+
+        $canonicalToxicDriving = NewsEvent::query()->create([
+            'created_by' => $admin->id,
+            'name' => '依托咪酯電子煙與毒駕管制爭議',
+            'slug' => 'etomidate-drugged-driving-law-reform-2026',
+            'summary' => '既有主要事件摘要。',
+            'primary_category' => 'other',
+            'tags' => [],
+            'progress_status' => 'tracking',
+            'status' => 'active',
+            'last_activity_at' => now()->subDay(),
         ]);
 
         $this->artisan('truthshield:maintain-events ops_20260614_event_copy_and_growth --execute')
@@ -218,8 +230,9 @@ class EventMaintenanceServiceTest extends TestCase
         $this->assertSame(3, NewsEventItem::query()->where('news_event_id', $foreignStudent->id)->count());
         $this->assertSame(3, NewsEventTimelineEntry::query()->where('news_event_id', $foreignStudent->id)->count());
         $this->assertSame(['traffic', 'law_reform'], $toxicDriving->tags);
-        $this->assertSame($existingToxicDriving->id, $toxicDriving->id);
+        $this->assertSame($canonicalToxicDriving->id, $toxicDriving->id);
         $this->assertSame(3, NewsEventItem::query()->where('news_event_id', $toxicDriving->id)->count());
+        $this->assertSame('archived', $duplicateToxicDriving->fresh()->progress_status);
 
         foreach ([1, 2, 3, $foreignStudent->id, $toxicDriving->id] as $eventId) {
             $this->assertDatabaseHas((new EventEditLog)->getTable(), [
@@ -236,7 +249,8 @@ class EventMaintenanceServiceTest extends TestCase
             ->assertSuccessful();
 
         $this->assertSame(1, NewsEvent::query()->where('slug', 'foreign-student-hospitality-internship-rights-2026')->count());
-        $this->assertSame(1, NewsEvent::query()->where('name', '依托咪酯電子煙與毒駕管制爭議')->count());
+        $this->assertSame(2, NewsEvent::query()->where('name', '依托咪酯電子煙與毒駕管制爭議')->count());
+        $this->assertSame(1, NewsEvent::query()->where('name', '依托咪酯電子煙與毒駕管制爭議')->where('progress_status', 'tracking')->count());
         $this->assertSame(3, NewsEventItem::query()->where('news_event_id', $foreignStudent->id)->count());
         $this->assertSame(3, NewsEventTimelineEntry::query()->where('news_event_id', $foreignStudent->id)->count());
     }

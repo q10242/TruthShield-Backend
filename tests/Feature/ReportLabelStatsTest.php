@@ -11,6 +11,7 @@ use App\Models\NewsUrl;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\Vote;
+use App\Services\UrlFingerprintService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -77,6 +78,35 @@ class ReportLabelStatsTest extends TestCase
             ->assertJsonPath('media_context.stats.sample_confidence', 'insufficient')
             ->assertJsonPath('media_context.stats.ratio_available', false)
             ->assertJsonPath('journalist_context', []);
+    }
+
+    public function test_existing_news_status_backfills_media_context_from_known_domain(): void
+    {
+        [$media] = $this->seedBasics();
+        NewsDomain::query()->create([
+            'media_outlet_id' => $media->id,
+            'domain' => 'known-media.example.test',
+            'name' => '測試媒體',
+            'is_active' => true,
+        ]);
+        $url = 'https://known-media.example.test/news/existing-article';
+        $fingerprint = app(UrlFingerprintService::class)->fingerprint($url);
+        $news = NewsUrl::query()->create([
+            'hash' => $fingerprint['hash'],
+            'original_url' => $fingerprint['original_url'],
+            'normalized_url' => $fingerprint['normalized_url'],
+            'title_snapshot' => '既有新聞',
+            'voting_closes_at' => now()->addHours(72),
+        ]);
+
+        $this->getJson('/api/news/status?url='.urlencode($url))
+            ->assertOk()
+            ->assertJsonPath('media_context.type', 'media_outlet')
+            ->assertJsonPath('media_context.id', $media->id)
+            ->assertJsonPath('media_context.stats.sample_confidence', 'insufficient')
+            ->assertJsonPath('media_context.stats.ratio_available', false);
+
+        $this->assertSame($media->id, $news->fresh()->media_outlet_id);
     }
 
     public function test_journalist_stats_exclude_suspected_matches(): void

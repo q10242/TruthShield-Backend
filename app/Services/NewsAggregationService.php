@@ -37,6 +37,13 @@ class NewsAggregationService
             return $this->withCacheStatus($this->localizeStatusPayload($empty, $locale), 'miss');
         }
 
+        $previousMediaOutletId = $newsUrl->media_outlet_id;
+        $this->mediaOutlets->attachOutlet($newsUrl);
+
+        if ($newsUrl->media_outlet_id !== $previousMediaOutletId) {
+            $this->forgetStatusCache($newsUrl);
+        }
+
         $this->ensureVotingWindow($newsUrl);
 
         if (! $this->isOpen($newsUrl)) {

@@ -120,7 +120,9 @@ class TrafficAnalyticsService
                 ->sum(fn ($row) => (int) ($row->estimated_count ?? round(1 / max(0.0001, (float) ($row->sample_rate ?? 1)))));
 
             $statusEvents = $rawToday->filter(fn ($row) => ($row->feature ?? null) === 'news_status');
-            $hits = $this->sumEstimated($statusEvents->filter(fn ($row) => ($row->cache_status ?? null) === 'hit'));
+            $hits = $this->sumEstimated($statusEvents->filter(
+                fn ($row) => in_array($row->cache_status ?? null, ['hit', 'snapshot'], true),
+            ));
             $misses = $this->sumEstimated($statusEvents->filter(fn ($row) => ($row->cache_status ?? null) === 'miss'));
             $statusTotal = $hits + $misses;
 

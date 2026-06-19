@@ -47,7 +47,12 @@ class NewsAggregationService
         $this->ensureVotingWindow($newsUrl);
 
         if (! $this->isOpen($newsUrl)) {
-            return $this->localizeStatusPayload($this->withCurrentSnapshot($newsUrl, $this->finalize($newsUrl)['status']), $locale);
+            $status = $this->localizeStatusPayload(
+                $this->withCurrentSnapshot($newsUrl, $this->finalize($newsUrl)['status']),
+                $locale,
+            );
+
+            return $this->withCacheStatus($status, 'snapshot');
         }
 
         $cacheKey = $this->statusCacheKey($newsUrl, $locale);

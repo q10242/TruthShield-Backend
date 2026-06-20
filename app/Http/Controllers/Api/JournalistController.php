@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CommunityTask;
 use App\Models\Journalist;
 use App\Models\JournalistMatchExclusion;
+use App\Models\JournalistMatchVote;
 use App\Models\JournalistNewsUrl;
 use App\Models\NewsUrl;
 use App\Services\MediaOutletService;
@@ -21,6 +22,8 @@ use InvalidArgumentException;
 
 class JournalistController extends Controller
 {
+    private const CROWD_CONFIRM_THRESHOLD = 3;
+
     public function index(Request $request, ReportLabelStatsService $stats): JsonResponse
     {
         $query = Journalist::query()
@@ -159,7 +162,7 @@ class JournalistController extends Controller
         $validated = $request->validate([
             'news_url' => ['required', 'url', 'max:4096'],
             'journalist_id' => ['required', 'integer', 'exists:journalists,id'],
-            'match_source' => ['required', Rule::in(['json_ld', 'meta_author', 'selector', 'regex', 'full_text', 'admin'])],
+            'match_source' => ['required', Rule::in(['json_ld', 'meta_author', 'selector', 'regex', 'full_text', 'admin', 'user_report'])],
             'matched_text' => ['nullable', 'string', 'max:320'],
             'confidence' => ['required', Rule::in(['high', 'medium', 'low'])],
             'title_snapshot' => ['nullable', 'string', 'max:255'],
@@ -272,8 +275,150 @@ class JournalistController extends Controller
         return response()->json(['data' => $match->fresh()]);
     }
 
+    public function voteOnMatch(Request $request, JournalistNewsUrl $match, NewsAggregationService $aggregation): JsonResponse
+    {
+        $validated = $request->validate([
+            'action' => ['required', Rule::in(['confirm', 'deny'])],
+        ]);
+
+        if ($match->review_status === 'confirmed') {
+            abort(403, 'Match is already confirmed.');
+        }
+
+        JournalistMatchVote::updateOrCreate(
+            [
+                'journalist_news_url_id' => $match->id,
+                'user_id' => $request->user()->id,
+            ],
+            [
+                'action' => $validated['action'],
+            ],
+        );
+
+        $confirmCount = $match->crowdVotes()->where('action', 'confirm')->count();
+        $denyCount = $match->crowdVotes()->where('action', 'deny')->count();
+
+        if ($confirmCount >= self::CROWD_CONFIRM_THRESHOLD && $confirmCount > $denyCount) {
+            $match->forceFill([
+                'review_status' => 'confirmed',
+                'confirmed_at' => now(),
+                'confirmed_by' => null,
+            ])->save();
+
+            if ($match->newsUrl) {
+                $aggregation->forgetStatusCache($match->newsUrl);
+            }
+        }
+
+        return response()->json([
+            'confirm_count' => $confirmCount,
+            'deny_count' => $denyCount,
+            'review_status' => $match->fresh()->review_status,
+            'your_action' => $validated['action'],
+        ]);
+    }
+
+    public function identifyJournalist(
+        Request $request,
+        UrlFingerprintService $fingerprints,
+        NewsAggregationService $aggregation,
+        MediaOutletService $mediaOutlets,
+    ): JsonResponse {
+        $validated = $request->validate([
+            'url' => ['required', 'url', 'max:4096'],
+            'journalist_id' => ['required', 'integer', 'exists:journalists,id'],
+            'title_snapshot' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        try {
+            $fingerprint = $fingerprints->fingerprint($validated['url']);
+        } catch (InvalidArgumentException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        $newsUrl = NewsUrl::query()->firstOrCreate(
+            ['hash' => $fingerprint['hash']],
+            [
+                'original_url' => $fingerprint['original_url'],
+                'normalized_url' => $fingerprint['normalized_url'],
+                'title_snapshot' => $validated['title_snapshot'] ?? null,
+                'voting_closes_at' => now()->addHours(72),
+            ],
+        );
+
+        if (! $newsUrl->title_snapshot && ! empty($validated['title_snapshot'])) {
+            $newsUrl->forceFill(['title_snapshot' => $validated['title_snapshot']])->save();
+        }
+
+        $aggregation->forgetMissingStatusCache($fingerprint['hash']);
+        $mediaOutlets->attachOutlet($newsUrl);
+
+        $existingMatch = JournalistNewsUrl::query()
+            ->where('journalist_id', $validated['journalist_id'])
+            ->where('news_url_id', $newsUrl->id)
+            ->first();
+
+        if ($existingMatch) {
+            if ($existingMatch->review_status === 'confirmed') {
+                return response()->json(['message' => 'Already confirmed'], 409);
+            }
+
+            JournalistMatchVote::updateOrCreate(
+                [
+                    'journalist_news_url_id' => $existingMatch->id,
+                    'user_id' => $request->user()->id,
+                ],
+                ['action' => 'confirm'],
+            );
+
+            $confirmCount = $existingMatch->crowdVotes()->where('action', 'confirm')->count();
+            $denyCount = $existingMatch->crowdVotes()->where('action', 'deny')->count();
+
+            if ($confirmCount >= self::CROWD_CONFIRM_THRESHOLD && $confirmCount > $denyCount) {
+                $existingMatch->forceFill([
+                    'review_status' => 'confirmed',
+                    'confirmed_at' => now(),
+                    'confirmed_by' => null,
+                ])->save();
+
+                $aggregation->forgetStatusCache($newsUrl);
+            }
+
+            return response()->json([
+                'match' => $existingMatch->fresh(),
+                'confirm_count' => $confirmCount,
+                'deny_count' => $denyCount,
+            ]);
+        }
+
+        $match = JournalistNewsUrl::query()->create([
+            'journalist_id' => $validated['journalist_id'],
+            'news_url_id' => $newsUrl->id,
+            'match_source' => 'user_report',
+            'confidence' => 'medium',
+            'review_status' => 'suspected',
+        ]);
+
+        JournalistMatchVote::create([
+            'journalist_news_url_id' => $match->id,
+            'user_id' => $request->user()->id,
+            'action' => 'confirm',
+        ]);
+
+        return response()->json([
+            'match' => $match->fresh(),
+            'confirm_count' => 1,
+            'deny_count' => 0,
+        ]);
+    }
+
     private function autoReviewStatus(array $validated, NewsUrl $newsUrl): string
     {
+        // user_report matches always stay suspected until crowd votes upgrade them
+        if ($validated['match_source'] === 'user_report') {
+            return 'suspected';
+        }
+
         if ($validated['confidence'] !== 'high') {
             return 'suspected';
         }

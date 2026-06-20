@@ -103,6 +103,8 @@ Route::get('/journalists/{journalist}', [JournalistController::class, 'show']);
 Route::get('/journalists/{journalist}/stats', [JournalistController::class, 'stats']);
 Route::post('/news/journalist-matches', [JournalistController::class, 'storeMatch'])->middleware('throttle:120,1');
 Route::post('/news/journalist-matches/{match}/report', [JournalistController::class, 'reportMatch'])->middleware('throttle:20,1');
+Route::post('/news/journalist-matches/{match}/vote', [JournalistController::class, 'voteOnMatch'])->middleware(['auth:sanctum', 'throttle:20,1']);
+Route::post('/news/journalist-identify', [JournalistController::class, 'identifyJournalist'])->middleware(['auth:sanctum', 'throttle:30,1']);
 Route::get('/reactions/summary', [ReaderReactionController::class, 'summary'])->middleware('throttle:120,1');
 Route::post('/reactions', [ReaderReactionController::class, 'store'])->middleware(['auth:sanctum', 'throttle:20,1']);
 Route::delete('/reactions', [ReaderReactionController::class, 'destroy'])->middleware(['auth:sanctum', 'throttle:20,1']);

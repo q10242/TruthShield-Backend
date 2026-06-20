@@ -75,6 +75,8 @@ class ReportLabelStatsService
                     'confidence' => $match->confidence,
                     'review_status' => $match->review_status,
                     'included_in_stats' => $match->review_status === 'confirmed',
+                    'crowd_confirm_count' => $match->crowdVotes()->where('action', 'confirm')->count(),
+                    'crowd_deny_count' => $match->crowdVotes()->where('action', 'deny')->count(),
                     'stats' => $stats ? $this->summaryOnly($stats) : null,
                 ];
             })

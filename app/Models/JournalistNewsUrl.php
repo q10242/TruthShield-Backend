@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
 class JournalistNewsUrl extends Pivot
@@ -45,5 +46,20 @@ class JournalistNewsUrl extends Pivot
     public function confirmer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'confirmed_by');
+    }
+
+    public function crowdVotes(): HasMany
+    {
+        return $this->hasMany(JournalistMatchVote::class);
+    }
+
+    public function crowdConfirmCount(): int
+    {
+        return $this->crowdVotes()->where('action', 'confirm')->count();
+    }
+
+    public function crowdDenyCount(): int
+    {
+        return $this->crowdVotes()->where('action', 'deny')->count();
     }
 }

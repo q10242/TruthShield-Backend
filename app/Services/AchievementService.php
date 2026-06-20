@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Badge;
+use App\Models\Comment;
+use App\Models\CommentReaction;
 use App\Models\CommunitySignal;
 use App\Models\Donation;
 use App\Models\EvidenceReaction;
@@ -180,6 +182,15 @@ class AchievementService
                 ->whereHas('newsUrl.votes', fn ($query) => $query->where('user_id', $user->id))
                 ->count(),
             'badges' => $user->badges()->count(),
+            'comments_created' => Comment::query()
+                ->where('user_id', $user->id)
+                ->whereNull('parent_id')
+                ->whereNull('hidden_at')
+                ->count(),
+            'comments_helpful_received' => CommentReaction::query()
+                ->where('helpful', true)
+                ->whereHas('comment', fn ($q) => $q->where('user_id', $user->id)->whereNull('hidden_at'))
+                ->count(),
         ];
     }
 
@@ -389,6 +400,36 @@ class AchievementService
                     ['slug' => 'public-trust-endowment', 'name' => '公共信任基金級支持者', 'target' => 2500, 'description' => '完成 2,500 筆專案捐款支持。'],
                     ['slug' => 'civic-media-patron', 'name' => '公民媒體萬里後盾', 'target' => 5000, 'description' => '完成 5,000 筆專案捐款支持。'],
                     ['slug' => 'ten-thousand-donations', 'name' => '萬次護盾支持者', 'target' => 10000, 'description' => '完成 10,000 筆專案捐款支持。'],
+                ],
+            ],
+            [
+                'metric' => 'comments_created',
+                'color' => '#c084fc',
+                'tiers' => [
+                    ['slug' => 'first-comment', 'name' => '初次發言', 'target' => 1, 'description' => '在留言板留下第一則想法。'],
+                    ['slug' => 'active-reader', 'name' => '活躍讀者', 'target' => 5, 'description' => '留下 5 則留言。'],
+                    ['slug' => 'discussion-contributor', 'name' => '討論貢獻者', 'target' => 15, 'description' => '留下 15 則留言，成為討論的一部分。'],
+                    ['slug' => 'regular-commenter', 'name' => '討論常客', 'target' => 30, 'description' => '留下 30 則留言。'],
+                    ['slug' => 'comment-enthusiast', 'name' => '留言達人', 'target' => 75, 'description' => '留下 75 則留言。'],
+                    ['slug' => 'senior-commenter', 'name' => '資深留言者', 'target' => 150, 'description' => '留下 150 則留言。'],
+                    ['slug' => 'comment-guardian', 'name' => '留言守護者', 'target' => 300, 'description' => '留下 300 則留言，持續參與社群對話。'],
+                    ['slug' => 'comment-master', 'name' => '留言大師', 'target' => 750, 'description' => '留下 750 則留言，成為社群對話中堅力量。'],
+                    ['slug' => 'thousand-commentator', 'name' => '千言留言者', 'target' => 1000, 'description' => '留下 1,000 則留言。'],
+                    ['slug' => 'ten-thousand-comments', 'name' => '萬則留言者', 'target' => 10000, 'description' => '留下 10,000 則留言。'],
+                ],
+            ],
+            [
+                'metric' => 'comments_helpful_received',
+                'color' => '#fb923c',
+                'tiers' => [
+                    ['slug' => 'first-helpful-comment', 'name' => '初獲好評', 'target' => 1, 'description' => '留言獲得第一次「有用」評價。'],
+                    ['slug' => 'worth-reading', 'name' => '值得一看', 'target' => 5, 'description' => '留言共獲得 5 次「有用」評價。'],
+                    ['slug' => 'community-contributor', 'name' => '社群貢獻者', 'target' => 15, 'description' => '留言共獲得 15 次「有用」評價。'],
+                    ['slug' => 'quality-commenter', 'name' => '留言品質保證', 'target' => 30, 'description' => '留言共獲得 30 次「有用」評價。'],
+                    ['slug' => 'discussion-inspirer', 'name' => '討論啟發者', 'target' => 75, 'description' => '留言共獲得 75 次「有用」評價。'],
+                    ['slug' => 'community-thinker', 'name' => '社群思想家', 'target' => 150, 'description' => '留言共獲得 150 次「有用」評價。'],
+                    ['slug' => 'helpful-voice', 'name' => '有益之聲', 'target' => 300, 'description' => '留言共獲得 300 次「有用」評價。'],
+                    ['slug' => 'thousand-helpful-comments', 'name' => '千次好評留言者', 'target' => 1000, 'description' => '留言共獲得 1,000 次「有用」評價。'],
                 ],
             ],
         ])

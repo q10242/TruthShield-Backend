@@ -126,6 +126,7 @@ class BotProtectionService
             'turnstile_site_key' => config('truthshield_bot.turnstile_site_key'),
             'challenge_mode' => config('truthshield_bot.challenge_mode', 'always'),
             'quick_action_read_gate_enabled' => (bool) config('truthshield_bot.quick_action_read_gate_enabled', false),
+            'quick_action_bar_enabled' => (bool) config('truthshield_bot.quick_action_bar_enabled', false),
             'challenge_threshold' => (int) config('truthshield_bot.challenge_threshold', 50),
             'protected_actions' => config('truthshield_bot.challenge_actions', []),
             'fallback_limits' => [

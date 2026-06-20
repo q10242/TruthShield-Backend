@@ -3143,6 +3143,12 @@ class TruthShieldApiTest extends TestCase
         $artLtnDomain = NewsDomain::query()->where('domain', 'art.ltn.com.tw')->firstOrFail();
         $defLtnDomain = NewsDomain::query()->where('domain', 'def.ltn.com.tw')->firstOrFail();
         $cavaDomain = NewsDomain::query()->where('domain', 'cava.tw')->firstOrFail();
+        $stormDomain = NewsDomain::query()->where('domain', 'www.storm.mg')->firstOrFail();
+        $yahooStockDomain = NewsDomain::query()->where('domain', 'tw.stock.yahoo.com')->firstOrFail();
+        $lineTodayDomain = NewsDomain::query()->where('domain', 'today.line.me')->firstOrFail();
+        $pchomeDomain = NewsDomain::query()->where('domain', 'news.pchome.com.tw')->firstOrFail();
+        $ltnEntertainmentDomain = NewsDomain::query()->where('domain', 'ent.ltn.com.tw')->firstOrFail();
+        $twReporterDomain = NewsDomain::query()->where('domain', 'www.twreporter.org')->firstOrFail();
 
         $this->assertSame('article', $cnaDomain->article_selector);
         $this->assertSame('h1', $cnaDomain->title_selector);
@@ -3160,6 +3166,12 @@ class TruthShieldApiTest extends TestCase
         $this->assertSame('.article-head h1', $cavaDomain->title_selector);
         $this->assertSame('.article-block', $cavaDomain->content_selector);
         $this->assertStringContainsString('topic|lifestyle', $cavaDomain->article_url_pattern);
+        $this->assertStringContainsString('lifestyle', $stormDomain->article_url_pattern);
+        $this->assertSame('^/news/.+\\.html$', $yahooStockDomain->article_url_pattern);
+        $this->assertSame('^/tw/v3/article/[A-Za-z0-9_-]+', $lineTodayDomain->article_url_pattern);
+        $this->assertStringContainsString('/index-', $pchomeDomain->article_url_pattern);
+        $this->assertSame('^/news/(?:breakingnews/)?\\d+', $ltnEntertainmentDomain->article_url_pattern);
+        $this->assertSame('^/a/', $twReporterDomain->article_url_pattern);
     }
 
     public function test_privacy_first_traffic_events_and_summary_flow(): void

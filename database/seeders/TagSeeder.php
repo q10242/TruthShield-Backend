@@ -23,15 +23,15 @@ class TagSeeder extends Seeder
                 ],
             ],
             [
-                'name' => '隱瞞事實',
+                'name' => '隱瞞事實或造假',
                 'slug' => 'missing-facts',
                 'color' => '#f97316',
                 'severity' => 'high',
                 'requires_evidence' => true,
-                'description' => 'Key facts are omitted in a way that changes interpretation.',
+                'description' => 'Key facts are omitted or fabricated in a way that changes interpretation.',
                 'translations' => [
-                    'zh-TW' => ['name' => '隱瞞事實', 'description' => '省略關鍵事實，導致讀者對事件產生不同理解。'],
-                    'en' => ['name' => 'Missing key facts', 'description' => 'Key facts are omitted in a way that changes interpretation.'],
+                    'zh-TW' => ['name' => '隱瞞事實或造假', 'description' => '省略關鍵事實或捏造資訊，導致讀者對事件產生不同理解。'],
+                    'en' => ['name' => 'Missing facts or fabrication', 'description' => 'Key facts are omitted or fabricated in a way that changes interpretation.'],
                 ],
             ],
             [

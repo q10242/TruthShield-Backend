@@ -175,6 +175,24 @@ class ReaderReactionController extends Controller
         ], $reaction->wasRecentlyCreated ? 201 : 200);
     }
 
+    public function destroy(Request $request, UrlFingerprintService $fingerprints): JsonResponse
+    {
+        $validated = $request->validate([
+            'news_url' => ['required', 'url', 'max:4096'],
+        ]);
+
+        $newsUrl = $this->newsUrlFor($fingerprints, $validated['news_url'], false);
+
+        if ($newsUrl) {
+            ReaderReaction::query()
+                ->where('user_id', $request->user()->id)
+                ->where('source_news_url_id', $newsUrl->id)
+                ->delete();
+        }
+
+        return response()->json(['message' => 'Reaction removed.']);
+    }
+
     private function newsUrlFor(UrlFingerprintService $fingerprints, string $url, bool $create): ?NewsUrl
     {
         try {

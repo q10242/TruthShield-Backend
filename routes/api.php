@@ -104,6 +104,7 @@ Route::post('/news/journalist-matches', [JournalistController::class, 'storeMatc
 Route::post('/news/journalist-matches/{match}/report', [JournalistController::class, 'reportMatch'])->middleware('throttle:20,1');
 Route::get('/reactions/summary', [ReaderReactionController::class, 'summary'])->middleware('throttle:120,1');
 Route::post('/reactions', [ReaderReactionController::class, 'store'])->middleware(['auth:sanctum', 'throttle:20,1']);
+Route::delete('/reactions', [ReaderReactionController::class, 'destroy'])->middleware(['auth:sanctum', 'throttle:20,1']);
 Route::post('/news/snapshot', [NewsSnapshotController::class, 'store'])->middleware('throttle:30,1');
 Route::post('/news/change-reports', [NewsChangeReportController::class, 'store'])->middleware('throttle:20,1');
 Route::get('/news/search', [NewsSearchController::class, 'index']);

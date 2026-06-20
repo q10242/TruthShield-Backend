@@ -5,20 +5,21 @@ namespace App\Services;
 use App\Models\Journalist;
 use App\Models\MediaOutlet;
 use App\Models\NewsUrl;
-use App\Models\Tag;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class ReportLabelStatsService
 {
+    /** @deprecated kept for backward-compat constant consumers */
     public const TRACKED_TAG_SLUG = 'clickbait-title';
 
-    public function mediaStats(MediaOutlet $mediaOutlet, int $articleLimit = 20): array
+    public function mediaStats(MediaOutlet $mediaOutlet, int $articleLimit = 20, bool $includePeriods = false): array
     {
         return $this->statsForNewsQuery(
             NewsUrl::query()->where('media_outlet_id', $mediaOutlet->id),
             $articleLimit,
+            $includePeriods,
         );
     }
 
@@ -81,45 +82,36 @@ class ReportLabelStatsService
             ->all();
     }
 
-    public function statsForNewsQuery(Builder $query, int $articleLimit = 20): array
+    public function statsForNewsQuery(Builder $query, int $articleLimit = 20, bool $includePeriods = false): array
     {
         $base = clone $query;
         $articleCount = (int) (clone $base)->count('news_urls.id');
         $ids = (clone $base)->pluck('news_urls.id')->map(fn ($id) => (int) $id)->all();
-        $trackedTag = Tag::query()
-            ->where('slug', self::TRACKED_TAG_SLUG)
-            ->first(['id', 'name', 'slug', 'severity', 'color', 'translations']);
 
-        $articleScores = $trackedTag && $ids
-            ? $this->articleScores($ids, (int) $trackedTag->id)
-            : collect();
-        $clickbaitCount = $articleScores->filter(fn (array $row) => $row['tracked_effective'])->count();
-        $recentIds = (clone $query)
+        $articleScores = $ids ? $this->articleScores($ids) : collect();
+        $tagDistribution = $this->tagDistributionFromScores($articleScores);
+        $topTag = $tagDistribution[0] ?? null;
+
+        $recent90Count = (int) (clone $query)
             ->where('news_urls.created_at', '>=', now()->subDays(90))
-            ->pluck('news_urls.id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-        $recentScores = $trackedTag && $recentIds
-            ? $this->articleScores($recentIds, (int) $trackedTag->id)
-            : collect();
-        $recentCount = count($recentIds);
-        $recentClickbaitCount = $recentScores->filter(fn (array $row) => $row['tracked_effective'])->count();
+            ->count('news_urls.id');
 
         $payload = [
-            'tracked_tag' => $trackedTag ? [
-                'id' => $trackedTag->id,
-                'slug' => $trackedTag->slug,
-                'name' => $trackedTag->name,
-                'severity' => $trackedTag->severity,
-                'color' => $trackedTag->color,
-            ] : null,
+            // Primary representative tag (highest vote count across articles)
+            'top_tag' => $topTag,
+            // Backward-compat alias
+            'tracked_tag' => $topTag,
             'article_count' => $articleCount,
-            'tracked_tag_count' => $clickbaitCount,
-            'tracked_tag_ratio' => $this->ratioOrNull($clickbaitCount, $articleCount),
+            'tag_distribution' => $tagDistribution,
+            // Backward-compat scalar fields
+            'tracked_tag_count' => $topTag['article_count'] ?? 0,
+            'tracked_tag_ratio' => $topTag
+                ? $this->ratioOrNull($topTag['article_count'] ?? 0, $articleCount)
+                : null,
             'recent_90_days' => [
-                'article_count' => $recentCount,
-                'tracked_tag_count' => $recentClickbaitCount,
-                'tracked_tag_ratio' => $this->ratioOrNull($recentClickbaitCount, $recentCount),
+                'article_count' => $recent90Count,
+                'tracked_tag_count' => 0,
+                'tracked_tag_ratio' => null,
             ],
             'sample_confidence' => $this->sampleConfidence($articleCount),
             'min_sample_size' => $this->minSampleSize(),
@@ -131,14 +123,20 @@ class ReportLabelStatsService
             'articles' => [],
         ];
 
+        if ($includePeriods) {
+            $payload['periods'] = $this->computePeriods(clone $query);
+        }
+
         if ($articleLimit > 0) {
-            $payload['articles'] = $this->articleList((clone $query), $articleScores, $articleLimit);
+            $payload['articles'] = $this->articleList(clone $query, $articleScores, $articleLimit);
         }
 
         return $payload;
     }
 
-    private function articleScores(array $newsUrlIds, int $trackedTagId): Collection
+    // ── Private helpers ────────────────────────────────────────────────────────
+
+    private function articleScores(array $newsUrlIds): Collection
     {
         $rows = DB::table('votes')
             ->join('tags', 'tags.id', '=', 'votes.tag_id')
@@ -150,37 +148,89 @@ class ReportLabelStatsService
                 'tags.slug',
                 'tags.name',
                 'tags.severity',
+                'tags.color',
                 DB::raw('sum(votes.weight_score) as weight'),
                 DB::raw('count(votes.id) as vote_count'),
             ])
-            ->groupBy('votes.news_url_id', 'votes.tag_id', 'tags.slug', 'tags.name', 'tags.severity')
+            ->groupBy('votes.news_url_id', 'votes.tag_id', 'tags.slug', 'tags.name', 'tags.severity', 'tags.color')
             ->get()
             ->groupBy('news_url_id');
 
-        return collect($newsUrlIds)->mapWithKeys(function (int $newsUrlId) use ($rows, $trackedTagId): array {
+        return collect($newsUrlIds)->mapWithKeys(function (int $newsUrlId) use ($rows): array {
             $tagRows = collect($rows->get($newsUrlId, []));
             $total = (float) $tagRows->sum('weight');
             $top = $tagRows->sortByDesc(fn ($row) => (float) $row->weight)->first();
-            $tracked = $tagRows->firstWhere('tag_id', $trackedTagId);
-            $trackedWeight = (float) ($tracked->weight ?? 0);
-            $trackedRatio = $total > 0 ? $trackedWeight / $total : 0.0;
 
             return [$newsUrlId => [
                 'news_url_id' => $newsUrlId,
                 'total_weight' => round($total, 4),
-                'tracked_weight' => round($trackedWeight, 4),
-                'tracked_ratio' => round($trackedRatio * 100, 2),
-                'tracked_effective' => $trackedWeight >= $this->minTagWeight() && $trackedRatio >= $this->minTagRatio(),
                 'top_tag' => $top ? [
                     'id' => (int) $top->tag_id,
                     'slug' => $top->slug,
                     'name' => $top->name,
                     'severity' => $top->severity,
+                    'color' => $top->color ?? '#67e8f9',
                     'weight' => round((float) $top->weight, 4),
                 ] : null,
                 'vote_count' => (int) $tagRows->sum('vote_count'),
+                // Kept for articleList backward-compat; always false now
+                'tracked_effective' => false,
+                'tracked_weight' => 0.0,
+                'tracked_ratio' => 0.0,
             ]];
         });
+    }
+
+    private function tagDistributionFromScores(Collection $scores): array
+    {
+        $withTag = $scores->filter(fn ($s) => $s['top_tag'] !== null);
+        $total = $withTag->count();
+
+        return $withTag
+            ->groupBy(fn ($s) => $s['top_tag']['id'])
+            ->map(function (Collection $group) use ($total): array {
+                $tag = $group->first()['top_tag'];
+                $count = $group->count();
+
+                return [
+                    'tag_id' => $tag['id'],
+                    'slug' => $tag['slug'],
+                    'name' => $tag['name'],
+                    'severity' => $tag['severity'],
+                    'color' => $tag['color'] ?? '#67e8f9',
+                    'article_count' => $count,
+                    'ratio' => $total > 0 ? round($count / $total * 100, 1) : 0.0,
+                ];
+            })
+            ->sortByDesc('article_count')
+            ->values()
+            ->all();
+    }
+
+    private function computePeriods(Builder $query): array
+    {
+        $windows = [
+            'all_time' => null,
+            'last_90_days' => now()->subDays(90),
+            'last_30_days' => now()->subDays(30),
+        ];
+
+        $result = [];
+        foreach ($windows as $key => $since) {
+            $q = clone $query;
+            if ($since) {
+                $q->where('news_urls.created_at', '>=', $since);
+            }
+            $ids = $q->pluck('news_urls.id')->map(fn ($id) => (int) $id)->all();
+            $scores = $ids ? $this->articleScores($ids) : collect();
+            $dist = $this->tagDistributionFromScores($scores);
+            $result[$key] = [
+                'article_count' => count($ids),
+                'tag_distribution' => $dist,
+            ];
+        }
+
+        return $result;
     }
 
     private function articleList(Builder $query, Collection $articleScores, int $limit): array
@@ -214,9 +264,6 @@ class ReportLabelStatsService
                     'finalized_at' => $newsUrl->finalized_at?->toJSON(),
                     'top_tag' => $score['top_tag'],
                     'total_weight' => $score['total_weight'],
-                    'tracked_tag_weight' => $score['tracked_weight'],
-                    'tracked_tag_ratio' => $score['tracked_ratio'],
-                    'tracked_tag_effective' => $score['tracked_effective'],
                     'vote_count' => $score['vote_count'],
                     'events' => $newsUrl->eventItems
                         ->pluck('event')
@@ -231,7 +278,7 @@ class ReportLabelStatsService
 
     private function summaryOnly(array $stats): array
     {
-        unset($stats['articles']);
+        unset($stats['articles'], $stats['periods']);
 
         return $stats;
     }

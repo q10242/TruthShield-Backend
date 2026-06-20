@@ -107,7 +107,7 @@ class MediaOutletController extends Controller
     {
         return response()->json([
             'media' => $mediaOutlet->only(['id', 'name', 'slug', 'type', 'region']),
-            'data' => $stats->mediaStats($mediaOutlet, 50),
+            'data' => $stats->mediaStats($mediaOutlet, 50, true),
         ]);
     }
 }

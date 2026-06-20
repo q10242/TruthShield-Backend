@@ -134,6 +134,26 @@ class VoteController extends Controller
             ], 428);
         }
 
+        $existingVote = Vote::query()
+            ->where('user_id', $request->user()->id)
+            ->where('news_url_id', $newsUrl->id)
+            ->first();
+
+        // Toggle: same tag clicked again → cancel the vote
+        if ($existingVote && $existingVote->tag_id === (int) $validated['tag_id']) {
+            $existingVote->delete();
+            $newsAggregation->forgetStatusCache($newsUrl);
+            $cache = Cache::store(config('truthshield.status_cache_store'));
+            foreach (['leaderboard:media:v1', 'transparency:summary:v1', 'system:health:metrics:v1'] as $key) {
+                $cache->forget($key);
+            }
+            $auditLog->record($request, 'vote.cancelled', $existingVote, [
+                'news_url_id' => $newsUrl->id,
+                'tag_id' => $validated['tag_id'],
+            ]);
+            return response()->json(['message' => 'Vote cancelled.', 'vote' => null], 200);
+        }
+
         $vote = Vote::query()->updateOrCreate(
             [
                 'user_id' => $request->user()->id,

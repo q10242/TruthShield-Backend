@@ -93,6 +93,7 @@ class ReportLabelStatsService
         $articleScores = $ids ? $this->articleScores($ids) : collect();
         $tagDistribution = $this->tagDistributionFromScores($articleScores);
         $topTag = $tagDistribution[0] ?? null;
+        $labeledArticleCount = $articleScores->whereNotNull('top_tag')->count();
 
         $recent90Count = (int) (clone $query)
             ->where('news_urls.created_at', '>=', now()->subDays(90))
@@ -104,20 +105,21 @@ class ReportLabelStatsService
             // Backward-compat alias
             'tracked_tag' => $topTag,
             'article_count' => $articleCount,
+            'labeled_article_count' => $labeledArticleCount,
             'tag_distribution' => $tagDistribution,
             // Backward-compat scalar fields
             'tracked_tag_count' => $topTag['article_count'] ?? 0,
             'tracked_tag_ratio' => $topTag
-                ? $this->ratioOrNull($topTag['article_count'] ?? 0, $articleCount)
+                ? $this->ratioOrNull($topTag['article_count'] ?? 0, $labeledArticleCount)
                 : null,
             'recent_90_days' => [
                 'article_count' => $recent90Count,
                 'tracked_tag_count' => 0,
                 'tracked_tag_ratio' => null,
             ],
-            'sample_confidence' => $this->sampleConfidence($articleCount),
+            'sample_confidence' => $this->sampleConfidence($labeledArticleCount),
             'min_sample_size' => $this->minSampleSize(),
-            'ratio_available' => $articleCount >= $this->minSampleSize(),
+            'ratio_available' => $labeledArticleCount >= $this->minSampleSize(),
             'consensus' => [
                 'min_weight' => $this->minTagWeight(),
                 'min_ratio' => $this->minTagRatio(),
@@ -226,9 +228,14 @@ class ReportLabelStatsService
             $ids = $q->pluck('news_urls.id')->map(fn ($id) => (int) $id)->all();
             $scores = $ids ? $this->articleScores($ids) : collect();
             $dist = $this->tagDistributionFromScores($scores);
+            $labeledArticleCount = $scores->whereNotNull('top_tag')->count();
             $result[$key] = [
                 'article_count' => count($ids),
+                'labeled_article_count' => $labeledArticleCount,
                 'tag_distribution' => $dist,
+                'sample_confidence' => $this->sampleConfidence($labeledArticleCount),
+                'min_sample_size' => $this->minSampleSize(),
+                'ratio_available' => $labeledArticleCount >= $this->minSampleSize(),
             ];
         }
 

@@ -60,6 +60,26 @@ class ReportLabelStatsTest extends TestCase
             ->assertJsonPath('data.0.stats.article_count', 1);
     }
 
+    public function test_media_stats_hide_ratios_when_labeled_sample_is_too_small(): void
+    {
+        [$media, $clickbait] = $this->seedBasics();
+
+        $this->createNewsWithVotes($media, $clickbait, 1);
+        for ($i = 0; $i < 9; $i++) {
+            $this->createNewsWithVotes($media, $clickbait, 0);
+        }
+
+        $this->getJson("/api/media-outlets/{$media->id}/stats")
+            ->assertOk()
+            ->assertJsonPath('data.article_count', 10)
+            ->assertJsonPath('data.labeled_article_count', 1)
+            ->assertJsonPath('data.tracked_tag_ratio', null)
+            ->assertJsonPath('data.sample_confidence', 'insufficient')
+            ->assertJsonPath('data.ratio_available', false)
+            ->assertJsonPath('data.periods.all_time.labeled_article_count', 1)
+            ->assertJsonPath('data.periods.all_time.ratio_available', false);
+    }
+
     public function test_empty_status_infers_media_context_from_known_news_domain(): void
     {
         [$media] = $this->seedBasics();

@@ -111,6 +111,7 @@ class VoteController extends Controller
 
         if (! $newsAggregation->isOpen($newsUrl)) {
             return response()->json([
+                'error_code' => 'voting_window_closed',
                 'message' => 'Voting window has closed for this news URL.',
                 'status' => $newsAggregation->statusForFingerprint($fingerprint),
             ], 409);
@@ -128,6 +129,7 @@ class VoteController extends Controller
 
         if ($minimumReadSeconds > 0 && $secondsRead < $minimumReadSeconds) {
             return response()->json([
+                'error_code' => 'read_required',
                 'message' => 'Please read the article before voting.',
                 'minimum_read_seconds' => $minimumReadSeconds,
                 'seconds_read' => $secondsRead,

@@ -9,6 +9,7 @@ use App\Models\NewsUrl;
 use App\Models\ReaderReaction;
 use App\Services\TrustScoreService;
 use App\Services\UrlFingerprintService;
+use App\Services\BotProtectionService;
 use App\Support\EventTaxonomy;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
@@ -84,8 +85,17 @@ class ReaderReactionController extends Controller
         ]);
     }
 
-    public function store(Request $request, UrlFingerprintService $fingerprints, TrustScoreService $trustScores): JsonResponse
+    public function store(
+        Request $request,
+        UrlFingerprintService $fingerprints,
+        TrustScoreService $trustScores,
+        BotProtectionService $botProtection,
+    ): JsonResponse
     {
+        if ($response = $botProtection->enforce($request, 'reader.reaction')) {
+            return $response;
+        }
+
         $validated = $request->validate([
             'news_url' => ['required', 'url', 'max:4096'],
             'event_id' => ['nullable', 'integer', 'exists:news_events,id'],
@@ -93,6 +103,8 @@ class ReaderReactionController extends Controller
             'feelings.*' => ['string', Rule::in(array_keys(self::FEELINGS))],
             'needs' => ['nullable', 'array', 'max:3'],
             'needs.*' => ['string', Rule::in(array_keys(self::NEEDS))],
+            'challenge_token' => ['nullable', 'string', 'max:2048'],
+            'challenge_retry' => ['nullable', 'boolean'],
         ]);
 
         $feelings = collect($validated['feelings'] ?? [])->unique()->values()->all();
@@ -105,6 +117,18 @@ class ReaderReactionController extends Controller
         }
 
         $newsUrl = $this->newsUrlFor($fingerprints, $validated['news_url'], true);
+        $minimumReadSeconds = (int) config('truthshield.min_read_seconds_before_vote', 15);
+        $secondsRead = (int) $request->user()
+            ->readSessions()
+            ->where('news_url_id', $newsUrl->id)
+            ->value('seconds_read');
+        if ($minimumReadSeconds > 0 && $secondsRead < $minimumReadSeconds) {
+            return response()->json([
+                'message' => 'Please read the article before reacting.',
+                'minimum_read_seconds' => $minimumReadSeconds,
+                'seconds_read' => $secondsRead,
+            ], 428);
+        }
         $relatedEvents = $this->relatedEvents($newsUrl);
         $event = null;
         if ($validated['event_id'] ?? null) {

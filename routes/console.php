@@ -16,6 +16,7 @@ use App\Models\TrustedEvidenceSource;
 use App\Models\User;
 use App\Models\Vote;
 use App\Services\AlgorithmVersionService;
+use App\Services\BotTrustRecoveryService;
 use App\Services\CommunityAutomationService;
 use App\Services\EvidenceSyncService;
 use App\Services\EventMaintenanceService;
@@ -114,6 +115,11 @@ Artisan::command('truthshield:detect-abuse-clusters', function () {
     DetectAbuseClustersJob::dispatchSync();
     $this->info('Abuse cluster detection job completed.');
 })->purpose('Aggregate recent abuse events into reviewable clusters.');
+
+Artisan::command('truthshield:recover-bot-trust', function (BotTrustRecoveryService $recovery) {
+    $count = $recovery->recoverEligible();
+    $this->info("Recovered {$count} bot-challenge trust deductions.");
+})->purpose('Restore bot-challenge trust deductions after a clean recovery window.');
 
 Artisan::command('truthshield:run-community-automation', function (CommunityAutomationService $automation) {
     $stats = $automation->run();
@@ -739,6 +745,7 @@ Schedule::command('truthshield:ensure-algorithm-version')->daily();
 Schedule::command('truthshield:sync-evidence --limit=500')->hourly();
 Schedule::command('truthshield:snapshot-evidence --limit=100')->everyThirtyMinutes();
 Schedule::command('truthshield:detect-abuse-clusters')->hourly();
+Schedule::command('truthshield:recover-bot-trust')->daily()->withoutOverlapping();
 Schedule::command('truthshield:build-account-graph')->hourly();
 Schedule::command('truthshield:record-operational-heartbeat scheduler')->everyMinute();
 Schedule::command('truthshield:record-operational-heartbeat queue_worker')->everyFiveMinutes();

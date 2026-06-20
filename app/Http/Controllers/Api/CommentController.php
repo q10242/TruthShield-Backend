@@ -131,10 +131,6 @@ class CommentController extends Controller
             'helpful' => ['required', 'boolean'],
         ]);
 
-        if ($comment->user_id === $request->user()->id) {
-            return response()->json(['message' => 'Cannot react to your own comment.'], 422);
-        }
-
         $existing = CommentReaction::query()
             ->where('comment_id', $comment->id)
             ->where('user_id', $request->user()->id)

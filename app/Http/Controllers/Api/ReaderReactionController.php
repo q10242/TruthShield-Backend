@@ -117,17 +117,19 @@ class ReaderReactionController extends Controller
         }
 
         $newsUrl = $this->newsUrlFor($fingerprints, $validated['news_url'], true);
-        $minimumReadSeconds = (int) config('truthshield.min_read_seconds_before_vote', 15);
-        $secondsRead = (int) $request->user()
-            ->readSessions()
-            ->where('news_url_id', $newsUrl->id)
-            ->value('seconds_read');
-        if ($minimumReadSeconds > 0 && $secondsRead < $minimumReadSeconds) {
-            return response()->json([
-                'message' => 'Please read the article before reacting.',
-                'minimum_read_seconds' => $minimumReadSeconds,
-                'seconds_read' => $secondsRead,
-            ], 428);
+        if ((bool) config('truthshield_bot.quick_action_read_gate_enabled', false)) {
+            $minimumReadSeconds = (int) config('truthshield.min_read_seconds_before_vote', 15);
+            $secondsRead = (int) $request->user()
+                ->readSessions()
+                ->where('news_url_id', $newsUrl->id)
+                ->value('seconds_read');
+            if ($minimumReadSeconds > 0 && $secondsRead < $minimumReadSeconds) {
+                return response()->json([
+                    'message' => 'Please read the article before reacting.',
+                    'minimum_read_seconds' => $minimumReadSeconds,
+                    'seconds_read' => $secondsRead,
+                ], 428);
+            }
         }
         $relatedEvents = $this->relatedEvents($newsUrl);
         $event = null;

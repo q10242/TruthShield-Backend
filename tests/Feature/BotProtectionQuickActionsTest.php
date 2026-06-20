@@ -32,6 +32,7 @@ class BotProtectionQuickActionsTest extends TestCase
             'truthshield_bot.turnstile_enabled' => true,
             'truthshield_bot.turnstile_secret' => 'test-secret',
             'truthshield_bot.challenge_mode' => 'always',
+            'truthshield_bot.quick_action_read_gate_enabled' => true,
             'truthshield_bot.block_threshold' => 100,
             'truthshield_bot.expected_hostname' => 'truth-shield.otus.tw',
             'truthshield_bot.fallback_per_minute' => 3,
@@ -174,6 +175,7 @@ class BotProtectionQuickActionsTest extends TestCase
         $this->getJson('/api/bot/config')
             ->assertOk()
             ->assertJsonPath('challenge_mode', 'always')
+            ->assertJsonPath('quick_action_read_gate_enabled', true)
             ->assertJsonPath('fallback_limits.per_minute', 3)
             ->assertJsonPath('fallback_limits.per_hour', 30);
     }

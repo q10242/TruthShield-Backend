@@ -7,6 +7,7 @@ return [
     'turnstile_secret' => env('TRUTHSHIELD_TURNSTILE_SECRET'),
     'turnstile_verify_url' => env('TRUTHSHIELD_TURNSTILE_VERIFY_URL', 'https://challenges.cloudflare.com/turnstile/v0/siteverify'),
     'challenge_mode' => env('TRUTHSHIELD_BOT_CHALLENGE_MODE', 'always'),
+    'quick_action_read_gate_enabled' => (bool) env('TRUTHSHIELD_QUICK_ACTION_READ_GATE_ENABLED', false),
     'challenge_threshold' => (int) env('TRUTHSHIELD_BOT_CHALLENGE_THRESHOLD', 50),
     'block_threshold' => (int) env('TRUTHSHIELD_BOT_BLOCK_THRESHOLD', 90),
     'expected_hostname' => env('TRUTHSHIELD_TURNSTILE_HOSTNAME', parse_url(env('FRONTEND_URL', ''), PHP_URL_HOST)),

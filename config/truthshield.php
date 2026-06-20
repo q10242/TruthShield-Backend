@@ -1,6 +1,9 @@
 <?php
 
 return [
+    'extension_latest_version' => env('TRUTHSHIELD_EXTENSION_LATEST_VERSION', '0.1.29'),
+    'extension_install_url' => env('TRUTHSHIELD_EXTENSION_INSTALL_URL', 'https://truth-shield.otus.tw/extension-install'),
+
     'status_cache_store' => env('TRUTHSHIELD_STATUS_CACHE_STORE', 'redis'),
     'status_cache_version' => env('TRUTHSHIELD_STATUS_CACHE_VERSION', 'v1'),
     'dev_login_enabled' => (bool) env('TRUTHSHIELD_DEV_LOGIN_ENABLED', env('APP_ENV') !== 'production'),
@@ -83,8 +86,13 @@ return [
         'www.ettoday.net',
         'www.setn.com',
         'news.ltn.com.tw',
+        'ent.ltn.com.tw',
         'tw.news.yahoo.com',
+        'tw.stock.yahoo.com',
         'www.storm.mg',
+        'today.line.me',
+        'news.pchome.com.tw',
+        'www.twreporter.org',
         'www.thenewslens.com',
         'www.mirrormedia.mg',
         'www.rti.org.tw',

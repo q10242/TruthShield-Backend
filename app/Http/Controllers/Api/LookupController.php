@@ -56,9 +56,7 @@ class LookupController extends Controller
 
     public function newsDomains(): JsonResponse
     {
-        return response()
-            ->json([
-                'data' => Cache::store(config('truthshield.status_cache_store'))->remember(
+        $domains = Cache::store(config('truthshield.status_cache_store'))->remember(
                     'lookup:news-domains:v3',
                     now()->addMinutes(5),
                     function (): array {
@@ -105,7 +103,15 @@ class LookupController extends Controller
                             })
                             ->all();
                     },
-                ),
+                );
+
+        return response()
+            ->json([
+                'data' => $domains,
+                'extension' => [
+                    'latest_version' => config('truthshield.extension_latest_version', '0.1.29'),
+                    'install_url' => config('truthshield.extension_install_url', 'https://truth-shield.otus.tw/extension-install'),
+                ],
             ])
             ->header('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
     }

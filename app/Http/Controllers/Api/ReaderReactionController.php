@@ -37,6 +37,16 @@ class ReaderReactionController extends Controller
         'thankful' => ['emoji' => '🙏', 'label' => '感謝補充'],
         'insightful' => ['emoji' => '💡', 'label' => '有收穫'],
         'credible' => ['emoji' => '✅', 'label' => '覺得可信'],
+        'shocked' => ['emoji' => '😮', 'label' => '震驚'],
+        'heartwarming' => ['emoji' => '🥰', 'label' => '溫馨'],
+        'exaggerated' => ['emoji' => '🤯', 'label' => '誇張'],
+        'frightened' => ['emoji' => '😨', 'label' => '驚嚇'],
+        'terrifying' => ['emoji' => '😰', 'label' => '可怕'],
+        'resigned' => ['emoji' => '😑', 'label' => '無奈'],
+        'facepalm' => ['emoji' => '🤦', 'label' => '智障'],
+        'funny' => ['emoji' => '😂', 'label' => '搞笑'],
+        'regret' => ['emoji' => '😣', 'label' => '後悔'],
+        'clown_self' => ['emoji' => '🤡', 'label' => '小丑竟是我自己'],
     ];
 
     private const NEEDS = [

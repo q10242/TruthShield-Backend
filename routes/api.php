@@ -109,7 +109,7 @@ Route::get('/reactions/summary', [ReaderReactionController::class, 'summary'])->
 Route::post('/reactions', [ReaderReactionController::class, 'store'])->middleware(['auth:sanctum', 'throttle:20,1']);
 Route::delete('/reactions', [ReaderReactionController::class, 'destroy'])->middleware(['auth:sanctum', 'throttle:20,1']);
 Route::get('/comments', [CommentController::class, 'index'])->middleware('throttle:120,1');
-Route::post('/comments', [CommentController::class, 'store'])->middleware(['auth:sanctum', 'throttle:5,1']);
+Route::post('/comments', [CommentController::class, 'store'])->middleware(['auth:sanctum', 'throttle:15,1']);
 Route::delete('/comments/{comment}', [CommentController::class, 'destroy'])->middleware(['auth:sanctum', 'throttle:20,1']);
 Route::post('/comments/{comment}/reaction', [CommentController::class, 'react'])->middleware(['auth:sanctum', 'throttle:30,1']);
 Route::post('/comments/{comment}/report', [CommentController::class, 'report'])->middleware(['auth:sanctum', 'throttle:10,1']);

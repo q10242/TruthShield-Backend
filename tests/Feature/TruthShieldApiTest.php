@@ -2304,6 +2304,42 @@ class TruthShieldApiTest extends TestCase
             ->assertHeader('content-type', 'text/csv; charset=utf-8');
     }
 
+    public function test_community_automation_resolves_domain_tasks_when_domain_is_already_active(): void
+    {
+        NewsDomain::query()->create([
+            'domain' => 'already-active.test',
+            'name' => 'Already Active',
+            'is_active' => true,
+        ]);
+        $report = NewsDomainReport::query()->create([
+            'domain' => 'already-active.test',
+            'url' => 'https://already-active.test/news/1',
+            'status' => 'pending',
+        ]);
+        CommunityTask::query()->create([
+            'type' => 'domain_candidate',
+            'subject_type' => NewsDomainReport::class,
+            'subject_id' => $report->id,
+            'subject_key' => 'already-active.test',
+            'title' => '確認未收錄新聞站',
+            'description' => '確認 already-active.test 是否應納入插件監控。',
+            'priority' => 55,
+            'status' => 'open',
+        ]);
+
+        $this->artisan('truthshield:run-community-automation')->assertExitCode(0);
+
+        $this->assertDatabaseHas('news_domain_reports', [
+            'domain' => 'already-active.test',
+            'status' => 'approved',
+        ]);
+        $this->assertDatabaseHas('community_tasks', [
+            'subject_key' => 'already-active.test',
+            'status' => 'resolved',
+            'resolved_reason' => 'domain_already_active',
+        ]);
+    }
+
     public function test_community_automation_auto_approves_low_risk_domain_url_rule_and_trusted_source(): void
     {
         config([

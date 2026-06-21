@@ -476,6 +476,21 @@ class CommunityAutomationService
     {
         $count = 0;
 
+        $activeDomains = NewsDomain::query()->where('is_active', true)->pluck('domain');
+        NewsDomainReport::query()
+            ->where('status', 'pending')
+            ->whereIn('domain', $activeDomains)
+            ->update(['status' => 'approved']);
+        CommunityTask::query()
+            ->where('type', 'domain_candidate')
+            ->whereIn('status', ['open', 'escalated'])
+            ->whereIn('subject_key', $activeDomains)
+            ->update([
+                'status' => 'resolved',
+                'resolved_at' => now(),
+                'resolved_reason' => 'domain_already_active',
+            ]);
+
         NewsDomainReport::query()->where('status', 'pending')->get()->each(function (NewsDomainReport $report) use (&$count): void {
             $summary = $this->signalSummary('domain_report', $report->domain);
             $this->upsertTask('domain_candidate', $report, $report->domain, '確認未收錄新聞站', "確認 {$report->domain} 是否應納入插件監控。", 55, '/report-domain', $summary, $this->isHighRiskDomain($report->domain));

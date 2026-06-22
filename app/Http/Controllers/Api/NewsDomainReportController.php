@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\NewsDomain;
 use App\Models\NewsDomainReport;
 use App\Services\BotProtectionService;
 use App\Services\CommunitySignalService;
@@ -33,6 +34,13 @@ class NewsDomainReportController extends Controller
                     'url' => ['Unable to parse domain from URL.'],
                 ],
             ], 422);
+        }
+
+        if (NewsDomain::query()->where('domain', $domain)->exists()) {
+            return response()->json([
+                'error_code' => 'domain_already_covered',
+                'message' => '這個網站已在 TruthShield 的支援清單中，無需回報。',
+            ], 409);
         }
 
         $report = NewsDomainReport::query()->where('domain', $domain)->where('status', 'pending')->first();

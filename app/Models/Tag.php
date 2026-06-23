@@ -14,9 +14,11 @@ class Tag extends Model
     public const EVIDENCE_REQUIREMENT_OPTIONAL = 'optional';
 
     private const CONTEXT_NOTE_SLUGS = [
+        'clickbait-title',
         'lack-of-balance',
         'single-source',
         'fact-opinion-blurring',
+        'misleading-data',
     ];
 
     private const DISCLOSURE_NOTE_SLUGS = [

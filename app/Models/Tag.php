@@ -19,6 +19,7 @@ class Tag extends Model
         'single-source',
         'fact-opinion-blurring',
         'misleading-data',
+        'narrative-manipulation',
     ];
 
     private const DISCLOSURE_NOTE_SLUGS = [

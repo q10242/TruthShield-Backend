@@ -107,6 +107,18 @@ class TagSeeder extends Seeder
                 ],
             ],
             [
+                'name' => '敘事操弄(帶風向)',
+                'slug' => 'narrative-manipulation',
+                'color' => '#f97316',
+                'severity' => 'high',
+                'requires_evidence' => true,
+                'description' => 'Story framing, topic selection, or wording is designed to steer readers toward a predetermined conclusion rather than neutrally presenting facts.',
+                'translations' => [
+                    'zh-TW' => ['name' => '敘事操弄(帶風向)', 'description' => '報導選題、排序或措辭刻意引導情緒或輿論，而非中立呈現事實。'],
+                    'en' => ['name' => 'Narrative manipulation', 'description' => 'Story framing, topic selection, or wording is designed to steer readers toward a predetermined conclusion rather than neutrally presenting facts.'],
+                ],
+            ],
+            [
                 'name' => '內容農場',
                 'slug' => 'content-farm',
                 'color' => '#dc2626',

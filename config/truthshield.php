@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'extension_latest_version' => env('TRUTHSHIELD_EXTENSION_LATEST_VERSION', '0.1.29'),
+    'extension_latest_version' => env('TRUTHSHIELD_EXTENSION_LATEST_VERSION', '0.1.30'),
     'extension_install_url' => env('TRUTHSHIELD_EXTENSION_INSTALL_URL', 'https://truth-shield.otus.tw/extension-install'),
 
     'status_cache_store' => env('TRUTHSHIELD_STATUS_CACHE_STORE', 'redis'),

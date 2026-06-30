@@ -301,6 +301,10 @@ class EventController extends Controller
 
         $event->forceFill(['last_activity_at' => now()])->save();
         $this->logEdit($event, $request, 'created', $entry, null, $entry->toArray(), 'Pinned timeline entry.');
+        $this->recordModerationEvent($event, $request, 'event.timeline_created', "事件「{$event->name}」新增時間線「{$entry->title}」。", [
+            'timeline_entry_id' => $entry->id,
+            'source_url' => $entry->source_url,
+        ]);
 
         return response()->json(['data' => $entry->load(['newsUrl', 'evidence', 'creator'])], 201);
     }
@@ -342,9 +346,14 @@ class EventController extends Controller
         ])->save();
 
         $event->forceFill(['last_activity_at' => now()])->save();
-        $this->logEdit($event, $request, 'updated', $entry, $before, $entry->fresh()->toArray(), 'Updated timeline entry.');
+        $fresh = $entry->fresh();
+        $this->logEdit($event, $request, 'updated', $entry, $before, $fresh->toArray(), 'Updated timeline entry.');
+        $this->recordModerationEvent($event, $request, 'event.timeline_updated', "事件「{$event->name}」更新時間線「{$fresh->title}」。", [
+            'timeline_entry_id' => $fresh->id,
+            'source_url' => $fresh->source_url,
+        ]);
 
-        return response()->json(['data' => $entry->fresh()->load(['newsUrl', 'evidence', 'creator'])]);
+        return response()->json(['data' => $fresh->load(['newsUrl', 'evidence', 'creator'])]);
     }
 
     public function deleteTimeline(Request $request, NewsEvent $event, NewsEventTimelineEntry $entry): JsonResponse
@@ -355,6 +364,10 @@ class EventController extends Controller
         $entry->delete();
         $event->forceFill(['last_activity_at' => now()])->save();
         $this->logEdit($event, $request, 'deleted', $entry, $before, null, 'Deleted timeline entry.');
+        $this->recordModerationEvent($event, $request, 'event.timeline_deleted', "事件「{$event->name}」刪除時間線「{$before['title']}」。", [
+            'timeline_entry_id' => $before['id'] ?? null,
+            'source_url' => $before['source_url'] ?? null,
+        ]);
 
         return response()->json(['message' => 'Timeline entry deleted.']);
     }

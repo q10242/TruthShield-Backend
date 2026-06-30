@@ -191,6 +191,58 @@ class EventTaxonomyTest extends TestCase
         ]);
     }
 
+    public function test_timeline_changes_record_public_moderation_events(): void
+    {
+        $user = User::factory()->create(['trust_score' => 2.0]);
+        $event = NewsEvent::query()->create([
+            'name' => '時間線治理紀錄',
+            'slug' => 'timeline-governance-log',
+            'summary' => '測試時間線公開治理紀錄。',
+            'primary_category' => 'public_policy',
+            'tags' => ['law_reform'],
+            'progress_status' => 'tracking',
+            'last_activity_at' => now(),
+        ]);
+
+        $entry = $this->actingAs($user, 'sanctum')
+            ->postJson("/api/events/{$event->id}/timeline", [
+                'title' => '新增時間線',
+                'summary' => '公開來源補充一筆時間線。',
+                'occurred_at' => '2026-06-30',
+                'source_type' => 'external',
+                'source_url' => 'https://example.test/timeline-created',
+            ])
+            ->assertCreated()
+            ->json('data');
+
+        $this->actingAs($user, 'sanctum')
+            ->patchJson("/api/events/{$event->id}/timeline/{$entry['id']}", [
+                'title' => '更新時間線',
+                'summary' => '修正時間線摘要。',
+                'occurred_at' => '2026-07-01',
+                'source_type' => 'external',
+                'source_url' => 'https://example.test/timeline-updated',
+            ])
+            ->assertOk();
+
+        $this->actingAs($user, 'sanctum')
+            ->deleteJson("/api/events/{$event->id}/timeline/{$entry['id']}")
+            ->assertOk();
+
+        foreach (['event.timeline_created', 'event.timeline_updated', 'event.timeline_deleted'] as $type) {
+            $this->assertDatabaseHas((new ModerationEvent)->getTable(), [
+                'user_id' => $user->id,
+                'event_type' => $type,
+                'subject_id' => $event->id,
+            ]);
+        }
+        $this->assertDatabaseHas((new EventEditLog)->getTable(), [
+            'news_event_id' => $event->id,
+            'subject_type' => 'NewsEventTimelineEntry',
+            'is_public' => true,
+        ]);
+    }
+
     public function test_admin_event_resource_records_public_governance_logs(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);

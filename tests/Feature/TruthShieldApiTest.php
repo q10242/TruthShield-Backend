@@ -24,6 +24,9 @@ use App\Models\EvidenceReport;
 use App\Models\EvidenceSnapshot;
 use App\Models\ExtensionEvent;
 use App\Models\ExtensionSelectorCheck;
+use App\Models\Journalist;
+use App\Models\JournalistMatchVote;
+use App\Models\JournalistNewsUrl;
 use App\Models\MediaOutlet;
 use App\Models\NewsChangeReport;
 use App\Models\NewsCluster;
@@ -317,9 +320,40 @@ class TruthShieldApiTest extends TestCase
                 'evidence_url' => 'https://i.imgur.com/example.png',
                 'evidence_note' => '截圖標出標題與內文落差。',
             ])
-            ->assertCreated();
+            ->assertOk();
 
         $this->assertFalse(Cache::store(config('truthshield.status_cache_store'))->has($cacheKey));
+    }
+
+    public function test_vote_with_journalist_name_reuses_same_media_journalist(): void
+    {
+        $this->seed(TagSeeder::class);
+        $user = User::factory()->create();
+        $tag = Tag::query()->where('slug', 'clickbait-title')->firstOrFail();
+        $outlet = MediaOutlet::query()->create(['name' => 'CNA', 'slug' => 'cna', 'is_active' => true]);
+        NewsDomain::query()->updateOrCreate([
+            'domain' => 'www.cna.com.tw',
+        ], [
+            'media_outlet_id' => $outlet->id,
+            'is_active' => true,
+        ]);
+
+        foreach ([1, 2] as $id) {
+            $this->actingAs($user, 'sanctum')
+                ->postJson('/api/vote', [
+                    'url' => "https://www.cna.com.tw/news/aipl/20260506000{$id}.aspx",
+                    'tag_id' => $tag->id,
+                    'evidence_url' => "https://imgur.com/a/example-{$id}",
+                    'evidence_note' => '標題與內文重點不一致。',
+                    'journalist_name' => '記者王小明／台北報導',
+                ])
+                ->assertCreated()
+                ->assertJsonPath('journalist_match.journalist.display_name', '王小明');
+        }
+
+        $this->assertSame(1, Journalist::query()->where('canonical_name', '王小明')->where('media_outlet_id', $outlet->id)->count());
+        $this->assertSame(2, JournalistNewsUrl::query()->count());
+        $this->assertSame(2, JournalistMatchVote::query()->where('action', 'confirm')->count());
     }
 
     public function test_user_can_create_event_and_pin_timeline_entry(): void

@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\NewsUrl;
+use App\Models\Journalist;
+use App\Models\JournalistMatchVote;
+use App\Models\JournalistNewsUrl;
 use App\Models\Tag;
 use App\Models\Vote;
 use App\Http\Controllers\Controller;
@@ -46,6 +49,7 @@ class VoteController extends Controller
             'secondary_tag_ids.*' => ['integer', 'distinct', 'exists:tags,id'],
             'evidence_url' => ['nullable', 'url', 'max:2048'],
             'evidence_note' => ['nullable', 'string', 'max:320'],
+            'journalist_name' => ['nullable', 'string', 'max:80'],
             'title_snapshot' => ['nullable', 'string', 'max:255'],
             'challenge_token' => ['nullable', 'string', 'max:2048'],
         ]);
@@ -185,10 +189,67 @@ class VoteController extends Controller
         ]);
         $accountSignals->record($request, $request->user(), $newsUrl, 'vote');
         InspectAbuseSignalsJob::dispatch($request->user()->id, $newsUrl->id, $vote->id, 'vote');
+        $journalistMatch = $this->recordJournalistName($request, $newsUrl, $validated['journalist_name'] ?? null);
 
         return response()->json([
             'message' => 'Vote recorded.',
             'vote' => $vote->load(['tag:id,name,slug,color', 'newsUrl:id,hash,normalized_url,title_snapshot']),
+            'journalist_match' => $journalistMatch?->load('journalist:id,display_name,canonical_name,media_outlet_id'),
         ], 201);
+    }
+
+    private function recordJournalistName(Request $request, NewsUrl $newsUrl, ?string $name): ?JournalistNewsUrl
+    {
+        $displayName = $this->cleanJournalistName(trim((string) $name));
+        if ($displayName === '') {
+            return null;
+        }
+        $canonicalName = function_exists('mb_strtolower') ? mb_strtolower($displayName) : strtolower($displayName);
+
+        $journalist = Journalist::query()->firstOrCreate(
+            [
+                'canonical_name' => $canonicalName,
+                'media_outlet_id' => $newsUrl->media_outlet_id,
+            ],
+            [
+                'display_name' => $displayName,
+                'status' => 'active',
+                'metadata' => ['source' => 'vote_report'],
+            ],
+        );
+
+        $match = JournalistNewsUrl::query()->firstOrCreate(
+            [
+                'journalist_id' => $journalist->id,
+                'news_url_id' => $newsUrl->id,
+            ],
+            [
+                'match_source' => 'user_report',
+                'matched_text' => $displayName,
+                'confidence' => 'medium',
+                'review_status' => 'suspected',
+                'metadata' => ['source' => 'vote'],
+            ],
+        );
+
+        if ($match->review_status !== 'confirmed') {
+            JournalistMatchVote::query()->updateOrCreate(
+                [
+                    'journalist_news_url_id' => $match->id,
+                    'user_id' => $request->user()->id,
+                ],
+                ['action' => 'confirm'],
+            );
+        }
+
+        return $match->fresh();
+    }
+
+    private function cleanJournalistName(string $name): string
+    {
+        $name = preg_split('/[／\/,，、|｜]/u', $name)[0] ?? $name;
+        $name = preg_replace('/^(記者|作者|文)\s*/u', '', $name) ?? $name;
+        $name = preg_replace('/\s*(報導|撰文)$/u', '', $name) ?? $name;
+        return preg_replace('/\s+/u', '', trim($name)) ?? '';
     }
 }

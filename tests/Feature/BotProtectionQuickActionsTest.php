@@ -117,17 +117,17 @@ class BotProtectionQuickActionsTest extends TestCase
             'severity' => 'positive',
             'requires_evidence' => false,
         ]);
-        $url = 'https://news.example.test/provider-outage';
-        $newsUrl = $this->newsUrl($url);
-        ReadSession::query()->create([
-            'user_id' => $user->id,
-            'news_url_id' => $newsUrl->id,
-            'seconds_read' => 15,
-            'first_seen_at' => now(),
-            'last_seen_at' => now(),
-        ]);
-
         for ($attempt = 1; $attempt <= 3; $attempt++) {
+            $url = "https://news.example.test/provider-outage-{$attempt}";
+            $newsUrl = $this->newsUrl($url);
+            ReadSession::query()->create([
+                'user_id' => $user->id,
+                'news_url_id' => $newsUrl->id,
+                'seconds_read' => 15,
+                'first_seen_at' => now(),
+                'last_seen_at' => now(),
+            ]);
+
             $this->actingAs($user, 'sanctum')
                 ->postJson('/api/vote', [
                     'url' => $url,
@@ -139,7 +139,7 @@ class BotProtectionQuickActionsTest extends TestCase
 
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/vote', [
-                'url' => $url,
+                'url' => 'https://news.example.test/provider-outage-4',
                 'tag_id' => $tag->id,
                 'challenge_token' => 'provider-fail',
             ])

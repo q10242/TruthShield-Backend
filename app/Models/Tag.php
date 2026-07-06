@@ -103,7 +103,10 @@ class Tag extends Model
 
     public function requiresEvidenceNote(): bool
     {
-        return false;
+        return in_array($this->evidenceRequirement(), [
+            self::EVIDENCE_REQUIREMENT_CONTEXT,
+            self::EVIDENCE_REQUIREMENT_DISCLOSURE,
+        ], true);
     }
 
     public function votes(): HasMany

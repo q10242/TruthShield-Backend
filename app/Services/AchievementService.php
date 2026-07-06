@@ -430,6 +430,9 @@ class AchievementService
                     ['slug' => 'community-thinker', 'name' => '社群思想家', 'target' => 150, 'description' => '留言共獲得 150 次「有用」評價。'],
                     ['slug' => 'helpful-voice', 'name' => '有益之聲', 'target' => 300, 'description' => '留言共獲得 300 次「有用」評價。'],
                     ['slug' => 'thousand-helpful-comments', 'name' => '千次好評留言者', 'target' => 1000, 'description' => '留言共獲得 1,000 次「有用」評價。'],
+                    ['slug' => 'discussion-anchor', 'name' => '討論定錨者', 'target' => 2500, 'description' => '留言共獲得 2,500 次「有用」評價。'],
+                    ['slug' => 'civic-dialogue-guide', 'name' => '公民討論引路人', 'target' => 5000, 'description' => '留言共獲得 5,000 次「有用」評價。'],
+                    ['slug' => 'ten-thousand-helpful-comments', 'name' => '萬評留言者', 'target' => 10000, 'description' => '留言共獲得 10,000 次「有用」評價。'],
                 ],
             ],
         ])

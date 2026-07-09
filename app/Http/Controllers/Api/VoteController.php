@@ -149,10 +149,7 @@ class VoteController extends Controller
         if ($existingVote && $existingVote->tag_id === (int) $validated['tag_id']) {
             $existingVote->delete();
             $newsAggregation->forgetStatusCache($newsUrl);
-            $cache = Cache::store(config('truthshield.status_cache_store'));
-            foreach (['leaderboard:media:v1', 'transparency:summary:v1', 'system:health:metrics:v1'] as $key) {
-                $cache->forget($key);
-            }
+            $this->forgetSummaryCaches();
             $auditLog->record($request, 'vote.cancelled', $existingVote, [
                 'news_url_id' => $newsUrl->id,
                 'tag_id' => $validated['tag_id'],
@@ -178,10 +175,7 @@ class VoteController extends Controller
         );
 
         $newsAggregation->forgetStatusCache($newsUrl);
-        $cache = Cache::store(config('truthshield.status_cache_store'));
-        foreach (['leaderboard:media:v1', 'transparency:summary:v1', 'system:health:metrics:v1'] as $key) {
-            $cache->forget($key);
-        }
+        $this->forgetSummaryCaches();
         $evidenceSync->syncFromVote($vote, $evidence);
         $auditLog->record($request, 'vote.upserted', $vote, [
             'news_url_id' => $newsUrl->id,
@@ -243,6 +237,17 @@ class VoteController extends Controller
         }
 
         return $match->fresh();
+    }
+
+    private function forgetSummaryCaches(): void
+    {
+        try {
+            $cache = Cache::store(config('truthshield.status_cache_store'));
+            foreach (['leaderboard:media:v1', 'transparency:summary:v1', 'system:health:metrics:v1'] as $key) {
+                $cache->forget($key);
+            }
+        } catch (\Throwable) {
+        }
     }
 
     private function cleanJournalistName(string $name): string

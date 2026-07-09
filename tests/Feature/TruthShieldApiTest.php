@@ -339,6 +339,24 @@ class TruthShieldApiTest extends TestCase
         $this->assertFalse(Cache::store(config('truthshield.status_cache_store'))->has($cacheKey));
     }
 
+    public function test_vote_succeeds_when_status_cache_store_is_unavailable(): void
+    {
+        $this->seed(TagSeeder::class);
+        config(['truthshield.status_cache_store' => 'missing-store']);
+
+        $user = User::factory()->create();
+        $tag = Tag::query()->where('slug', 'accurate-reporting')->firstOrFail();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/vote', [
+                'url' => 'https://www.ettoday.net/news/20260709/3197929.htm',
+                'tag_id' => $tag->id,
+                'journalist_name' => '記者王小明／台北報導',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('vote.news_url.normalized_url', 'https://www.ettoday.net/news/20260709/3197929.htm');
+    }
+
     public function test_vote_with_journalist_name_reuses_same_media_journalist(): void
     {
         $this->seed(TagSeeder::class);
@@ -811,6 +829,17 @@ class TruthShieldApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('display_text', 'Not enough voting data yet')
             ->assertJsonPath('is_open', true);
+    }
+
+    public function test_status_response_succeeds_when_status_cache_store_is_unavailable(): void
+    {
+        $this->seed(TagSeeder::class);
+        config(['truthshield.status_cache_store' => 'missing-store']);
+
+        $this->getJson('/api/news/status?url='.urlencode('https://www.ettoday.net/news/20260709/3197929.htm'))
+            ->assertOk()
+            ->assertJsonPath('normalized_url', 'https://www.ettoday.net/news/20260709/3197929.htm')
+            ->assertJsonPath('cache_status', 'miss');
     }
 
     public function test_news_snapshot_records_metadata_and_detects_changes(): void

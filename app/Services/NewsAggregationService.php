@@ -22,7 +22,7 @@ class NewsAggregationService
     {
         $locale = $this->normalizeLocale($locale);
         $missingCacheKey = $this->missingStatusCacheKey($fingerprint['hash']);
-        $cachedMissing = Cache::store(config('truthshield.status_cache_store'))->get($missingCacheKey);
+        $cachedMissing = $this->cacheGet($missingCacheKey);
 
         if (is_array($cachedMissing)) {
             return $this->withCacheStatus($this->localizeStatusPayload($this->normalizeEmptyStatus($cachedMissing), $locale), 'hit');
@@ -32,7 +32,7 @@ class NewsAggregationService
 
         if (! $newsUrl) {
             $empty = $this->emptyStatus($fingerprint['hash'], $fingerprint['normalized_url']);
-            Cache::store(config('truthshield.status_cache_store'))->put($missingCacheKey, $empty, now()->addMinutes(2));
+            $this->cachePut($missingCacheKey, $empty, now()->addMinutes(2));
 
             return $this->withCacheStatus($this->localizeStatusPayload($empty, $locale), 'miss');
         }
@@ -57,14 +57,13 @@ class NewsAggregationService
 
         $cacheKey = $this->statusCacheKey($newsUrl, $locale);
         $ttl = now()->addSeconds(max(1, min(600, now()->diffInSeconds($newsUrl->voting_closes_at, false))));
-        $cache = Cache::store(config('truthshield.status_cache_store'));
-
-        if ($cache->has($cacheKey)) {
-            return $this->withCacheStatus($cache->get($cacheKey), 'hit');
+        $cachedStatus = $this->cacheGet($cacheKey);
+        if (is_array($cachedStatus)) {
+            return $this->withCacheStatus($cachedStatus, 'hit');
         }
 
         $status = $this->localizeStatusPayload($this->buildStatusPayload($newsUrl), $locale);
-        $cache->put($cacheKey, $status, $ttl);
+        $this->cachePut($cacheKey, $status, $ttl);
 
         return $this->withCacheStatus($status, 'miss');
     }
@@ -107,15 +106,15 @@ class NewsAggregationService
 
     public function forgetStatusCache(NewsUrl $newsUrl): void
     {
-        Cache::store(config('truthshield.status_cache_store'))->forget($this->statusCacheKey($newsUrl, 'zh-TW'));
-        Cache::store(config('truthshield.status_cache_store'))->forget($this->statusCacheKey($newsUrl, 'en'));
-        Cache::store(config('truthshield.status_cache_store'))->forget($this->legacyStatusCacheKey($newsUrl));
+        $this->cacheForget($this->statusCacheKey($newsUrl, 'zh-TW'));
+        $this->cacheForget($this->statusCacheKey($newsUrl, 'en'));
+        $this->cacheForget($this->legacyStatusCacheKey($newsUrl));
         $this->forgetMissingStatusCache($newsUrl->hash);
     }
 
     public function forgetMissingStatusCache(string $hash): void
     {
-        Cache::store(config('truthshield.status_cache_store'))->forget($this->missingStatusCacheKey($hash));
+        $this->cacheForget($this->missingStatusCacheKey($hash));
     }
 
     public function finalizeNewsUrl(NewsUrl $newsUrl): array
@@ -134,20 +133,24 @@ class NewsAggregationService
             ];
         }
 
-        $lock = Cache::store(config('truthshield.status_cache_store'))->lock("news:finalize:{$newsUrl->hash}", 15);
+        try {
+            $lock = Cache::store(config('truthshield.status_cache_store'))->lock("news:finalize:{$newsUrl->hash}", 15);
 
-        return $lock->block(5, function () use ($newsUrl): array {
-            $fresh = $newsUrl->fresh();
+            return $lock->block(5, function () use ($newsUrl): array {
+                $fresh = $newsUrl->fresh();
 
-            if ($fresh?->finalized_at && $fresh->final_status_payload && is_array($fresh->final_evidence_payload)) {
-                return [
-                    'status' => $this->withCurrentSnapshot($fresh, $fresh->final_status_payload),
-                    'evidence' => $fresh->final_evidence_payload,
-                ];
-            }
+                if ($fresh?->finalized_at && $fresh->final_status_payload && is_array($fresh->final_evidence_payload)) {
+                    return [
+                        'status' => $this->withCurrentSnapshot($fresh, $fresh->final_status_payload),
+                        'evidence' => $fresh->final_evidence_payload,
+                    ];
+                }
 
-            return $this->writeFinalPayload($fresh ?? $newsUrl);
-        });
+                return $this->writeFinalPayload($fresh ?? $newsUrl);
+            });
+        } catch (\Throwable) {
+            return $this->writeFinalPayload($newsUrl->fresh() ?? $newsUrl);
+        }
     }
 
     private function writeFinalPayload(NewsUrl $newsUrl): array
@@ -643,5 +646,30 @@ class NewsAggregationService
         $status['cache_status'] = $cacheStatus;
 
         return $status;
+    }
+
+    private function cacheGet(string $key): mixed
+    {
+        try {
+            return Cache::store(config('truthshield.status_cache_store'))->get($key);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function cachePut(string $key, mixed $value, mixed $ttl): void
+    {
+        try {
+            Cache::store(config('truthshield.status_cache_store'))->put($key, $value, $ttl);
+        } catch (\Throwable) {
+        }
+    }
+
+    private function cacheForget(string $key): void
+    {
+        try {
+            Cache::store(config('truthshield.status_cache_store'))->forget($key);
+        } catch (\Throwable) {
+        }
     }
 }

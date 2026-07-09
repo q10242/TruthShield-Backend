@@ -50,7 +50,7 @@ class JournalistNewsUrl extends Pivot
 
     public function crowdVotes(): HasMany
     {
-        return $this->hasMany(JournalistMatchVote::class);
+        return $this->hasMany(JournalistMatchVote::class, 'journalist_news_url_id', 'id');
     }
 
     public function crowdConfirmCount(): int

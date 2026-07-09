@@ -53,7 +53,7 @@ class ReportLabelStatsService
             ->with('journalist:id,display_name,canonical_name,media_outlet_id,status')
             ->whereIn('review_status', ['confirmed', 'suspected'])
             ->whereHas('journalist', fn (Builder $query) => $query->where('status', 'active'))
-            ->latest()
+            ->latest('journalist_news_url.created_at')
             ->limit(5)
             ->get();
 

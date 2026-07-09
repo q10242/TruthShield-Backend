@@ -206,6 +206,48 @@ class ReportLabelStatsTest extends TestCase
             ->assertJsonPath('data.0.stats.tracked_tag_count', 1);
     }
 
+    public function test_status_includes_suspected_journalist_context_without_failing(): void
+    {
+        [$media, , $accurate] = $this->seedBasics();
+        $url = 'https://context.example.test/news/suspected-journalist';
+        $fingerprint = app(UrlFingerprintService::class)->fingerprint($url);
+        $news = NewsUrl::query()->create([
+            'hash' => $fingerprint['hash'],
+            'media_outlet_id' => $media->id,
+            'original_url' => $url,
+            'normalized_url' => $fingerprint['normalized_url'],
+            'title_snapshot' => '測試新聞',
+            'voting_closes_at' => now()->addHours(72),
+        ]);
+        Vote::query()->create([
+            'user_id' => User::factory()->create()->id,
+            'news_url_id' => $news->id,
+            'tag_id' => $accurate->id,
+            'weight_score' => 1.0,
+            'hidden' => false,
+        ]);
+        $journalist = Journalist::query()->create([
+            'media_outlet_id' => $media->id,
+            'display_name' => '王小明',
+            'canonical_name' => '王小明',
+            'status' => 'active',
+        ]);
+        JournalistNewsUrl::query()->create([
+            'journalist_id' => $journalist->id,
+            'news_url_id' => $news->id,
+            'match_source' => 'user_report',
+            'matched_text' => '王小明',
+            'confidence' => 'medium',
+            'review_status' => 'suspected',
+        ]);
+
+        $this->getJson('/api/news/status?url='.urlencode($url))
+            ->assertOk()
+            ->assertJsonPath('journalist_context.0.journalist.display_name', '王小明')
+            ->assertJsonPath('journalist_context.0.included_in_stats', false)
+            ->assertJsonPath('journalist_context.0.stats', null);
+    }
+
     public function test_journalist_cache_contains_aliases_and_exclusions_shape(): void
     {
         [$media] = $this->seedBasics();

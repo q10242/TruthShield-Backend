@@ -28,6 +28,8 @@
   {"domain":"www.businesstoday.com.tw","article_selector":"article","title_selector":"h1","content_selector":"article"},
   {"domain":"finance.ettoday.net","article_selector":"article","title_selector":"h1","content_selector":"article"},
   {"domain":"www.nownews.com","article_selector":"article","title_selector":"h1","content_selector":"article"},
+  {"domain":"www.juksy.com","article_selector":"article","title_selector":"h1","content_selector":"article","article_url_pattern":"^/article/\\d+$"},
+  {"domain":"kol.juksy.com","article_selector":"article","title_selector":"h1","content_selector":"article","article_url_pattern":"^/article/\\d+$"},
   {"domain":"www.taisounds.com","article_selector":"article","title_selector":"h1","content_selector":"article"},
   {"domain":"www.rti.org.tw","article_selector":"article","title_selector":"h1","content_selector":"article"},
   {"domain":"www.peoplenews.tw","article_selector":"article","title_selector":"h1","content_selector":"article"},

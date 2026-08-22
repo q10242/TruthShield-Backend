@@ -60,6 +60,7 @@ use App\Services\AbuseDetectionService;
 use App\Services\EcpayDonationService;
 use App\Services\NotificationService;
 use App\Services\TransactionalEmailService;
+use App\Support\ExtensionSelectorFixtures;
 use Database\Seeders\TagSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -152,6 +153,18 @@ class TruthShieldApiTest extends TestCase
             ->where('domain', 'cna.com.tw')
             ->where('success', false)
             ->count());
+    }
+
+    public function test_juksy_selector_fixtures_cover_article_routes(): void
+    {
+        foreach (['www.juksy.com', 'kol.juksy.com'] as $domain) {
+            $fixture = ExtensionSelectorFixtures::forDomain($domain);
+
+            $this->assertSame('article', $fixture['article_selector']);
+            $this->assertSame('h1', $fixture['title_selector']);
+            $this->assertSame('article', $fixture['content_selector']);
+            $this->assertSame('^/article/\\d+$', $fixture['article_url_pattern']);
+        }
     }
 
     public function test_seeded_youtube_domains_are_available_for_video_pages(): void
